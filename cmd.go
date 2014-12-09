@@ -59,17 +59,14 @@ func main() {
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	go func() {
-		<-sig // Wait for ^C signal
-		logger.Warningf("Interrupt signal detected, shutting down.")
-		server.Stop()
-	}()
 
-	done, err := server.Start(options.Bind)
+	err = server.Start(options.Bind)
 	if err != nil {
 		logger.Errorf("Failed to start server: %v", err)
 		return
 	}
 
-	<-done
+	<-sig // Wait for ^C signal
+	logger.Warningf("Interrupt signal detected, shutting down.")
+	server.Stop()
 }
