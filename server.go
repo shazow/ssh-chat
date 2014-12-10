@@ -43,9 +43,12 @@ func NewServer(privateKey []byte) (*Server, error) {
 	return &server, nil
 }
 
-func (s *Server) Broadcast(msg string) {
+func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", len(s.clients), strings.TrimRight(msg, "\r\n"))
 	for _, client := range s.clients {
+		if except != nil && client == *except {
+			continue
+		}
 		client.Msg <- msg
 	}
 }
@@ -88,9 +91,10 @@ func (s *Server) Start(laddr string) error {
 
 				s.lock.Lock()
 				s.clients = append(s.clients, *client)
+				num := len(s.clients)
 				s.lock.Unlock()
 
-				s.Broadcast(fmt.Sprintf("* Joined: %s", client.Name))
+				s.Broadcast(fmt.Sprintf("* Joined: %s (%d present)\r\n", client.Name, num), nil)
 
 				go client.handleChannels(channels)
 			}()

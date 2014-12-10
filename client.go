@@ -30,7 +30,14 @@ func NewClient(server *Server, name string) *Client {
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
 
-	term := terminal.NewTerminal(channel, "")
+	prompt := fmt.Sprintf("%s> ", c.Name)
+	term := terminal.NewTerminal(channel, prompt)
+
+	go func() {
+		for msg := range c.Msg {
+			term.Write([]byte(msg))
+		}
+	}()
 
 	for {
 		line, err := term.ReadLine()
@@ -43,8 +50,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			channel.Close()
 		}
 
+		term.Write(term.Escape.Reset)
 		msg := fmt.Sprintf("%s: %s\r\n", c.Name, line)
-		c.Server.Broadcast(msg)
+		c.Server.Broadcast(msg, c)
 	}
 }
 
@@ -79,12 +87,6 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 		}(requests)
 
 		go c.handleShell(channel)
-
-		go func() {
-			for msg := range c.Msg {
-				channel.Write([]byte(msg))
-			}
-		}()
 
 		// We don't care about other channels?
 		return
