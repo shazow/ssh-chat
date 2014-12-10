@@ -13,7 +13,7 @@ type Server struct {
 	sshConfig *ssh.ServerConfig
 	sshSigner *ssh.Signer
 	done      chan struct{}
-	clients   map[Client]struct{}
+	clients   map[*Client]struct{}
 	lock      sync.Mutex
 }
 
@@ -29,6 +29,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 			return nil, nil
 		},
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			// fingerprint := md5.Sum(key.Marshal()
 			return nil, nil
 		},
 	}
@@ -38,7 +39,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		sshConfig: &config,
 		sshSigner: &signer,
 		done:      make(chan struct{}),
-		clients:   map[Client]struct{}{},
+		clients:   map[*Client]struct{}{},
 	}
 
 	return &server, nil
@@ -47,7 +48,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", len(s.clients), strings.TrimRight(msg, "\r\n"))
 	for client := range s.clients {
-		if except != nil && client == *except {
+		if except != nil && client == except {
 			continue
 		}
 		client.Msg <- msg
@@ -87,23 +88,25 @@ func (s *Server) Start(laddr string) error {
 
 				go ssh.DiscardRequests(requests)
 
-				client := NewClient(s, sshConn.User())
+				client := NewClient(s, sshConn, sshConn.User())
 				// TODO: mutex this
 
 				s.lock.Lock()
-				s.clients[*client] = struct{}{}
+				s.clients[client] = struct{}{}
 				num := len(s.clients)
 				s.lock.Unlock()
 
-				s.Broadcast(fmt.Sprintf("* Joined: %s (%d present)\r\n", client.Name, num), nil)
+				client.sendWelcome()
+
+				s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)\r\n", client.Name, num), nil)
 
 				go func() {
 					sshConn.Wait()
 					s.lock.Lock()
-					delete(s.clients, *client)
+					delete(s.clients, client)
 					s.lock.Unlock()
 
-					s.Broadcast(fmt.Sprintf("* Left: %s\r\n", client.Name), nil)
+					s.Broadcast(fmt.Sprintf("* %s left.\r\n", client.Name), nil)
 				}()
 
 				go client.handleChannels(channels)
@@ -120,5 +123,9 @@ func (s *Server) Start(laddr string) error {
 }
 
 func (s *Server) Stop() {
+	for client := range s.clients {
+		client.Conn.Close()
+	}
+
 	close(s.done)
 }
