@@ -15,7 +15,7 @@ build: $(BINARY)
 clean:
 	rm $(BINARY)
 
-key: $(KEY)
+$(KEY):
 	ssh-keygen -f $(KEY) -P ''
 
 run: $(BINARY) $(KEY)

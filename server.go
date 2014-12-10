@@ -13,7 +13,7 @@ type Server struct {
 	sshConfig *ssh.ServerConfig
 	sshSigner *ssh.Signer
 	done      chan struct{}
-	clients   []Client
+	clients   map[Client]struct{}
 	lock      sync.Mutex
 }
 
@@ -38,6 +38,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		sshConfig: &config,
 		sshSigner: &signer,
 		done:      make(chan struct{}),
+		clients:   map[Client]struct{}{},
 	}
 
 	return &server, nil
@@ -45,7 +46,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", len(s.clients), strings.TrimRight(msg, "\r\n"))
-	for _, client := range s.clients {
+	for client := range s.clients {
 		if except != nil && client == *except {
 			continue
 		}
@@ -90,11 +91,20 @@ func (s *Server) Start(laddr string) error {
 				// TODO: mutex this
 
 				s.lock.Lock()
-				s.clients = append(s.clients, *client)
+				s.clients[*client] = struct{}{}
 				num := len(s.clients)
 				s.lock.Unlock()
 
 				s.Broadcast(fmt.Sprintf("* Joined: %s (%d present)\r\n", client.Name, num), nil)
+
+				go func() {
+					sshConn.Wait()
+					s.lock.Lock()
+					delete(s.clients, *client)
+					s.lock.Unlock()
+
+					s.Broadcast(fmt.Sprintf("* Left: %s\r\n", client.Name), nil)
+				}()
 
 				go client.handleChannels(channels)
 			}()
