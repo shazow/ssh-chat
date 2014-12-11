@@ -11,8 +11,9 @@ Coming real soon.
 * [ ] backfill chat history
 * [ ] tab completion
 * [ ] /kick
-* [ ] /help
-* [ ] /about
-* [ ] /list
+* [x] /help
+* [x] /about
+* [x] /list
+* [x] /nick
 * [ ] pubkey fingerprint
 * [ ] truncate usernames
