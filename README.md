@@ -10,7 +10,9 @@ Coming real soon.
 * [x] client map rather than list
 * [ ] backfill chat history
 * [ ] tab completion
+* [ ] /kick
 * [ ] /help
 * [ ] /about
 * [ ] /list
 * [ ] pubkey fingerprint
+* [ ] truncate usernames
