@@ -2,12 +2,31 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 const MSG_BUFFER = 10
+
+const HELP_TEXT = `-> Available commands:
+  /about
+  /exit
+  /help
+  /list
+  /nick $NAME
+`
+
+const ABOUT_TEXT = `-> ssh-chat is made by @shazow.
+
+  It is a custom ssh server built in Go to serve a chat experience
+  instead of a shell.
+
+  Source: https://github.com/shazow/ssh-chat
+
+  For more, visit shazow.net or follow at twitter.com/shazow
+`
 
 type Client struct {
 	Server     *Server
@@ -19,15 +38,11 @@ type Client struct {
 	termHeight int
 }
 
-func NewClient(server *Server, conn *ssh.ServerConn, name string) *Client {
-	if name == "" {
-		name = "Anonymoose"
-	}
-
+func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
 		Server: server,
 		Conn:   conn,
-		Name:   name,
+		Name:   conn.User(),
 		Msg:    make(chan string, MSG_BUFFER),
 	}
 }
@@ -42,10 +57,9 @@ func (c *Client) Resize(width int, height int) error {
 	return nil
 }
 
-func (c *Client) sendWelcome() {
-	msg := fmt.Sprintf("Welcome to ssh-chat. Enter /help for more.\r\n")
-	c.Msg <- msg
-
+func (c *Client) Rename(name string) {
+	c.Name = name
+	c.term.SetPrompt(fmt.Sprintf("[%s] ", name))
 }
 
 func (c *Client) handleShell(channel ssh.Channel) {
@@ -63,12 +77,31 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			break
 		}
 
-		switch line {
-		case "/exit":
-			channel.Close()
+		parts := strings.SplitN(line, " ", 2)
+		isCmd := strings.HasPrefix(parts[0], "/")
+
+		if isCmd {
+			switch parts[0] {
+			case "/exit":
+				channel.Close()
+			case "/help":
+				c.Msg <- HELP_TEXT
+			case "/about":
+				c.Msg <- ABOUT_TEXT
+			case "/nick":
+				if len(parts) == 2 {
+					c.Server.Rename(c, parts[1])
+				} else {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /nick $NAME\r\n")
+				}
+			case "/list":
+				c.Msg <- fmt.Sprintf("-> Connected: %s\r\n", strings.Join(c.Server.List(nil), ","))
+			default:
+				c.Msg <- fmt.Sprintf("-> Invalid command: %s\r\n", line)
+			}
+			continue
 		}
 
-		//c.term.Write(c.term.Escape.Reset)
 		msg := fmt.Sprintf("%s: %s\r\n", c.Name, line)
 		c.Server.Broadcast(msg, c)
 	}
