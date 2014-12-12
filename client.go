@@ -130,7 +130,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if c.IsSilenced() {
 					c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
 				} else {
-					c.Server.Broadcast(msg, c)
+					c.Server.Broadcast(msg, nil)
 				}
 			case "/nick":
 				if len(parts) == 2 {
