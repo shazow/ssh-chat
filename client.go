@@ -113,7 +113,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			break
 		}
 
-		parts := strings.SplitN(line, " ", 2)
+		parts := strings.SplitN(line, " ", 3)
 		isCmd := strings.HasPrefix(parts[0], "/")
 
 		if isCmd {
@@ -125,6 +125,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
 			case "/about":
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
+			case "/me":
+				msg := fmt.Sprintf("* %s %s", c.Name, line)
+				if c.IsSilenced() {
+					c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
+				} else {
+					c.Server.Broadcast(msg, c)
+				}
 			case "/nick":
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
@@ -175,6 +182,27 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						fingerprint := client.Fingerprint()
 						client.Write(fmt.Sprintf("-> Made op by %s.", c.Name))
 						c.Server.Op(fingerprint)
+					}
+				}
+			case "/silence":
+				if !c.Server.IsOp(c) {
+					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+				} else if len(parts) < 2 {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /silence $NAME")
+				} else {
+					duration := time.Duration(5) * time.Minute
+					if len(parts) >= 3 {
+						parsedDuration, err := time.ParseDuration(parts[2])
+						if err == nil {
+							duration = parsedDuration
+						}
+					}
+					client := c.Server.Who(parts[1])
+					if client == nil {
+						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+					} else {
+						client.Silence(duration)
+						client.Write(fmt.Sprintf("-> Silenced for %s by %s.", duration, c.Name))
 					}
 				}
 			default:
