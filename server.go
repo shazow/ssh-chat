@@ -57,8 +57,12 @@ func NewServer(privateKey []byte) (*Server, error) {
 	return &server, nil
 }
 
+func (s *Server) Len() int {
+	return len(s.clients)
+}
+
 func (s *Server) Broadcast(msg string, except *Client) {
-	logger.Debugf("Broadcast to %d: %s", len(s.clients), strings.TrimRight(msg, "\r\n"))
+	logger.Debugf("Broadcast to %d: %s", s.Len(), strings.TrimRight(msg, "\r\n"))
 	s.history.Add(msg)
 
 	for _, client := range s.clients {

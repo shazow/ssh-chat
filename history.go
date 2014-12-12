@@ -1,3 +1,4 @@
+// TODO: Split this out into its own module, it's kinda neat.
 package main
 
 type History struct {

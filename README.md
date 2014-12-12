@@ -8,7 +8,7 @@ Coming real soon.
 * [x] Welcome message.
 * [x] set term width properly
 * [x] client map rather than list
-* [ ] backfill chat history
+* [x] backfill chat history
 * [ ] tab completion
 * [ ] /kick
 * [x] /help
@@ -16,4 +16,4 @@ Coming real soon.
 * [x] /list
 * [x] /nick
 * [ ] pubkey fingerprint
-* [ ] truncate usernames
+* [x] truncate usernames

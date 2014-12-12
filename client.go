@@ -124,7 +124,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME\r\n")
 				}
 			case "/list":
-				c.Msg <- fmt.Sprintf("-> Connected: %s\r\n", strings.Join(c.Server.List(nil), ","))
+				names := c.Server.List(nil)
+				c.Msg <- fmt.Sprintf("-> %d connected: %s\r\n", len(names), strings.Join(names, ","))
 			default:
 				c.Msg <- fmt.Sprintf("-> Invalid command: %s\r\n", line)
 			}
