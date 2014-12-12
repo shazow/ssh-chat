@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -19,12 +21,13 @@ type Clients map[string]*Client
 
 type Server struct {
 	sshConfig *ssh.ServerConfig
-	sshSigner *ssh.Signer
 	done      chan struct{}
 	clients   Clients
 	lock      sync.Mutex
 	count     int
 	history   *History
+	admins    map[string]struct{}   // fingerprint lookup
+	banned    map[string]*time.Time // fingerprint lookup
 }
 
 func NewServer(privateKey []byte) (*Server, error) {
@@ -33,26 +36,30 @@ func NewServer(privateKey []byte) (*Server, error) {
 		return nil, err
 	}
 
+	server := Server{
+		done:    make(chan struct{}),
+		clients: Clients{},
+		count:   0,
+		history: NewHistory(HISTORY_LEN),
+		admins:  map[string]struct{}{},
+		banned:  map[string]*time.Time{},
+	}
+
 	config := ssh.ServerConfig{
 		NoClientAuth: false,
-		PasswordCallback: func(conn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			return nil, nil
-		},
+		// Auth-related things should be constant-time to avoid timing attacks.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			// fingerprint := md5.Sum(key.Marshal())
-			return nil, nil
+			fingerprint := Fingerprint(key)
+			if server.IsBanned(fingerprint) {
+				return nil, fmt.Errorf("Banned.")
+			}
+			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
+			return perm, nil
 		},
 	}
 	config.AddHostKey(signer)
 
-	server := Server{
-		sshConfig: &config,
-		sshSigner: &signer,
-		done:      make(chan struct{}),
-		clients:   Clients{},
-		count:     0,
-		history:   NewHistory(HISTORY_LEN),
-	}
+	server.sshConfig = &config
 
 	return &server, nil
 }
@@ -160,6 +167,50 @@ func (s *Server) Who(name string) *Client {
 	return s.clients[name]
 }
 
+func (s *Server) Op(fingerprint string) {
+	logger.Infof("Adding admin: %s", fingerprint)
+	s.lock.Lock()
+	s.admins[fingerprint] = struct{}{}
+	s.lock.Unlock()
+}
+
+func (s *Server) IsOp(client *Client) bool {
+	_, r := s.admins[client.Fingerprint()]
+	return r
+}
+
+func (s *Server) IsBanned(fingerprint string) bool {
+	ban, hasBan := s.banned[fingerprint]
+	if !hasBan {
+		return false
+	}
+	if ban == nil {
+		return true
+	}
+	if ban.Before(time.Now()) {
+		s.Unban(fingerprint)
+		return false
+	}
+	return true
+}
+
+func (s *Server) Ban(fingerprint string, duration *time.Duration) {
+	var until *time.Time
+	s.lock.Lock()
+	if duration != nil {
+		when := time.Now().Add(*duration)
+		until = &when
+	}
+	s.banned[fingerprint] = until
+	s.lock.Unlock()
+}
+
+func (s *Server) Unban(fingerprint string) {
+	s.lock.Lock()
+	delete(s.banned, fingerprint)
+	s.lock.Unlock()
+}
+
 func (s *Server) Start(laddr string) error {
 	// Once a ServerConfig has been configured, connections can be
 	// accepted.
@@ -213,4 +264,10 @@ func (s *Server) Stop() {
 	}
 
 	close(s.done)
+}
+
+func Fingerprint(k ssh.PublicKey) string {
+	hash := md5.Sum(k.Marshal())
+	r := fmt.Sprintf("% x", hash)
+	return strings.Replace(r, " ", ":", -1)
 }

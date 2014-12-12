@@ -86,6 +86,10 @@ func (c *Client) Rename(name string) {
 	c.term.SetPrompt(fmt.Sprintf("[%s] ", name))
 }
 
+func (c *Client) Fingerprint() string {
+	return c.Conn.Permissions.Extensions["fingerprint"]
+}
+
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
 
@@ -129,13 +133,34 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/whois":
 				if len(parts) == 2 {
 					client := c.Server.Who(parts[1])
-					c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Conn.RemoteAddr(), client.Conn.ClientVersion())
+					if client != nil {
+						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Fingerprint(), client.Conn.ClientVersion())
+					} else {
+						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+					}
 				} else {
 					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME")
 				}
 			case "/list":
 				names := c.Server.List(nil)
 				c.Msg <- fmt.Sprintf("-> %d connected: %s", len(names), strings.Join(names, ", "))
+			case "/ban":
+				if !c.Server.IsOp(c) {
+					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+				} else if len(parts) != 2 {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /ban $NAME")
+				} else {
+					client := c.Server.Who(parts[1])
+					if client == nil {
+						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+					} else {
+						fingerprint := client.Fingerprint()
+						client.Write(fmt.Sprintf("-> Banned by %s.", c.Name))
+						c.Server.Ban(fingerprint, nil)
+						client.Conn.Close()
+						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.Name), nil)
+					}
+				}
 			default:
 				c.Msg <- fmt.Sprintf("-> Invalid command: %s", line)
 			}

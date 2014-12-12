@@ -19,7 +19,7 @@ $(KEY):
 	ssh-keygen -f $(KEY) -P ''
 
 run: $(BINARY) $(KEY)
-	./$(BINARY) -i $(KEY) -b ":$(PORT)" -vv
+	./$(BINARY) -i $(KEY) --bind ":$(PORT)" -vv
 
 test:
 	go test .
