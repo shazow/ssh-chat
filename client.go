@@ -126,7 +126,11 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/about":
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/me":
-				msg := fmt.Sprintf("* %s %s", c.Name, line)
+				me := strings.TrimLeft(line, "/me")
+				if me == "" {
+					me = "is at a loss for words."
+				}
+				msg := fmt.Sprintf("** %s%s", c.Name, me)
 				if c.IsSilenced() {
 					c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
 				} else {
