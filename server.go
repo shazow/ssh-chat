@@ -3,11 +3,17 @@ package main
 import (
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
+
+const MAX_NAME_LENGTH = 32
+const HISTORY_LEN = 20
+
+var RE_STRIP_NAME = regexp.MustCompile("[[:^alpha:]]")
 
 type Clients map[string]*Client
 
@@ -18,6 +24,7 @@ type Server struct {
 	clients   Clients
 	lock      sync.Mutex
 	count     int
+	history   *History
 }
 
 func NewServer(privateKey []byte) (*Server, error) {
@@ -32,7 +39,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 			return nil, nil
 		},
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			// fingerprint := md5.Sum(key.Marshal()
+			// fingerprint := md5.Sum(key.Marshal())
 			return nil, nil
 		},
 	}
@@ -44,6 +51,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		done:      make(chan struct{}),
 		clients:   Clients{},
 		count:     0,
+		history:   NewHistory(HISTORY_LEN),
 	}
 
 	return &server, nil
@@ -51,6 +59,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", len(s.clients), strings.TrimRight(msg, "\r\n"))
+	s.history.Add(msg)
 
 	for _, client := range s.clients {
 		if except != nil && client == except {
@@ -61,18 +70,23 @@ func (s *Server) Broadcast(msg string, except *Client) {
 }
 
 func (s *Server) Add(client *Client) {
+	for _, msg := range s.history.Get(10) {
+		if msg == "" {
+			continue
+		}
+		client.Msg <- msg
+	}
 	client.Msg <- fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more.\r\n")
 
 	s.lock.Lock()
 	s.count++
 
-	_, collision := s.clients[client.Name]
-	if collision {
-		newName := fmt.Sprintf("Guest%d", s.count)
-		client.Msg <- fmt.Sprintf("-> Your name '%s' was taken, renamed to '%s'. Use /nick <name> to change it.\r\n", client.Name, newName)
-		client.Name = newName
+	newName, err := s.proposeName(client.Name)
+	if err != nil {
+		client.Msg <- fmt.Sprintf("-> Your name '%s' is not avaialble, renamed to '%s'. Use /nick <name> to change it.\r\n", client.Name, newName)
 	}
 
+	client.Name = newName
 	s.clients[client.Name] = client
 	num := len(s.clients)
 	s.lock.Unlock()
@@ -88,15 +102,36 @@ func (s *Server) Remove(client *Client) {
 	s.Broadcast(fmt.Sprintf("* %s left.\r\n", client.Name), nil)
 }
 
+func (s *Server) proposeName(name string) (string, error) {
+	// Assumes caller holds lock.
+	var err error
+	name = RE_STRIP_NAME.ReplaceAllString(name, "")
+
+	if len(name) > MAX_NAME_LENGTH {
+		name = name[:MAX_NAME_LENGTH]
+	} else if len(name) == 0 {
+		name = fmt.Sprintf("Guest%d", s.count)
+	}
+
+	_, collision := s.clients[name]
+	if collision {
+		err = fmt.Errorf("%s is not available.", name)
+		name = fmt.Sprintf("Guest%d", s.count)
+	}
+
+	return name, err
+}
+
 func (s *Server) Rename(client *Client, newName string) {
 	s.lock.Lock()
 
-	_, collision := s.clients[newName]
-	if collision {
-		client.Msg <- fmt.Sprintf("-> %s is not available.\r\n", newName)
+	newName, err := s.proposeName(newName)
+	if err != nil {
+		client.Msg <- fmt.Sprintf("-> %s\r\n", err)
 		s.lock.Unlock()
 		return
 	}
+
 	delete(s.clients, client.Name)
 	oldName := client.Name
 	client.Rename(newName)
@@ -117,6 +152,10 @@ func (s *Server) List(prefix *string) []string {
 	}
 
 	return r
+}
+
+func (s *Server) Who(name string) *Client {
+	return s.clients[name]
 }
 
 func (s *Server) Start(laddr string) error {

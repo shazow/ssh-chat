@@ -3,39 +3,43 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const MSG_BUFFER = 10
+const MSG_BUFFER int = 10
 
-const HELP_TEXT = `-> Available commands:
-  /about
-  /exit
-  /help
-  /list
-  /nick $NAME
+const HELP_TEXT string = `-> Available commands:
+   /about
+   /exit
+   /help
+   /list
+   /nick $NAME
+   /whois $NAME
 `
 
-const ABOUT_TEXT = `-> ssh-chat is made by @shazow.
+const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
 
-  It is a custom ssh server built in Go to serve a chat experience
-  instead of a shell.
+   It is a custom ssh server built in Go to serve a chat experience
+   instead of a shell.
 
-  Source: https://github.com/shazow/ssh-chat
+   Source: https://github.com/shazow/ssh-chat
 
-  For more, visit shazow.net or follow at twitter.com/shazow
+   For more, visit shazow.net or follow at twitter.com/shazow
 `
 
 type Client struct {
-	Server     *Server
-	Conn       *ssh.ServerConn
-	Msg        chan string
-	Name       string
-	term       *terminal.Terminal
-	termWidth  int
-	termHeight int
+	Server        *Server
+	Conn          *ssh.ServerConn
+	Msg           chan string
+	Name          string
+	Op            bool
+	term          *terminal.Terminal
+	termWidth     int
+	termHeight    int
+	silencedUntil time.Time
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -45,6 +49,24 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Name:   conn.User(),
 		Msg:    make(chan string, MSG_BUFFER),
 	}
+}
+
+func (c *Client) Write(msg string) {
+	c.term.Write([]byte(msg))
+}
+
+func (c *Client) WriteLines(msg []string) {
+	for _, line := range msg {
+		c.Write(line + "\r\n")
+	}
+}
+
+func (c *Client) IsSilenced() bool {
+	return c.silencedUntil.After(time.Now())
+}
+
+func (c *Client) Silence(d time.Duration) {
+	c.silencedUntil = time.Now().Add(d)
 }
 
 func (c *Client) Resize(width int, height int) error {
@@ -67,7 +89,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 
 	go func() {
 		for msg := range c.Msg {
-			c.term.Write([]byte(msg))
+			c.Write(msg)
 		}
 	}()
 
@@ -85,14 +107,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/exit":
 				channel.Close()
 			case "/help":
-				c.Msg <- HELP_TEXT
+				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
 			case "/about":
-				c.Msg <- ABOUT_TEXT
+				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/nick":
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
 				} else {
 					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /nick $NAME\r\n")
+				}
+			case "/whois":
+				if len(parts) == 2 {
+					client := c.Server.Who(parts[1])
+					c.Msg <- fmt.Sprintf("-> %s is %s via %s\r\n", client.Name, client.Conn.RemoteAddr(), client.Conn.ClientVersion())
+				} else {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME\r\n")
 				}
 			case "/list":
 				c.Msg <- fmt.Sprintf("-> Connected: %s\r\n", strings.Join(c.Server.List(nil), ","))
@@ -103,6 +132,10 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 
 		msg := fmt.Sprintf("%s: %s\r\n", c.Name, line)
+		if c.IsSilenced() {
+			c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
+			continue
+		}
 		c.Server.Broadcast(msg, c)
 	}
 
