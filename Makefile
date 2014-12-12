@@ -20,3 +20,6 @@ $(KEY):
 
 run: $(BINARY) $(KEY)
 	./$(BINARY) -i $(KEY) -b ":$(PORT)" -vv
+
+test:
+	go test .

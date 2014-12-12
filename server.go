@@ -191,7 +191,7 @@ func (s *Server) Start(laddr string) error {
 					return
 				}
 
-				logger.Infof("Connection from: %s, %s, %s", sshConn.RemoteAddr(), sshConn.User(), sshConn.ClientVersion())
+				logger.Infof("Connection #%d from: %s, %s, %s", s.count+1, sshConn.RemoteAddr(), sshConn.User(), sshConn.ClientVersion())
 
 				go ssh.DiscardRequests(requests)
 
