@@ -125,7 +125,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				}
 			case "/list":
 				names := c.Server.List(nil)
-				c.Msg <- fmt.Sprintf("-> %d connected: %s", len(names), strings.Join(names, ","))
+				c.Msg <- fmt.Sprintf("-> %d connected: %s", len(names), strings.Join(names, ", "))
 			default:
 				c.Msg <- fmt.Sprintf("-> Invalid command: %s", line)
 			}
