@@ -62,7 +62,7 @@ func (s *Server) Len() int {
 }
 
 func (s *Server) Broadcast(msg string, except *Client) {
-	logger.Debugf("Broadcast to %d: %s", s.Len(), strings.TrimRight(msg, "\r\n"))
+	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
 
 	for _, client := range s.clients {
@@ -76,7 +76,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 func (s *Server) Add(client *Client) {
 	go func() {
 		client.WriteLines(s.history.Get(10))
-		client.Write(fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more.\r\n"))
+		client.Write(fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more."))
 	}()
 
 	s.lock.Lock()
@@ -84,15 +84,15 @@ func (s *Server) Add(client *Client) {
 
 	newName, err := s.proposeName(client.Name)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.\r\n", client.Name, newName)
+		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.Name, newName)
 	}
 
-	client.Name = newName
+	client.Rename(newName)
 	s.clients[client.Name] = client
 	num := len(s.clients)
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)\r\n", client.Name, num), nil)
+	s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)", client.Name, num), client)
 }
 
 func (s *Server) Remove(client *Client) {
@@ -100,7 +100,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, client.Name)
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s left.\r\n", client.Name), nil)
+	s.Broadcast(fmt.Sprintf("* %s left.", client.Name), nil)
 }
 
 func (s *Server) proposeName(name string) (string, error) {
@@ -128,7 +128,7 @@ func (s *Server) Rename(client *Client, newName string) {
 
 	newName, err := s.proposeName(newName)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> %s\r\n", err)
+		client.Msg <- fmt.Sprintf("-> %s", err)
 		s.lock.Unlock()
 		return
 	}
@@ -139,7 +139,7 @@ func (s *Server) Rename(client *Client, newName string) {
 	s.clients[client.Name] = client
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s is now known as %s.\r\n", oldName, newName), nil)
+	s.Broadcast(fmt.Sprintf("* %s is now known as %s.", oldName, newName), nil)
 }
 
 func (s *Server) List(prefix *string) []string {
@@ -195,6 +195,7 @@ func (s *Server) Start(laddr string) error {
 				client := NewClient(s, sshConn)
 				client.handleChannels(channels)
 				s.Add(client)
+
 				go func() {
 					// Block until done, then remove.
 					sshConn.Wait()

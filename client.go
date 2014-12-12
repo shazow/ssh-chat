@@ -52,12 +52,12 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 }
 
 func (c *Client) Write(msg string) {
-	c.term.Write([]byte(msg))
+	c.term.Write([]byte(msg + "\r\n"))
 }
 
 func (c *Client) WriteLines(msg []string) {
 	for _, line := range msg {
-		c.Write(line + "\r\n")
+		c.Write(line)
 	}
 }
 
@@ -114,25 +114,25 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
 				} else {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /nick $NAME\r\n")
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /nick $NAME")
 				}
 			case "/whois":
 				if len(parts) == 2 {
 					client := c.Server.Who(parts[1])
-					c.Msg <- fmt.Sprintf("-> %s is %s via %s\r\n", client.Name, client.Conn.RemoteAddr(), client.Conn.ClientVersion())
+					c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Conn.RemoteAddr(), client.Conn.ClientVersion())
 				} else {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME\r\n")
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME")
 				}
 			case "/list":
 				names := c.Server.List(nil)
-				c.Msg <- fmt.Sprintf("-> %d connected: %s\r\n", len(names), strings.Join(names, ","))
+				c.Msg <- fmt.Sprintf("-> %d connected: %s", len(names), strings.Join(names, ","))
 			default:
-				c.Msg <- fmt.Sprintf("-> Invalid command: %s\r\n", line)
+				c.Msg <- fmt.Sprintf("-> Invalid command: %s", line)
 			}
 			continue
 		}
 
-		msg := fmt.Sprintf("%s: %s\r\n", c.Name, line)
+		msg := fmt.Sprintf("%s: %s", c.Name, line)
 		if c.IsSilenced() {
 			c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
 			continue
