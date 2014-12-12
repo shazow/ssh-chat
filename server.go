@@ -74,20 +74,17 @@ func (s *Server) Broadcast(msg string, except *Client) {
 }
 
 func (s *Server) Add(client *Client) {
-	for _, msg := range s.history.Get(10) {
-		if msg == "" {
-			continue
-		}
-		client.Msg <- msg
-	}
-	client.Msg <- fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more.\r\n")
+	go func() {
+		client.WriteLines(s.history.Get(10))
+		client.Write(fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more.\r\n"))
+	}()
 
 	s.lock.Lock()
 	s.count++
 
 	newName, err := s.proposeName(client.Name)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> Your name '%s' is not avaialble, renamed to '%s'. Use /nick <name> to change it.\r\n", client.Name, newName)
+		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.\r\n", client.Name, newName)
 	}
 
 	client.Name = newName
@@ -196,15 +193,13 @@ func (s *Server) Start(laddr string) error {
 				go ssh.DiscardRequests(requests)
 
 				client := NewClient(s, sshConn)
+				client.handleChannels(channels)
 				s.Add(client)
-
 				go func() {
 					// Block until done, then remove.
 					sshConn.Wait()
 					s.Remove(client)
 				}()
-
-				go client.handleChannels(channels)
 			}()
 		}
 	}()
