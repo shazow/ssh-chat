@@ -1,10 +1,13 @@
 // TODO: Split this out into its own module, it's kinda neat.
 package main
 
+import "sync"
+
 type History struct {
 	entries []string
 	head    int
 	size    int
+	lock    sync.Mutex
 }
 
 func NewHistory(size int) *History {
@@ -14,6 +17,9 @@ func NewHistory(size int) *History {
 }
 
 func (h *History) Add(entry string) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	max := cap(h.entries)
 	h.head = (h.head + 1) % max
 	h.entries[h.head] = entry
@@ -27,6 +33,9 @@ func (h *History) Len() int {
 }
 
 func (h *History) Get(num int) []string {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	max := cap(h.entries)
 	if num > h.size {
 		num = h.size

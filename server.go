@@ -133,6 +133,7 @@ func (s *Server) Rename(client *Client, newName string) {
 		return
 	}
 
+	// TODO: Use a channel/goroutine for adding clients, rathern than locks?
 	delete(s.clients, client.Name)
 	oldName := client.Name
 	client.Rename(newName)
@@ -193,7 +194,10 @@ func (s *Server) Start(laddr string) error {
 				go ssh.DiscardRequests(requests)
 
 				client := NewClient(s, sshConn)
-				client.handleChannels(channels)
+				go client.handleChannels(channels)
+
+				// FIXME: This is hacky, need to restructure the concurrency. Fairly sure this will leak channels.
+				<-client.ready
 				s.Add(client)
 
 				go func() {

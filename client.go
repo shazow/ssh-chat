@@ -36,6 +36,7 @@ type Client struct {
 	Msg           chan string
 	Name          string
 	Op            bool
+	ready         chan struct{}
 	term          *terminal.Terminal
 	termWidth     int
 	termHeight    int
@@ -48,6 +49,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Conn:   conn,
 		Name:   conn.User(),
 		Msg:    make(chan string, MSG_BUFFER),
+		ready:  make(chan struct{}, 1),
 	}
 }
 
@@ -86,6 +88,7 @@ func (c *Client) Rename(name string) {
 
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
+	c.ready <- struct{}{}
 
 	go func() {
 		for msg := range c.Msg {
@@ -145,6 +148,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 	prompt := fmt.Sprintf("[%s] ", c.Name)
 
+	hasShell := false
+
 	for ch := range channels {
 		if t := ch.ChannelType(); t != "session" {
 			ch.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
@@ -156,44 +161,37 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 			logger.Errorf("Could not accept channel: %v", err)
 			continue
 		}
+		defer channel.Close()
 
 		c.term = terminal.NewTerminal(channel, prompt)
+		for req := range requests {
+			var width, height int
+			var ok bool
 
-		go func(in <-chan *ssh.Request) {
-			defer channel.Close()
-			hasShell := false
-			for req := range in {
-				var width, height int
-				var ok bool
-
-				switch req.Type {
-				case "shell":
-					if c.term != nil && !hasShell {
-						go c.handleShell(channel)
-						ok = true
-						hasShell = true
-					}
-				case "pty-req":
-					width, height, ok = parsePtyRequest(req.Payload)
-					if ok {
-						err := c.Resize(width, height)
-						ok = err == nil
-					}
-				case "window-change":
-					width, height, ok = parseWinchRequest(req.Payload)
-					if ok {
-						err := c.Resize(width, height)
-						ok = err == nil
-					}
+			switch req.Type {
+			case "shell":
+				if c.term != nil && !hasShell {
+					go c.handleShell(channel)
+					ok = true
+					hasShell = true
 				}
-
-				if req.WantReply {
-					req.Reply(ok, nil)
+			case "pty-req":
+				width, height, ok = parsePtyRequest(req.Payload)
+				if ok {
+					err := c.Resize(width, height)
+					ok = err == nil
+				}
+			case "window-change":
+				width, height, ok = parseWinchRequest(req.Payload)
+				if ok {
+					err := c.Resize(width, height)
+					ok = err == nil
 				}
 			}
-		}(requests)
 
-		// We don't care about other channels?
-		return
+			if req.WantReply {
+				req.Reply(ok, nil)
+			}
+		}
 	}
 }
