@@ -117,6 +117,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		isCmd := strings.HasPrefix(parts[0], "/")
 
 		if isCmd {
+			// TODO: Factor this out.
 			switch parts[0] {
 			case "/exit":
 				channel.Close()
@@ -159,6 +160,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
 						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.Name), nil)
+					}
+				}
+			case "/op":
+				if !c.Server.IsOp(c) {
+					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+				} else if len(parts) != 2 {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /op $NAME")
+				} else {
+					client := c.Server.Who(parts[1])
+					if client == nil {
+						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+					} else {
+						fingerprint := client.Fingerprint()
+						client.Write(fmt.Sprintf("-> Made op by %s.", c.Name))
+						c.Server.Op(fingerprint)
 					}
 				}
 			default:
