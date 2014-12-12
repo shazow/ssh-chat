@@ -88,7 +88,14 @@ func (c *Client) Rename(name string) {
 
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
-	c.ready <- struct{}{}
+
+	// FIXME: This shouldn't live here, need to restructure the call chaining.
+	c.Server.Add(c)
+	go func() {
+		// Block until done, then remove.
+		c.Conn.Wait()
+		c.Server.Remove(c)
+	}()
 
 	go func() {
 		for msg := range c.Msg {

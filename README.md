@@ -55,5 +55,3 @@ things up with `make run`.
 * [ ] Lots of refactoring
   * [ ] Pull out the chat-related stuff into isolation from the ssh serving
     stuff
-
-* Fix hanging on collision connect

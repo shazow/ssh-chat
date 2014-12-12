@@ -195,16 +195,6 @@ func (s *Server) Start(laddr string) error {
 
 				client := NewClient(s, sshConn)
 				go client.handleChannels(channels)
-
-				// FIXME: This is hacky, need to restructure the concurrency. Fairly sure this will leak channels.
-				<-client.ready
-				s.Add(client)
-
-				go func() {
-					// Block until done, then remove.
-					sshConn.Wait()
-					s.Remove(client)
-				}()
 			}()
 		}
 	}()
