@@ -57,7 +57,6 @@ func NewServer(privateKey []byte) (*Server, error) {
 				return nil, fmt.Errorf("Banned.")
 			}
 			ip := strings.Split(conn.RemoteAddr().String(), ":")[0]
-			logger.Infof(ip)
 			if ip == "73.3.250.197" {
 				// Can't believe I'm doing this...
 				return nil, fmt.Errorf("Banned.")
