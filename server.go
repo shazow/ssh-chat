@@ -89,10 +89,11 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			continue
 		}
 
-		client.Send(msg)
 		if client.beepMe && strings.Contains(msg, client.Name) {
 			/* Add an ascii BEL to ding clients when they're mentioned */
-			client.Send(BEEP)
+			client.Send(msg + BEEP)
+		} else {
+			client.Send(msg)
 		}
 	}
 }
