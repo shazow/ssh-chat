@@ -16,6 +16,9 @@ import (
 const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
+const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
+const BEEP string = "\007"
+
 var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_.-]")
 
 type Clients map[string]*Client
@@ -78,9 +81,8 @@ func (s *Server) Len() int {
 	return len(s.clients)
 }
 
-const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
 func (s *Server) SysMsg(msg string, args ...interface{}) {
-	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * " + fmt.Sprintf(msg, args...)), nil)
+	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * "+fmt.Sprintf(msg, args...)), nil)
 }
 
 func (s *Server) Broadcast(msg string, except *Client) {
@@ -92,8 +94,8 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			continue
 		}
 		/* Add an ascii BEL to ding clients when they're mentioned */
-		if strings.Contains(msg, client.Name) {
-			client.Msg <- msg + "\007"
+		if strings.HasPrefix(msg, fmt.Sprintf("%s:", client.Name)) {
+			client.Msg <- msg + BEEP
 		} else {
 			client.Msg <- msg
 		}
@@ -108,7 +110,7 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 		return fmt.Errorf("no client with that nick")
 	}
 	/* Send the message */
-	target.Msg <- fmt.Sprintf("\007[PM from %v] %v", sender.Name, message)
+	target.Msg <- fmt.Sprintf(BEEP+"[PM from %v] %v", sender.Name, message)
 	logger.Debugf("PM from %v to %v: %v", sender.Name, nick, message)
 	return nil
 }
@@ -131,7 +133,7 @@ func (s *Server) Add(client *Client) {
 	s.clients[client.Name] = client
 	num := len(s.clients)
 	s.lock.Unlock()
-	
+
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
 }
 
