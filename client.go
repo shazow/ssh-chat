@@ -51,7 +51,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Server: server,
 		Conn:   conn,
 		Name:   conn.User(),
-		Color:  RandomColor(),
+		Color:  RandomColor256(),
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 	}
