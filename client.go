@@ -303,15 +303,15 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/msg": /* Send a PM */
 				/* Make sure we have a recipient and a message */
 				if len(parts) < 2 {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /msg $NAME $MESSAGE")
+					c.SysMsg("Missing $NAME from: /msg $NAME $MESSAGE")
 					break
 				} else if len(parts) < 3 {
-					c.Msg <- fmt.Sprintf("-> Missing $MESSAGE from: /msg $NAME $MESSAGE")
+					c.SysMsg("Missing $MESSAGE from: /msg $NAME $MESSAGE")
 					break
 				}
 				/* Ask the server to send the message */
 				if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
-					c.Msg <- fmt.Sprintf("Unable to send message to %v: %v", parts[1], err)
+					c.SysMsg("Unable to send message to %v: %v", parts[1], err)
 				}
 			case "/motd": /* print motd */
 				if !c.Server.IsOp(c) {
@@ -338,7 +338,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
 		/* Rate limit */
 		if time.Now().Sub(c.lastTX) < REQUIRED_WAIT {
-			c.Msg <- fmt.Sprintf("-> Rate limiting in effect.")
+			c.SysMsg("Rate limiting in effect.")
 			continue
 		}
 		if c.IsSilenced() || len(msg) > 1000 || len(line) < 1 {
