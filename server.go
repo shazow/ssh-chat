@@ -16,7 +16,7 @@ import (
 const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
-var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_]")
+var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_.-]")
 
 type Clients map[string]*Client
 
@@ -90,8 +90,6 @@ func (s *Server) Broadcast(msg string, except *Client) {
 		} else {
 			client.Msg <- msg
 		}
-
-		client.Msg <- msg
 	}
 }
 
