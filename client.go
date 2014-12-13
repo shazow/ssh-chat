@@ -128,7 +128,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
 				if me == "" {
-					me = "is at a loss for words."
+					me = " is at a loss for words."
 				}
 				msg := fmt.Sprintf("** %s%s", c.Name, me)
 				if c.IsSilenced() {
