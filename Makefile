@@ -10,6 +10,9 @@ all: $(BINARY)
 $(BINARY): **/*.go *.go
 	go build .
 
+deps:
+	go get .
+
 build: $(BINARY)
 
 clean:
