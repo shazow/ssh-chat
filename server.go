@@ -223,6 +223,7 @@ func (s *Server) Start(laddr string) error {
 	logger.Infof("Listening on %s", laddr)
 
 	go func() {
+		defer socket.Close()
 		for {
 			conn, err := socket.Accept()
 
