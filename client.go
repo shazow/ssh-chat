@@ -18,6 +18,7 @@ const HELP_TEXT string = `-> Available commands:
    /list
    /nick $NAME
    /whois $NAME
+   /msg $NAME $MESSAGE
 `
 
 const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
@@ -226,6 +227,20 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						client.Write(fmt.Sprintf("-> Silenced for %s by %s.", duration, c.ColoredName()))
 					}
 				}
+			case "/msg": /* Send a PM */
+				/* Make sure we have a recipient and a message */
+				if len(parts) < 2 {
+					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /msg $NAME $MESSAGE")
+					break
+				} else if len(parts) < 3 {
+					c.Msg <- fmt.Sprintf("-> Missing $MESSAGE from: /msg $NAME $MESSAGE")
+					break
+				}
+				/* Ask the server to send the message */
+				if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
+					c.Msg <- fmt.Sprintf("Unable to send message to %v: %v", parts[1], err)
+				}
+
 			default:
 				c.Msg <- fmt.Sprintf("-> Invalid command: %s", line)
 			}

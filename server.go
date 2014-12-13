@@ -93,6 +93,19 @@ func (s *Server) Broadcast(msg string, except *Client) {
 	}
 }
 
+/* Send a message to a particular nick, if it exists */
+func (s *Server) Privmsg(nick, message string, sender *Client) error {
+	/* Get the recipient */
+	target, ok := s.clients[nick]
+	if !ok {
+		return fmt.Errorf("no client with that nick")
+	}
+	/* Send the message */
+	target.Msg <- fmt.Sprintf("\007[PM from %v] %v", sender.Name, message)
+	logger.Debugf("PM from %v to %v: %v", sender.Name, nick, message)
+	return nil
+}
+
 func (s *Server) Add(client *Client) {
 	go func() {
 		client.WriteLines(s.history.Get(10))
