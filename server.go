@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/md5"
+	"crypto/sha1"
 	"fmt"
 	"net"
 	"regexp"
@@ -282,7 +282,7 @@ func (s *Server) Stop() {
 }
 
 func Fingerprint(k ssh.PublicKey) string {
-	hash := md5.Sum(k.Marshal())
+	hash := sha1.Sum(k.Marshal())
 	r := fmt.Sprintf("% x", hash)
 	return strings.Replace(r, " ", ":", -1)
 }
