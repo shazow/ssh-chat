@@ -160,7 +160,7 @@ func (s *Server) Rename(client *Client, newName string) {
 	s.clients[client.Name] = client
 	s.lock.Unlock()
 
-	s.SysMsg("%s is now known as %s.", oldName, newName)
+	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
 }
 
 func (s *Server) List(prefix *string) []string {
