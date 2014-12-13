@@ -17,6 +17,7 @@ const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
 const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
+const PRIVATE_MESSAGE_FORMAT string = "\033[3m"
 const BEEP string = "\007"
 
 var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_.-]")
@@ -105,7 +106,7 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 		return fmt.Errorf("no client with that nick")
 	}
 	/* Send the message */
-	target.Msg <- fmt.Sprintf(BEEP+"[PM from %v] %v", sender.Name, message)
+	target.Msg <- fmt.Sprintf(BEEP+"[PM from %v] %s%v%s", sender.ColoredName(), PRIVATE_MESSAGE_FORMAT, message, RESET)
 	logger.Debugf("PM from %v to %v: %v", sender.Name, nick, message)
 	return nil
 }
