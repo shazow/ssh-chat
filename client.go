@@ -62,11 +62,11 @@ func (c *Client) ColoredName() string {
 }
 
 func (c *Client) SysMsg(msg string, args ...interface{}) {
-	c.Msg <- SYSTEM_MESSAGE_FORMAT + "-> " + fmt.Sprintf(msg, args...) + RESET
+	c.Msg <- ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> " + fmt.Sprintf(msg, args...))
 }
 
 func (c *Client) SysMsg2(msg string, args ...interface{}) {
-	c.Write(SYSTEM_MESSAGE_FORMAT + "-> " + fmt.Sprintf(msg, args...) + RESET)
+	c.Write(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> " + fmt.Sprintf(msg, args...)))
 }
 
 func (c *Client) Write(msg string) {

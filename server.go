@@ -78,7 +78,7 @@ func (s *Server) Len() int {
 
 const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
 func (s *Server) SysMsg(msg string, args ...interface{}) {
-	s.Broadcast(SYSTEM_MESSAGE_FORMAT + " * " + fmt.Sprintf(msg, args...) + RESET, nil)
+	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * " + fmt.Sprintf(msg, args...)), nil)
 }
 
 func (s *Server) Broadcast(msg string, except *Client) {
@@ -112,7 +112,7 @@ func (s *Server) Add(client *Client) {
 	num := len(s.clients)
 	s.lock.Unlock()
 	
-	s.Broadcast(fmt.Sprintf("%s * %s joined. (Total connected: %d)%s", SYSTEM_MESSAGE_FORMAT, client.ColoredName(), num, RESET), client)
+	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
 }
 
 func (s *Server) Remove(client *Client) {
