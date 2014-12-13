@@ -20,6 +20,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /nick $NAME      - Rename yourself to a new name
    /whois $NAME     - Display information about another connected user
    /msg $NAME $MESSAGE
+   /beep			- Enable BEL notifications on mention.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -54,6 +55,7 @@ type Client struct {
 	termHeight    int
 	silencedUntil time.Time
 	lastTX        time.Time
+	beepMe        bool
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -160,6 +162,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/uptime":
 				c.Write(c.Server.Uptime())
+			case "/beep":
+				c.beepMe = !c.beepMe
+				if c.beepMe {
+					c.SysMsg("I'll beep you good.")
+				} else {
+					c.SysMsg("No more beeps. :(")
+				}
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
 				if me == "" {
