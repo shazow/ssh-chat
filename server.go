@@ -30,6 +30,7 @@ type Server struct {
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPk  map[string]*time.Time // fingerprint lookup
 	bannedIp  map[net.Addr]*time.Time
+	started   time.Time
 }
 
 func NewServer(privateKey []byte) (*Server, error) {
@@ -46,6 +47,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		admins:   map[string]struct{}{},
 		bannedPk: map[string]*time.Time{},
 		bannedIp: map[net.Addr]*time.Time{},
+		started:  time.Now(),
 	}
 
 	config := ssh.ServerConfig{
@@ -180,6 +182,10 @@ func (s *Server) Op(fingerprint string) {
 	s.lock.Lock()
 	s.admins[fingerprint] = struct{}{}
 	s.lock.Unlock()
+}
+
+func (s *Server) Uptime() string {
+	return time.Now().Sub(s.started).String()
 }
 
 func (s *Server) IsOp(client *Client) bool {

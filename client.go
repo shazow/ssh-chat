@@ -56,7 +56,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 }
 
 func (c *Client) ColoredName() string {
-    return ColorString(c.Color, c.Name)	
+	return ColorString(c.Color, c.Name)
 }
 
 func (c *Client) Write(msg string) {
@@ -134,6 +134,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
 			case "/about":
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
+			case "/uptime":
+				c.Write(c.Server.Uptime())
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
 				if me == "" {
