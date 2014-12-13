@@ -78,7 +78,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 func (c *Client) ColoredName() string {
 	return ColorString(c.Color, c.Name)
 }
-v
+
 func (c *Client) SysMsg(msg string, args ...interface{}) {
 	c.Msg <- ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> "+fmt.Sprintf(msg, args...))
 }
