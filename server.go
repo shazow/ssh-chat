@@ -93,12 +93,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 		if except != nil && client == except {
 			continue
 		}
-		/* Add an ascii BEL to ding clients when they're mentioned */
-		if strings.HasPrefix(msg, fmt.Sprintf("%s:", client.Name)) {
-			client.Msg <- msg + BEEP
-		} else {
-			client.Msg <- msg
-		}
+		client.Msg <- msg
 	}
 }
 
