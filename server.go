@@ -276,11 +276,11 @@ func (s *Server) Start(laddr string) error {
 func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	if key == 9 {
 		shortLine := strings.Split(line[:pos], " ")
-		partialNick := shortLine[len(shortLine) - 1]
+		partialNick := shortLine[len(shortLine)-1]
 
 		nicks := s.List(&partialNick)
 		if len(nicks) > 0 {
-			nick := nicks[len(nicks) - 1]
+			nick := nicks[len(nicks)-1]
 			posPartialNick := pos - len(partialNick)
 
 			newLine = strings.Replace(line[posPartialNick:],
