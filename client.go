@@ -25,6 +25,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
    /ban $NAME       - Banish a user from the chat
+   /kick $NAME      - Kick em' out.
    /op $NAME        - Promote a user to server operator
    /silence $NAME   - Revoke a user's ability to speak
 `
@@ -234,6 +235,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						fingerprint := client.Fingerprint()
 						client.SysMsg2("Made op by %s.", c.ColoredName())
 						c.Server.Op(fingerprint)
+					}
+				}
+			case "/kick":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 2 {
+					c.SysMsg("Missing $NAME from: /kick $NAME")
+				} else {
+					client := c.Server.Who(parts[1])
+					if client == nil {
+						c.SysMsg("No such name: %s", parts[1])
+					} else {
+						client.SysMsg2("Kicked by %s.", c.ColoredName())
+						client.Conn.Close()
+						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
 					}
 				}
 			case "/silence":
