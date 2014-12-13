@@ -9,18 +9,19 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const MSG_BUFFER int = 10
+const MSG_BUFFER int = 50
+const MAX_MSG_LENGTH int = 512
 
 const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
-   /about               - About this chat.
-   /exit                - Exit the chat.
-   /help                - Show this help text.
-   /list                - List the users that are currently connected.
-   /me $ACTION          - Show yourself doing an action.
-   /nick $NAME          - Rename yourself to a new name.
-   /whois $NAME         - Display information about another connected user.
-   /msg $NAME $MESSAGE  - Send a private message to another user.
-   /beep                - Enable BEL notifications on mention.
+   /about           - About this chat
+   /exit            - Exit the chat
+   /help            - Show this help text
+   /list            - List the users that are currently connected
+   /beep            - Enable BEL notifications on mention.
+   /me $ACTION      - Show yourself doing an action
+   /nick $NAME      - Rename yourself to a new name
+   /whois $NAME     - Display information about another connected user
+   /msg $NAME $MESSAGE
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -30,8 +31,7 @@ const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator comma
    /silence $NAME       - Revoke a user's ability to speak.
 `
 
-const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `
--> ssh-chat is made by @shazow.
+const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
 
    It is a custom ssh server built in Go to serve a chat experience
    instead of a shell.
@@ -79,10 +79,6 @@ func (c *Client) SysMsg(msg string, args ...interface{}) {
 	c.Msg <- ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> "+fmt.Sprintf(msg, args...))
 }
 
-func (c *Client) SysMsg2(msg string, args ...interface{}) {
-	c.Write(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> "+fmt.Sprintf(msg, args...)))
-}
-
 func (c *Client) Write(msg string) {
 	c.term.Write([]byte(msg + "\r\n"))
 }
@@ -90,6 +86,24 @@ func (c *Client) Write(msg string) {
 func (c *Client) WriteLines(msg []string) {
 	for _, line := range msg {
 		c.Write(line)
+	}
+}
+
+func (c *Client) Send(msg string) {
+	if len(msg) > MAX_MSG_LENGTH {
+		return
+	}
+	select {
+	case c.Msg <- msg:
+	default:
+		logger.Errorf("Msg buffer full, dropping: %s (%s)", c.Name, c.Conn.RemoteAddr())
+		c.Conn.Close()
+	}
+}
+
+func (c *Client) SendLines(msg []string) {
+	for _, line := range msg {
+		c.Send(line)
 	}
 }
 
@@ -223,7 +237,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.SysMsg2("Banned by %s.", c.ColoredName())
+						client.SysMsg("Banned by %s.", c.ColoredName())
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
 						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
@@ -240,7 +254,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.SysMsg2("Made op by %s.", c.ColoredName())
+						client.SysMsg("Made op by %s.", c.ColoredName())
 						c.Server.Op(fingerprint)
 					}
 				}
@@ -254,7 +268,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					if client == nil {
 						c.SysMsg("No such name: %s", parts[1])
 					} else {
-						client.SysMsg2("Kicked by %s.", c.ColoredName())
+						client.SysMsg("Kicked by %s.", c.ColoredName())
 						client.Conn.Close()
 						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
 					}
@@ -277,7 +291,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						client.Silence(duration)
-						client.SysMsg2("Silenced for %s by %s.", duration, c.ColoredName())
+						client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
 					}
 				}
 			case "/msg": /* Send a PM */
@@ -306,7 +320,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			c.Msg <- fmt.Sprintf("-> Rate limiting in effect.")
 			continue
 		}
-		if c.IsSilenced() || len(msg) > 1000 {
+		if c.IsSilenced() || len(msg) > 1000 || len(msg) == 0 {
 			c.SysMsg("Message rejected.")
 			continue
 		}
