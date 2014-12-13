@@ -30,6 +30,7 @@ type Server struct {
 	lock      sync.Mutex
 	count     int
 	history   *History
+	motd      string
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPk  map[string]*time.Time // fingerprint lookup
 	bannedIp  map[net.Addr]*time.Time
@@ -47,6 +48,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		clients:  Clients{},
 		count:    0,
 		history:  NewHistory(HISTORY_LEN),
+		motd:     "Message of the Day! Modify with /motd",
 		admins:   map[string]struct{}{},
 		bannedPk: map[string]*time.Time{},
 		bannedIp: map[net.Addr]*time.Time{},
@@ -111,8 +113,26 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 	return nil
 }
 
+func (s *Server) SetMotd(client *Client, motd string) {
+	s.lock.Lock()
+	s.motd = motd
+	s.lock.Unlock()
+}
+
+func (s *Server) MotdUnicast(client *Client) {
+	client.SysMsg("/** MOTD")
+	client.SysMsg(" * " + ColorString("36", s.motd)) /* a nice cyan color */
+	client.SysMsg(" **/")
+}
+
+func (s *Server) MotdBroadcast(client *Client) {
+	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
+	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+}
+
 func (s *Server) Add(client *Client) {
 	go func() {
+		s.MotdUnicast(client)
 		client.SendLines(s.history.Get(10))
 		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
 	}()
