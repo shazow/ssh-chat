@@ -84,6 +84,13 @@ func (s *Server) Broadcast(msg string, except *Client) {
 		if except != nil && client == except {
 			continue
 		}
+		/* Add an ascii BEL to ding clients when they're mentioned */
+		if strings.Contains(msg, client.Name) {
+			client.Msg <- msg + "\007"
+		} else {
+			client.Msg <- msg
+		}
+
 		client.Msg <- msg
 	}
 }
