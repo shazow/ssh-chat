@@ -313,7 +313,11 @@ func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine s
 		if len(nicks) > 0 {
 			nick := nicks[len(nicks)-1]
 			posPartialNick := pos - len(partialNick)
-
+			if len(shortLine) < 2 {
+				nick += ": "
+			} else {
+				nick += " "
+			}
 			newLine = strings.Replace(line[posPartialNick:],
 				partialNick, nick, 1)
 			newLine = line[:posPartialNick] + newLine
