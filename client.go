@@ -25,7 +25,6 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
-<<<<<<< HEAD
    /ban $NAME       - Banish a user from the chat
    /kick $NAME      - Kick em' out.
    /op $NAME        - Promote a user to server operator
