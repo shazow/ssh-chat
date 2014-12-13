@@ -28,7 +28,8 @@ type Server struct {
 	count     int
 	history   *History
 	admins    map[string]struct{}   // fingerprint lookup
-	banned    map[string]*time.Time // fingerprint lookup
+	bannedPk  map[string]*time.Time // fingerprint lookup
+	bannedIp  map[net.Addr]*time.Time
 }
 
 func NewServer(privateKey []byte) (*Server, error) {
@@ -38,12 +39,13 @@ func NewServer(privateKey []byte) (*Server, error) {
 	}
 
 	server := Server{
-		done:    make(chan struct{}),
-		clients: Clients{},
-		count:   0,
-		history: NewHistory(HISTORY_LEN),
-		admins:  map[string]struct{}{},
-		banned:  map[string]*time.Time{},
+		done:     make(chan struct{}),
+		clients:  Clients{},
+		count:    0,
+		history:  NewHistory(HISTORY_LEN),
+		admins:   map[string]struct{}{},
+		bannedPk: map[string]*time.Time{},
+		bannedIp: map[net.Addr]*time.Time{},
 	}
 
 	config := ssh.ServerConfig{
@@ -52,6 +54,12 @@ func NewServer(privateKey []byte) (*Server, error) {
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			fingerprint := Fingerprint(key)
 			if server.IsBanned(fingerprint) {
+				return nil, fmt.Errorf("Banned.")
+			}
+			ip := strings.Split(conn.RemoteAddr().String(), ":")[0]
+			logger.Infof(ip)
+			if ip == "73.3.250.197" {
+				// Can't believe I'm doing this...
 				return nil, fmt.Errorf("Banned.")
 			}
 			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
@@ -181,7 +189,7 @@ func (s *Server) IsOp(client *Client) bool {
 }
 
 func (s *Server) IsBanned(fingerprint string) bool {
-	ban, hasBan := s.banned[fingerprint]
+	ban, hasBan := s.bannedPk[fingerprint]
 	if !hasBan {
 		return false
 	}
@@ -202,13 +210,13 @@ func (s *Server) Ban(fingerprint string, duration *time.Duration) {
 		when := time.Now().Add(*duration)
 		until = &when
 	}
-	s.banned[fingerprint] = until
+	s.bannedPk[fingerprint] = until
 	s.lock.Unlock()
 }
 
 func (s *Server) Unban(fingerprint string) {
 	s.lock.Lock()
-	delete(s.banned, fingerprint)
+	delete(s.bannedPk, fingerprint)
 	s.lock.Unlock()
 }
 

@@ -73,6 +73,7 @@ things up with `make run`.
 * [x] backfill chat history
 * [ ] tab completion
 * [x] /ban
+* [ ] /ban by ip
 * [x] /help
 * [x] /about
 * [x] /list
@@ -80,6 +81,9 @@ things up with `make run`.
 * [x] pubkey fingerprint
 * [x] truncate usernames
 * [ ] rename collision bug
+* [ ] op ops on join
+* [ ] piped stdout bug
+* [ ] saner sanitizing of inputs (version string, allow space/period)
 * [x] Some tests.
 * [ ] More tests.
 * [ ] Even more tests.
