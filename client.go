@@ -30,6 +30,8 @@ const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
    For more, visit shazow.net or follow at twitter.com/shazow
 `
 
+const REQUIRED_WAIT time.Duration = time.Second / 2
+
 type Client struct {
 	Server        *Server
 	Conn          *ssh.ServerConn
@@ -42,6 +44,7 @@ type Client struct {
 	termWidth     int
 	termHeight    int
 	silencedUntil time.Time
+	lastTX        time.Time
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -52,11 +55,12 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Color:  RandomColor(),
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
+		lastTX: time.Now(),
 	}
 }
 
 func (c *Client) ColoredName() string {
-    return ColorString(c.Color, c.Name)	
+	return ColorString(c.Color, c.Name)
 }
 
 func (c *Client) Write(msg string) {
@@ -229,11 +233,17 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
+		/* Rate limit */
+		if time.Now().Sub(c.lastTX) < REQUIRED_WAIT {
+			c.Msg <- fmt.Sprintf("-> Rate limiting in effect.")
+			continue
+		}
 		if c.IsSilenced() || len(msg) > 1000 {
 			c.Msg <- fmt.Sprintf("-> Message rejected.")
 			continue
 		}
 		c.Server.Broadcast(msg, c)
+		c.lastTX = time.Now()
 	}
 
 }
