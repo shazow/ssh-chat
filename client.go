@@ -20,10 +20,12 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /nick $NAME      - Rename yourself to a new name
    /whois $NAME     - Display information about another connected user
    /msg $NAME $MESSAGE
+   /beep			- Enable BEL notifications on mention.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
    /ban $NAME       - Banish a user from the chat
+   /kick $NAME      - Kick em' out.
    /op $NAME        - Promote a user to server operator
    /silence $NAME   - Revoke a user's ability to speak
 `
@@ -54,6 +56,7 @@ type Client struct {
 	termHeight    int
 	silencedUntil time.Time
 	lastTX        time.Time
+	beepMe        bool
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -160,6 +163,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/uptime":
 				c.Write(c.Server.Uptime())
+			case "/beep":
+				c.beepMe = !c.beepMe
+				if c.beepMe {
+					c.SysMsg("I'll beep you good.")
+				} else {
+					c.SysMsg("No more beeps. :(")
+				}
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
 				if me == "" {
@@ -225,6 +235,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						fingerprint := client.Fingerprint()
 						client.SysMsg2("Made op by %s.", c.ColoredName())
 						c.Server.Op(fingerprint)
+					}
+				}
+			case "/kick":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 2 {
+					c.SysMsg("Missing $NAME from: /kick $NAME")
+				} else {
+					client := c.Server.Who(parts[1])
+					if client == nil {
+						c.SysMsg("No such name: %s", parts[1])
+					} else {
+						client.SysMsg2("Kicked by %s.", c.ColoredName())
+						client.Conn.Close()
+						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
 					}
 				}
 			case "/silence":
