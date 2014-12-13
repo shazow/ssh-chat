@@ -42,16 +42,22 @@ things up with `make run`.
 * [x] client map rather than list
 * [x] backfill chat history
 * [ ] tab completion
-* [ ] /kick
+* [x] /ban
 * [x] /help
 * [x] /about
 * [x] /list
 * [x] /nick
-* [ ] pubkey fingerprint
+* [x] pubkey fingerprint
 * [x] truncate usernames
+* [ ] rename collision bug
 * [x] Some tests.
 * [ ] More tests.
 * [ ] Even more tests.
 * [ ] Lots of refactoring
   * [ ] Pull out the chat-related stuff into isolation from the ssh serving
     stuff
+
+
+## License
+
+MIT
