@@ -89,10 +89,15 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			continue
 		}
 
-		client.Send(msg)
-		if client.beepMe && strings.Contains(msg, client.Name) {
-			/* Add an ascii BEL to ding clients when they're mentioned */
-			client.Send(BEEP)
+		if strings.Contains(msg, client.Name) {
+			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
+			tmpMsg := strings.Split(msg, RESET)
+			if client.beepMe {
+				tmpMsg[0] += BEEP
+			}
+			client.Send(strings.Join(tmpMsg, RESET + BOLD + "\033[31m") + RESET)
+		} else {
+			client.Send(msg)
 		}
 	}
 }
