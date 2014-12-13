@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/rog-go/new9p/client"
-
 	"golang.org/x/crypto/ssh"
 )
 
@@ -242,7 +240,7 @@ func (s *Server) Start(laddr string) error {
 					return
 				}
 
-				version := client.Conn.ClientVersion()
+				version := sshConn.ClientVersion()
 				if len(version) > 100 {
 					version = []byte("Evil Jerk with a superlong string")
 				}
