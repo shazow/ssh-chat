@@ -119,6 +119,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		if isCmd {
 			// TODO: Factor this out.
 			switch parts[0] {
+			case "/test-colors": // Shh, this command is a secret!
+				c.Write(ColorString("32", "Lorem ipsum dolor sit amet,"))
+				c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
 			case "/exit":
 				channel.Close()
 			case "/help":
