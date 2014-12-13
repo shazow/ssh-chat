@@ -22,6 +22,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /nick $NAME          - Rename yourself to a new name.
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
+   /motd                - Prints the Message of the Day
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -33,6 +34,7 @@ const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator comma
    /kick $NAME          - Kick em' out.
    /op $NAME            - Promote a user to server operator.
    /silence $NAME       - Revoke a user's ability to speak.
+   /motd $MESSAGE    - Sets the Message of the Day
 ` + RESET
 
 const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
@@ -310,6 +312,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				/* Ask the server to send the message */
 				if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
 					c.Msg <- fmt.Sprintf("Unable to send message to %v: %v", parts[1], err)
+				}
+			case "/motd": /* print motd */
+				if !c.Server.IsOp(c) {
+					c.Server.MotdUnicast(c)
+				} else if len(parts) < 2 {
+					c.Server.MotdUnicast(c)
+				} else {
+					var newmotd string
+					if (len(parts) == 2) {
+						newmotd = parts[1]
+					} else {
+						newmotd = parts[1] + " " + parts[2]
+					}
+					c.Server.SetMotd(c, newmotd)
+					c.Server.MotdBroadcast(c)
 				}
 
 			default:
