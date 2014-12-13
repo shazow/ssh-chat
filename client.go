@@ -12,12 +12,18 @@ import (
 const MSG_BUFFER int = 10
 
 const HELP_TEXT string = `-> Available commands:
-   /about
-   /exit
-   /help
-   /list
-   /nick $NAME
-   /whois $NAME
+   /about           - About this chat
+   /exit            - Exit the chat
+   /help            - Show this help text
+   /list            - List the users that are currently connected
+   /me $ACTION      - Show yourself doing an action
+   /nick $NAME      - Rename yourself to a new name
+   /whois $NAME     - Display information about another connected user
+`
+const OP_HELP_TEXT string = `-> Available operator commands:
+   /ban $NAME       - Banish a user from the chat
+   /op $NAME        - Promote a user to server operator
+   /silence $NAME   - Revoke a user's ability to speak
 `
 
 const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
@@ -132,6 +138,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				channel.Close()
 			case "/help":
 				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
+				if c.Server.IsOp(c) {
+					c.WriteLines(strings.Split(OP_HELP_TEXT, "\n"))
+				}
 			case "/about":
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/me":
