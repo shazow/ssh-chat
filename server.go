@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -222,13 +223,16 @@ func (s *Server) Start(laddr string) error {
 	logger.Infof("Listening on %s", laddr)
 
 	go func() {
+		defer socket.Close()
 		for {
 			conn, err := socket.Accept()
 
 			if err != nil {
-				// TODO: Handle shutdown more gracefully?
-				logger.Errorf("Failed to accept connection, aborting loop: %v", err)
-				return
+				logger.Errorf("Failed to accept connection: %v", err)
+				if err == syscall.EINVAL {
+					// TODO: Handle shutdown more gracefully?
+					return
+				}
 			}
 
 			// Goroutineify to resume accepting sockets early.
