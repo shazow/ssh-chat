@@ -35,6 +35,7 @@ type Client struct {
 	Conn          *ssh.ServerConn
 	Msg           chan string
 	Name          string
+	Color         string
 	Op            bool
 	ready         chan struct{}
 	term          *terminal.Terminal
@@ -48,6 +49,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Server: server,
 		Conn:   conn,
 		Name:   conn.User(),
+		Color:  RandomColor(),
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 	}
@@ -83,7 +85,7 @@ func (c *Client) Resize(width int, height int) error {
 
 func (c *Client) Rename(name string) {
 	c.Name = name
-	c.term.SetPrompt(fmt.Sprintf("[%s] ", name))
+	c.term.SetPrompt(fmt.Sprintf("[%s] ", ColorString(c.Color, c.Name)))
 }
 
 func (c *Client) Fingerprint() string {
@@ -222,7 +224,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			continue
 		}
 
-		msg := fmt.Sprintf("%s: %s", c.Name, line)
+		msg := fmt.Sprintf("%s: %s", ColorString(c.Color, c.Name), line)
 		if c.IsSilenced() || len(msg) > 1000 {
 			c.Msg <- fmt.Sprintf("-> Message rejected.")
 			continue
@@ -233,7 +235,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 }
 
 func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
-	prompt := fmt.Sprintf("[%s] ", c.Name)
+	prompt := fmt.Sprintf("[%s] ", ColorString(c.Color, c.Name))
 
 	hasShell := false
 
