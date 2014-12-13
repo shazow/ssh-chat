@@ -13,22 +13,27 @@ const MSG_BUFFER int = 50
 const MAX_MSG_LENGTH int = 512
 
 const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
-   /about           - About this chat
-   /exit            - Exit the chat
-   /help            - Show this help text
-   /list            - List the users that are currently connected
-   /beep            - Enable BEL notifications on mention.
-   /me $ACTION      - Show yourself doing an action
-   /nick $NAME      - Rename yourself to a new name
-   /whois $NAME     - Display information about another connected user
-   /msg $NAME $MESSAGE
+   /about               - About this chat.
+   /exit                - Exit the chat.
+   /help                - Show this help text.
+   /list                - List the users that are currently connected.
+   /beep                - Enable BEL notifications on mention.
+   /me $ACTION          - Show yourself doing an action.
+   /nick $NAME          - Rename yourself to a new name.
+   /whois $NAME         - Display information about another connected user.
+   /msg $NAME $MESSAGE  - Sends a private message to a user.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
+<<<<<<< HEAD
    /ban $NAME       - Banish a user from the chat
    /kick $NAME      - Kick em' out.
    /op $NAME        - Promote a user to server operator
    /silence $NAME   - Revoke a user's ability to speak
+   /ban $NAME           - Banish a user from the chat
+   /kick $NAME          - Kick em' out.
+   /op $NAME            - Promote a user to server operator.
+   /silence $NAME       - Revoke a user's ability to speak.
 ` + RESET
 
 const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
@@ -217,8 +222,15 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $NAME from: /whois $NAME")
 				}
 			case "/list":
-				names := c.Server.List(nil)
-				c.SysMsg("%d connected: %s", len(names), strings.Join(names, ", "))
+				names := ""
+				nameList := c.Server.List(nil)
+				for _, name := range nameList {
+					names += c.Server.Who(name).ColoredName() + SYSTEM_MESSAGE_FORMAT + ", "
+				}
+				if len(names) > 2 {
+					names = names[:len(names)-2]
+				}
+				c.SysMsg("%d connected: %s", len(nameList), names)
 			case "/ban":
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
