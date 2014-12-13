@@ -29,7 +29,6 @@ const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
 
    For more, visit shazow.net or follow at twitter.com/shazow
 `
-
 type Client struct {
 	Server        *Server
 	Conn          *ssh.ServerConn
@@ -56,7 +55,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 }
 
 func (c *Client) ColoredName() string {
-    return ColorString(c.Color, c.Name)	
+	return ColorString(c.Color, c.Name)
 }
 
 func (c *Client) Write(msg string) {
@@ -257,6 +256,8 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 		defer channel.Close()
 
 		c.term = terminal.NewTerminal(channel, prompt)
+		c.term.AutoCompleteCallback = c.Server.AutoCompleteFunction
+
 		for req := range requests {
 			var width, height int
 			var ok bool
