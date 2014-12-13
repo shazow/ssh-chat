@@ -16,7 +16,7 @@ import (
 const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
-var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_]")
+var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_.-]")
 
 type Clients map[string]*Client
 
@@ -86,8 +86,26 @@ func (s *Server) Broadcast(msg string, except *Client) {
 		if except != nil && client == except {
 			continue
 		}
-		client.Msg <- msg
+		/* Add an ascii BEL to ding clients when they're mentioned */
+		if strings.Contains(msg, client.Name) {
+			client.Msg <- msg + "\007"
+		} else {
+			client.Msg <- msg
+		}
 	}
+}
+
+/* Send a message to a particular nick, if it exists */
+func (s *Server) Privmsg(nick, message string, sender *Client) error {
+	/* Get the recipient */
+	target, ok := s.clients[nick]
+	if !ok {
+		return fmt.Errorf("no client with that nick")
+	}
+	/* Send the message */
+	target.Msg <- fmt.Sprintf("\007[PM from %v] %v", sender.Name, message)
+	logger.Debugf("PM from %v to %v: %v", sender.Name, nick, message)
+	return nil
 }
 
 func (s *Server) Add(client *Client) {
