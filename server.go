@@ -91,7 +91,7 @@ func (s *Server) Add(client *Client) {
 
 	newName, err := s.proposeName(client.Name)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.Name, newName)
+		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.ColoredName(), ColorString(client.Color, newName))
 	}
 
 	client.Rename(newName)
@@ -99,7 +99,7 @@ func (s *Server) Add(client *Client) {
 	num := len(s.clients)
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)", client.Name, num), client)
+	s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)", client.ColoredName(), num), client)
 }
 
 func (s *Server) Remove(client *Client) {
@@ -107,7 +107,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, client.Name)
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s left.", client.Name), nil)
+	s.Broadcast(fmt.Sprintf("* %s left.", client.ColoredName()), nil)
 }
 
 func (s *Server) proposeName(name string) (string, error) {
