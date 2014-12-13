@@ -12,10 +12,10 @@ import (
 )
 
 type Options struct {
-	Verbose  []bool `short:"v" long:"verbose" description:"Show verbose logging."`
-	Identity string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind     string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
-	Admin    string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
+	Verbose  []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
+	Identity string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Bind     string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
+	Admin    []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
 }
 
 var logLevels = []log.Level{
@@ -67,8 +67,8 @@ func main() {
 		return
 	}
 
-	if options.Admin != "" {
-		server.Op(options.Admin)
+	for _, fingerprint := range options.Admin {
+		server.Op(fingerprint)
 	}
 
 	<-sig // Wait for ^C signal
