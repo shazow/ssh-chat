@@ -134,7 +134,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if c.IsSilenced() {
 					c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
 				} else {
-					c.Server.Broadcast(msg, nil)
+					c.Server.Broadcast(msg[:200], nil)
 				}
 			case "/nick":
 				if len(parts) == 2 {
@@ -146,7 +146,11 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if len(parts) == 2 {
 					client := c.Server.Who(parts[1])
 					if client != nil {
-						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Fingerprint(), client.Conn.ClientVersion())
+						version := client.Conn.ClientVersion()
+						if len(version) > 100 {
+							version = []byte("Evil Jerk with a superlong string")
+						}
+						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Fingerprint(), version)
 					} else {
 						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
 					}
@@ -216,8 +220,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 
 		msg := fmt.Sprintf("%s: %s", c.Name, line)
-		if c.IsSilenced() {
-			c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
+		if c.IsSilenced() || len(msg) > 1000 {
+			c.Msg <- fmt.Sprintf("-> Message rejected.")
 			continue
 		}
 		c.Server.Broadcast(msg, c)
