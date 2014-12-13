@@ -56,7 +56,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 }
 
 func (c *Client) ColoredName() string {
-    return ColorString(c.Color, c.Name)	
+    return ColorString(c.Color, c.Name)
 }
 
 func (c *Client) Write(msg string) {
@@ -229,7 +229,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
-		if c.IsSilenced() || len(msg) > 1000 {
+		if c.IsSilenced() || len(msg) > 1000 || len(line) < 1 {
 			c.Msg <- fmt.Sprintf("-> Message rejected.")
 			continue
 		}
