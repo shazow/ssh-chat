@@ -166,14 +166,6 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		parts := strings.SplitN(line, " ", 3)
 		isCmd := strings.HasPrefix(parts[0], "/")
 
-		// Allow for messages starting with / that aren't commands to be escaped
-		if len(line) > 2 {
-			if line[:3] == "/ /" {
-				line = line[2:]
-				isCmd = false
-			}
-		}
-
 		if isCmd {
 			// TODO: Factor this out.
 			switch parts[0] {
