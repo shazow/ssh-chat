@@ -2,6 +2,16 @@
 
 Custom SSH server written in Go. Instead of a shell, you get a chat prompt.
 
+## Demo
+
+Join the party:
+
+```
+$ ssh chat.shazow.net
+```
+
+(Apologies if the server is down.)
+
 
 ## Quick Start
 
