@@ -61,11 +61,6 @@ func NewServer(privateKey []byte) (*Server, error) {
 			if server.IsBanned(fingerprint) {
 				return nil, fmt.Errorf("Banned.")
 			}
-			ip := strings.Split(conn.RemoteAddr().String(), ":")[0]
-			if ip == "73.3.250.197" {
-				// Can't believe I'm doing this...
-				return nil, fmt.Errorf("Banned.")
-			}
 			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
 			return perm, nil
 		},
@@ -93,11 +88,11 @@ func (s *Server) Broadcast(msg string, except *Client) {
 		if except != nil && client == except {
 			continue
 		}
-		/* Add an ascii BEL to ding clients when they're mentioned */
+
+		client.Send(msg)
 		if client.beepMe && strings.Contains(msg, client.Name) {
-			client.Msg <- msg + BEEP
-		} else {
-			client.Msg <- msg
+			/* Add an ascii BEL to ding clients when they're mentioned */
+			client.Send(BEEP)
 		}
 	}
 }
@@ -117,8 +112,8 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 
 func (s *Server) Add(client *Client) {
 	go func() {
-		client.WriteLines(s.history.Get(10))
-		client.SysMsg2("Welcome to ssh-chat. Enter /help for more.")
+		client.SendLines(s.history.Get(10))
+		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
 	}()
 
 	s.lock.Lock()
