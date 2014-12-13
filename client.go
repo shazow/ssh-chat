@@ -13,15 +13,15 @@ const MSG_BUFFER int = 50
 const MAX_MSG_LENGTH int = 512
 
 const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
-   /about           - About this chat
-   /exit            - Exit the chat
-   /help            - Show this help text
-   /list            - List the users that are currently connected
-   /beep            - Enable BEL notifications on mention.
-   /me $ACTION      - Show yourself doing an action
-   /nick $NAME      - Rename yourself to a new name
-   /whois $NAME     - Display information about another connected user
-   /msg $NAME $MESSAGE
+   /about               - About this chat.
+   /exit                - Exit the chat.
+   /help                - Show this help text.
+   /list                - List the users that are currently connected.
+   /beep                - Enable BEL notifications on mention.
+   /me $ACTION          - Show yourself doing an action.
+   /nick $NAME          - Rename yourself to a new name.
+   /whois $NAME         - Display information about another connected user.
+   /msg $NAME $MESSAGE  - Sends a private message to a user.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
