@@ -71,7 +71,7 @@ things up with `make run`.
 * [x] set term width properly
 * [x] client map rather than list
 * [x] backfill chat history
-* [ ] tab completion
+* [x] tab completion
 * [x] /ban
 * [ ] /ban by ip
 * [x] /help
@@ -88,7 +88,7 @@ things up with `make run`.
 * [ ] More tests.
 * [ ] Even more tests.
 * [ ] Lots of refactoring
-  * [ ] Pull out the chat-related stuff into isolation from the ssh serving
+* [ ] Pull out the chat-related stuff into isolation from the ssh serving
     stuff
 
 
