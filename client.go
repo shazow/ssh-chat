@@ -30,6 +30,8 @@ const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
    For more, visit shazow.net or follow at twitter.com/shazow
 `
 
+var autoCompleteFunc func(line string, pos int, key rune) (newLine string, newPos int, ok bool) = nil
+
 type Client struct {
 	Server        *Server
 	Conn          *ssh.ServerConn
@@ -45,6 +47,9 @@ type Client struct {
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
+	if autoCompleteFunc == nil {
+		autoCompleteFunc = createAutoCompleteFunc(server)
+	}
 	return &Client{
 		Server: server,
 		Conn:   conn,
@@ -56,7 +61,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 }
 
 func (c *Client) ColoredName() string {
-    return ColorString(c.Color, c.Name)	
+	return ColorString(c.Color, c.Name)
 }
 
 func (c *Client) Write(msg string) {
@@ -257,6 +262,8 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 		defer channel.Close()
 
 		c.term = terminal.NewTerminal(channel, prompt)
+		c.term.AutoCompleteCallback = autoCompleteFunc
+
 		for req := range requests {
 			var width, height int
 			var ok bool
@@ -286,5 +293,30 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 				req.Reply(ok, nil)
 			}
 		}
+	}
+}
+
+func createAutoCompleteFunc(server *Server) func(string, int, rune) (string, int, bool) {
+	return func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		if key == 9 {
+			shortLine := strings.Split(line[:pos], " ")
+			partialNick := shortLine[len(shortLine)-1]
+
+			nicks := server.List(&partialNick)
+			if len(nicks) > 0 {
+				nick := nicks[len(nicks)-1]
+				posPartialNick := pos - len(partialNick)
+
+				newLine = strings.Replace(line[posPartialNick:],
+					partialNick, nick, 1)
+				newLine = line[:posPartialNick] + newLine
+				newPos = pos + (len(nick) - len(partialNick))
+				ok = true
+				fmt.Println(newLine)
+			}
+		} else {
+			ok = false
+		}
+		return
 	}
 }
