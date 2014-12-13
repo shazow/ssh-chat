@@ -16,6 +16,7 @@ const HELP_TEXT string = `-> Available commands:
    /exit
    /help
    /list
+   /uptime
    /nick $NAME
    /whois $NAME
 `
