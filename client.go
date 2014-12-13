@@ -35,6 +35,7 @@ type Client struct {
 	Conn          *ssh.ServerConn
 	Msg           chan string
 	Name          string
+	Color         string
 	Op            bool
 	ready         chan struct{}
 	term          *terminal.Terminal
@@ -48,9 +49,14 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Server: server,
 		Conn:   conn,
 		Name:   conn.User(),
+		Color:  RandomColor(),
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 	}
+}
+
+func (c *Client) ColoredName() string {
+    return ColorString(c.Color, c.Name)	
 }
 
 func (c *Client) Write(msg string) {
@@ -83,7 +89,7 @@ func (c *Client) Resize(width int, height int) error {
 
 func (c *Client) Rename(name string) {
 	c.Name = name
-	c.term.SetPrompt(fmt.Sprintf("[%s] ", name))
+	c.term.SetPrompt(fmt.Sprintf("[%s] ", c.ColoredName()))
 }
 
 func (c *Client) Fingerprint() string {
@@ -119,6 +125,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		if isCmd {
 			// TODO: Factor this out.
 			switch parts[0] {
+			case "/test-colors": // Shh, this command is a secret!
+				c.Write(ColorString("32", "Lorem ipsum dolor sit amet,"))
+				c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
 			case "/exit":
 				channel.Close()
 			case "/help":
@@ -130,7 +139,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if me == "" {
 					me = " is at a loss for words."
 				}
-				msg := fmt.Sprintf("** %s%s", c.Name, me)
+				msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
 				if c.IsSilenced() || len(msg) > 1000 {
 					c.Msg <- fmt.Sprintf("-> Message rejected.")
 				} else {
@@ -150,7 +159,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						if len(version) > 100 {
 							version = "Evil Jerk with a superlong string"
 						}
-						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Fingerprint(), version)
+						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
 					} else {
 						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
 					}
@@ -171,10 +180,10 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.Write(fmt.Sprintf("-> Banned by %s.", c.Name))
+						client.Write(fmt.Sprintf("-> Banned by %s.", c.ColoredName()))
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.Name), nil)
+						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
 					}
 				}
 			case "/op":
@@ -188,7 +197,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.Write(fmt.Sprintf("-> Made op by %s.", c.Name))
+						client.Write(fmt.Sprintf("-> Made op by %s.", c.ColoredName()))
 						c.Server.Op(fingerprint)
 					}
 				}
@@ -210,7 +219,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
 					} else {
 						client.Silence(duration)
-						client.Write(fmt.Sprintf("-> Silenced for %s by %s.", duration, c.Name))
+						client.Write(fmt.Sprintf("-> Silenced for %s by %s.", duration, c.ColoredName()))
 					}
 				}
 			default:
@@ -219,7 +228,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			continue
 		}
 
-		msg := fmt.Sprintf("%s: %s", c.Name, line)
+		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
 		if c.IsSilenced() || len(msg) > 1000 {
 			c.Msg <- fmt.Sprintf("-> Message rejected.")
 			continue
@@ -230,7 +239,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 }
 
 func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
-	prompt := fmt.Sprintf("[%s] ", c.Name)
+	prompt := fmt.Sprintf("[%s] ", c.ColoredName())
 
 	hasShell := false
 
