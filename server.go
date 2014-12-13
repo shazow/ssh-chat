@@ -76,6 +76,11 @@ func (s *Server) Len() int {
 	return len(s.clients)
 }
 
+const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
+func (s *Server) SysMsg(msg string, args ...interface{}) {
+	s.Broadcast(SYSTEM_MESSAGE_FORMAT + " * " + fmt.Sprintf(msg, args...) + RESET, nil)
+}
+
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
@@ -91,7 +96,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 func (s *Server) Add(client *Client) {
 	go func() {
 		client.WriteLines(s.history.Get(10))
-		client.Write(fmt.Sprintf("-> Welcome to ssh-chat. Enter /help for more."))
+		client.SysMsg2("Welcome to ssh-chat. Enter /help for more.")
 	}()
 
 	s.lock.Lock()
@@ -99,15 +104,15 @@ func (s *Server) Add(client *Client) {
 
 	newName, err := s.proposeName(client.Name)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.ColoredName(), ColorString(client.Color, newName))
+		client.SysMsg("Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.ColoredName(), ColorString(client.Color, newName))
 	}
 
 	client.Rename(newName)
 	s.clients[client.Name] = client
 	num := len(s.clients)
 	s.lock.Unlock()
-
-	s.Broadcast(fmt.Sprintf("* %s joined. (Total connected: %d)", client.ColoredName(), num), client)
+	
+	s.Broadcast(fmt.Sprintf("%s * %s joined. (Total connected: %d)%s", SYSTEM_MESSAGE_FORMAT, client.ColoredName(), num, RESET), client)
 }
 
 func (s *Server) Remove(client *Client) {
@@ -115,7 +120,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, client.Name)
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s left.", client.ColoredName()), nil)
+	s.SysMsg("%s left.", client.ColoredName())
 }
 
 func (s *Server) proposeName(name string) (string, error) {
@@ -143,7 +148,7 @@ func (s *Server) Rename(client *Client, newName string) {
 
 	newName, err := s.proposeName(newName)
 	if err != nil {
-		client.Msg <- fmt.Sprintf("-> %s", err)
+		client.SysMsg("%s", err)
 		s.lock.Unlock()
 		return
 	}
@@ -155,7 +160,7 @@ func (s *Server) Rename(client *Client, newName string) {
 	s.clients[client.Name] = client
 	s.lock.Unlock()
 
-	s.Broadcast(fmt.Sprintf("* %s is now known as %s.", oldName, newName), nil)
+	s.SysMsg("%s is now known as %s.", oldName, newName)
 }
 
 func (s *Server) List(prefix *string) []string {

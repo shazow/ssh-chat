@@ -11,16 +11,18 @@ import (
 
 const MSG_BUFFER int = 10
 
-const HELP_TEXT string = `-> Available commands:
+const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `
+-> Available commands:
    /about
    /exit
    /help
    /list
    /nick $NAME
    /whois $NAME
-`
+` + RESET
 
-const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
+const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `
+-> ssh-chat is made by @shazow.
 
    It is a custom ssh server built in Go to serve a chat experience
    instead of a shell.
@@ -28,7 +30,7 @@ const ABOUT_TEXT string = `-> ssh-chat is made by @shazow.
    Source: https://github.com/shazow/ssh-chat
 
    For more, visit shazow.net or follow at twitter.com/shazow
-`
+` + RESET
 
 type Client struct {
 	Server        *Server
@@ -57,6 +59,14 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 
 func (c *Client) ColoredName() string {
     return ColorString(c.Color, c.Name)	
+}
+
+func (c *Client) SysMsg(msg string, args ...interface{}) {
+	c.Msg <- SYSTEM_MESSAGE_FORMAT + "-> " + fmt.Sprintf(msg, args...) + RESET
+}
+
+func (c *Client) SysMsg2(msg string, args ...interface{}) {
+	c.Write(SYSTEM_MESSAGE_FORMAT + "-> " + fmt.Sprintf(msg, args...) + RESET)
 }
 
 func (c *Client) Write(msg string) {
@@ -141,7 +151,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				}
 				msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
 				if c.IsSilenced() || len(msg) > 1000 {
-					c.Msg <- fmt.Sprintf("-> Message rejected.")
+					c.SysMsg("Message rejected.")
 				} else {
 					c.Server.Broadcast(msg, nil)
 				}
@@ -149,7 +159,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
 				} else {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /nick $NAME")
+					c.SysMsg("Missing $NAME from: /nick $NAME")
 				}
 			case "/whois":
 				if len(parts) == 2 {
@@ -159,28 +169,28 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						if len(version) > 100 {
 							version = "Evil Jerk with a superlong string"
 						}
-						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
+						c.SysMsg("%s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
 					} else {
-						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+						c.SysMsg("No such name: %s", parts[1])
 					}
 				} else {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /whois $NAME")
+					c.SysMsg("Missing $NAME from: /whois $NAME")
 				}
 			case "/list":
 				names := c.Server.List(nil)
-				c.Msg <- fmt.Sprintf("-> %d connected: %s", len(names), strings.Join(names, ", "))
+				c.SysMsg("%d connected: %s", len(names), strings.Join(names, ", "))
 			case "/ban":
 				if !c.Server.IsOp(c) {
-					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+					c.SysMsg("You're not an admin.")
 				} else if len(parts) != 2 {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /ban $NAME")
+					c.SysMsg("Missing $NAME from: /ban $NAME")
 				} else {
 					client := c.Server.Who(parts[1])
 					if client == nil {
-						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.Write(fmt.Sprintf("-> Banned by %s.", c.ColoredName()))
+						client.SysMsg2("Banned by %s.", c.ColoredName())
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
 						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
@@ -188,24 +198,24 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				}
 			case "/op":
 				if !c.Server.IsOp(c) {
-					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+					c.SysMsg("You're not an admin.")
 				} else if len(parts) != 2 {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /op $NAME")
+					c.SysMsg("Missing $NAME from: /op $NAME")
 				} else {
 					client := c.Server.Who(parts[1])
 					if client == nil {
-						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.Write(fmt.Sprintf("-> Made op by %s.", c.ColoredName()))
+						client.SysMsg2("Made op by %s.", c.ColoredName())
 						c.Server.Op(fingerprint)
 					}
 				}
 			case "/silence":
 				if !c.Server.IsOp(c) {
-					c.Msg <- fmt.Sprintf("-> You're not an admin.")
+					c.SysMsg("You're not an admin.")
 				} else if len(parts) < 2 {
-					c.Msg <- fmt.Sprintf("-> Missing $NAME from: /silence $NAME")
+					c.SysMsg("Missing $NAME from: /silence $NAME")
 				} else {
 					duration := time.Duration(5) * time.Minute
 					if len(parts) >= 3 {
@@ -216,21 +226,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					}
 					client := c.Server.Who(parts[1])
 					if client == nil {
-						c.Msg <- fmt.Sprintf("-> No such name: %s", parts[1])
+						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						client.Silence(duration)
-						client.Write(fmt.Sprintf("-> Silenced for %s by %s.", duration, c.ColoredName()))
+						client.SysMsg2("Silenced for %s by %s.", duration, c.ColoredName())
 					}
 				}
 			default:
-				c.Msg <- fmt.Sprintf("-> Invalid command: %s", line)
+				c.SysMsg("Invalid command: %s", line)
 			}
 			continue
 		}
 
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
 		if c.IsSilenced() || len(msg) > 1000 {
-			c.Msg <- fmt.Sprintf("-> Message rejected.")
+			c.SysMsg("Message rejected.")
 			continue
 		}
 		c.Server.Broadcast(msg, c)
