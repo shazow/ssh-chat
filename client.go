@@ -341,7 +341,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			c.Msg <- fmt.Sprintf("-> Rate limiting in effect.")
 			continue
 		}
-		if c.IsSilenced() || len(msg) > 1000 || len(msg) == 0 {
+		if c.IsSilenced() || len(msg) > 1000 || len(line) < 1 {
 			c.SysMsg("Message rejected.")
 			continue
 		}

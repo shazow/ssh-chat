@@ -36,6 +36,9 @@ func main() {
 		return
 	}
 
+	// Initialize seed for random colors
+	RandomColorInit()
+
 	// Figure out the log level
 	numVerbose := len(options.Verbose)
 	if numVerbose > len(logLevels) {
