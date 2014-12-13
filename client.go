@@ -16,6 +16,7 @@ const HELP_TEXT string = `-> Available commands:
    /exit
    /help
    /list
+   /uptime
    /nick $NAME
    /whois $NAME
 `
@@ -133,6 +134,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
 			case "/about":
 				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
+			case "/uptime":
+				c.Write(c.Server.Uptime())
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
 				if me == "" {
