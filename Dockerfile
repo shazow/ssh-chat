@@ -1,4 +1,4 @@
-FROM golang:1.3.3
+FROM golang:1.4
 MAINTAINER Alvin Lai <al@alvinlai.com>
 
 RUN apt-get update
