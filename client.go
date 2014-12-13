@@ -131,10 +131,10 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					me = " is at a loss for words."
 				}
 				msg := fmt.Sprintf("** %s%s", c.Name, me)
-				if c.IsSilenced() {
-					c.Msg <- fmt.Sprintf("-> Message rejected, silenced.")
+				if c.IsSilenced() || len(msg) > 1000 {
+					c.Msg <- fmt.Sprintf("-> Message rejected.")
 				} else {
-					c.Server.Broadcast(msg[:200], nil)
+					c.Server.Broadcast(msg, nil)
 				}
 			case "/nick":
 				if len(parts) == 2 {
