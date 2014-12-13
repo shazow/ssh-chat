@@ -15,7 +15,7 @@ import (
 const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
-var RE_STRIP_NAME = regexp.MustCompile("[^0-9A-Za-z_]")
+var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_]")
 
 type Clients map[string]*Client
 
@@ -113,7 +113,7 @@ func (s *Server) Remove(client *Client) {
 func (s *Server) proposeName(name string) (string, error) {
 	// Assumes caller holds lock.
 	var err error
-	name = RE_STRIP_NAME.ReplaceAllString(name, "")
+	name = RE_STRIP_TEXT.ReplaceAllString(name, "")
 
 	if len(name) > MAX_NAME_LENGTH {
 		name = name[:MAX_NAME_LENGTH]
@@ -240,9 +240,9 @@ func (s *Server) Start(laddr string) error {
 					return
 				}
 
-				version := sshConn.ClientVersion()
+				version := RE_STRIP_TEXT.ReplaceAllString(string(sshConn.ClientVersion()), "")
 				if len(version) > 100 {
-					version = []byte("Evil Jerk with a superlong string")
+					version = "Evil Jerk with a superlong string"
 				}
 				logger.Infof("Connection #%d from: %s, %s, %s", s.count+1, sshConn.RemoteAddr(), sshConn.User(), version)
 

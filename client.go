@@ -146,9 +146,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if len(parts) == 2 {
 					client := c.Server.Who(parts[1])
 					if client != nil {
-						version := client.Conn.ClientVersion()
+						version := RE_STRIP_TEXT.ReplaceAllString(string(client.Conn.ClientVersion()), "")
 						if len(version) > 100 {
-							version = []byte("Evil Jerk with a superlong string")
+							version = "Evil Jerk with a superlong string"
 						}
 						c.Msg <- fmt.Sprintf("-> %s is %s via %s", client.Name, client.Fingerprint(), version)
 					} else {
