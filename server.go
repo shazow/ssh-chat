@@ -15,7 +15,7 @@ import (
 const MAX_NAME_LENGTH = 32
 const HISTORY_LEN = 20
 
-var RE_STRIP_NAME = regexp.MustCompile("[[:^alpha:]]")
+var RE_STRIP_NAME = regexp.MustCompile("[^0-9A-Za-z_]")
 
 type Clients map[string]*Client
 
