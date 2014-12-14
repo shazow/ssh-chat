@@ -11,6 +11,8 @@ import (
 
 const MSG_BUFFER int = 50
 const MAX_MSG_LENGTH int = 512
+const DEFAULT_CHANNEL = "default"
+const DEFAULT_TIMEFORMAT = "[15:04]"
 
 const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /about               - About this chat.
@@ -23,6 +25,9 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day
+   /join $CHANNEL       - Join the specified channel.
+   /channel             - Print the name of the current channel.
+   /timeformat $FORMAT  - Set the timeformat to the given format.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -59,17 +64,21 @@ type Client struct {
 	silencedUntil time.Time
 	lastTX        time.Time
 	beepMe        bool
+	Channel       string
+	TimeFormat    string
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server: server,
-		Conn:   conn,
-		Name:   conn.User(),
-		Color:  RandomColor256(),
-		Msg:    make(chan string, MSG_BUFFER),
-		ready:  make(chan struct{}, 1),
-		lastTX: time.Now(),
+		Server:     server,
+		Conn:       conn,
+		Name:       conn.User(),
+		Color:      RandomColor256(),
+		Msg:        make(chan string, MSG_BUFFER),
+		ready:      make(chan struct{}, 1),
+		lastTX:     time.Now(),
+		Channel:    DEFAULT_CHANNEL,
+		TimeFormat: DEFAULT_TIMEFORMAT,
 	}
 }
 
@@ -82,7 +91,12 @@ func (c *Client) SysMsg(msg string, args ...interface{}) {
 }
 
 func (c *Client) Write(msg string) {
-	c.term.Write([]byte(msg + "\r\n"))
+	time := time.Now()
+	ftime := time.UTC().Format(c.TimeFormat)
+	if ftime != "" {
+		ftime = ftime + " "
+	}
+	c.term.Write([]byte(ftime + msg + "\r\n"))
 }
 
 func (c *Client) WriteLines(msg []string) {
@@ -195,7 +209,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if c.IsSilenced() || len(msg) > 1000 {
 					c.SysMsg("Message rejected.")
 				} else {
-					c.Server.Broadcast(msg, nil)
+					channel := Client{Channel: c.Channel}
+					c.Server.Broadcast(msg, &channel)
 				}
 			case "/nick":
 				if len(parts) == 2 {
@@ -220,14 +235,14 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				}
 			case "/list":
 				names := ""
-				nameList := c.Server.List(nil)
+				nameList := c.Server.ListChannel(c.Channel)
 				for _, name := range nameList {
 					names += c.Server.Who(name).ColoredName() + SYSTEM_MESSAGE_FORMAT + ", "
 				}
 				if len(names) > 2 {
 					names = names[:len(names)-2]
 				}
-				c.SysMsg("%d connected: %s", len(nameList), names)
+				c.SysMsg("%d connected in channel %s: %s", len(nameList), c.Channel, names)
 			case "/ban":
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
@@ -316,7 +331,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.MotdUnicast(c)
 				} else {
 					var newmotd string
-					if (len(parts) == 2) {
+					if len(parts) == 2 {
 						newmotd = parts[1]
 					} else {
 						newmotd = parts[1] + " " + parts[2]
@@ -324,7 +339,25 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.SetMotd(c, newmotd)
 					c.Server.MotdBroadcast(c)
 				}
+			case "/join":
+				if len(parts) < 2 {
+					c.SysMsg("Missing $CHANNEL from: /join $CHANNEL.")
+					break
+				}
+				if parts[1] == "" {
+					c.SysMsg("The name of the $CHANNEL can not be empty.")
+					break
+				}
 
+				c.Server.setChannel(c, parts[1])
+			case "/channel":
+				c.SysMsg("You are currently in channel %s.", c.Channel)
+			case "/timeformat":
+				if len(parts) < 2 {
+					c.SysMsg("Missing $FORMAT from: /timeformat $FORMAT.")
+					break
+				}
+				c.setTimeFormat(parts[1])
 			default:
 				c.SysMsg("Invalid command: %s", line)
 			}
@@ -398,4 +431,14 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 			}
 		}
 	}
+}
+
+func (c *Client) setChannel(channel string) {
+	c.Channel = channel
+	c.SysMsg("joined channel %s.", channel)
+}
+
+func (c *Client) setTimeFormat(format string) {
+	c.TimeFormat = format
+	c.SysMsg("set timefromat to %s", format)
 }
