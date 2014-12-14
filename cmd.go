@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,10 +13,11 @@ import (
 )
 
 type Options struct {
-	Verbose  []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
-	Identity string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind     string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
-	Admin    []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
+	Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
+	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
+	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
+	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints that are allowed to connect"`
 }
 
 var logLevels = []log.Level{
@@ -60,6 +62,24 @@ func main() {
 		return
 	}
 
+	for _, fingerprint := range options.Admin {
+		server.Op(fingerprint)
+	}
+
+	if options.Whitelist != "" {
+		file, err := os.Open(options.Whitelist)
+		if err != nil {
+			logger.Errorf("Could not open whitelist file")
+			return
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			server.Whitelist(scanner.Text())
+		}
+	}
+
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -68,10 +88,6 @@ func main() {
 	if err != nil {
 		logger.Errorf("Failed to start server: %v", err)
 		return
-	}
-
-	for _, fingerprint := range options.Admin {
-		server.Op(fingerprint)
 	}
 
 	<-sig // Wait for ^C signal
