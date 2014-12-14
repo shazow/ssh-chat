@@ -88,17 +88,20 @@ func (s *Server) Broadcast(msg string, except *Client) {
 	s.history.Add(msg)
 
 	for _, client := range s.clients {
-		if except != nil && client == except {
+		if (except != nil && client == except) || client.Channel != except.Channel {
 			continue
 		}
 
+		if except != nil && except.Channel != "" {
+			msg = "#" + except.Channel + "> " + msg
+		}
 		if strings.Contains(msg, client.Name) {
 			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
 			tmpMsg := strings.Split(msg, RESET)
 			if client.beepMe {
 				tmpMsg[0] += BEEP
 			}
-			client.Send(strings.Join(tmpMsg, RESET + BOLD + "\033[31m") + RESET)
+			client.Send(strings.Join(tmpMsg, RESET+BOLD+"\033[31m") + RESET)
 		} else {
 			client.Send(msg)
 		}
@@ -132,7 +135,7 @@ func (s *Server) MotdUnicast(client *Client) {
 
 func (s *Server) MotdBroadcast(client *Client) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+	s.Broadcast(" /**\r\n"+"  * "+ColorString("36", s.motd)+"\r\n  **/", client)
 }
 
 func (s *Server) Add(client *Client) {
