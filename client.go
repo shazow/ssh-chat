@@ -26,11 +26,12 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
-   /ban $NAME           - Banish a user from the chat
-   /kick $NAME          - Kick em' out.
-   /op $NAME            - Promote a user to server operator.
-   /silence $NAME       - Revoke a user's ability to speak.
-   /motd $MESSAGE       - Sets the Message of the Day
+   /ban $NAME                - Banish a user from the chat
+   /kick $NAME               - Kick em' out.
+   /op $NAME                 - Promote a user to server operator.
+   /silence $NAME            - Revoke a user's ability to speak.
+   /motd $MESSAGE            - Sets the Message of the Day
+   /whitelist $FINGERPRINT   - Adds pubkey fingerprint to the connection whitelist
 ` + RESET
 
 const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
@@ -323,6 +324,16 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					}
 					c.Server.SetMotd(newmotd)
 					c.Server.MotdBroadcast(c)
+				}
+			case "/whitelist": /* whitelist a fingerprint */
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 2 {
+					c.SysMsg("Missing $FINGERPRINT from: /whitelist $FINGERPRINT")
+				} else {
+					fingerprint := parts[1]
+					c.Server.Whitelist(fingerprint)
+					c.SysMsg("Added %s to the whitelist", fingerprint)
 				}
 
 			default:
