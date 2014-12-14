@@ -26,15 +26,11 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
-   /ban $NAME       - Banish a user from the chat
-   /kick $NAME      - Kick em' out.
-   /op $NAME        - Promote a user to server operator
-   /silence $NAME   - Revoke a user's ability to speak
    /ban $NAME           - Banish a user from the chat
    /kick $NAME          - Kick em' out.
    /op $NAME            - Promote a user to server operator.
    /silence $NAME       - Revoke a user's ability to speak.
-   /motd $MESSAGE    - Sets the Message of the Day
+   /motd $MESSAGE       - Sets the Message of the Day
 ` + RESET
 
 const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
