@@ -60,7 +60,7 @@ type Client struct {
 	silencedUntil time.Time
 	lastTX        time.Time
 	beepMe        bool
-	colorMe		  bool
+	colorMe       bool
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -72,6 +72,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 		lastTX: time.Now(),
+		colorMe: true,
 	}
 }
 
