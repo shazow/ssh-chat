@@ -199,7 +199,7 @@ func (s *Server) Rename(client *Client, newName string) {
 		return
 	}
 
-	// TODO: Use a channel/goroutine for adding clients, rathern than locks?
+	// TODO: Use a channel/goroutine for adding clients, rather than locks?
 	delete(s.clients, client.Name)
 	oldName := client.Name
 	client.Rename(newName)
