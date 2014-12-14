@@ -103,7 +103,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			if client.beepMe {
 				tmpMsg[0] += BEEP
 			}
-			client.Send(strings.Join(tmpMsg, RESET + BOLD + "\033[31m") + RESET)
+			client.Send(strings.Join(tmpMsg, RESET+BOLD+"\033[31m") + RESET)
 		} else {
 			client.Send(msg)
 		}
@@ -137,7 +137,7 @@ func (s *Server) MotdUnicast(client *Client) {
 
 func (s *Server) MotdBroadcast(client *Client) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+	s.Broadcast(" /**\r\n"+"  * "+ColorString("36", s.motd)+"\r\n  **/", client)
 }
 
 func (s *Server) Add(client *Client) {
@@ -237,9 +237,9 @@ func (s *Server) Op(fingerprint string) {
 
 func (s *Server) Whitelist(fingerprint string) {
 	logger.Infof("Adding whitelist: %s", fingerprint)
-	s.lock.Lock()
+	s.Lock()
 	s.whitelist[fingerprint] = struct{}{}
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) Uptime() string {
