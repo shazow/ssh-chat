@@ -23,6 +23,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day
+   /theme [color|mono]  - Set client theme
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -30,6 +31,7 @@ const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator comma
    /kick $NAME               - Kick em' out.
    /op $NAME                 - Promote a user to server operator.
    /silence $NAME            - Revoke a user's ability to speak.
+   /shutdown $MESSAGE        - Broadcast message and shutdown server
    /motd $MESSAGE            - Sets the Message of the Day
    /whitelist $FINGERPRINT   - Adds pubkey fingerprint to the connection whitelist
 ` + RESET
