@@ -12,6 +12,7 @@ import (
 const MSG_BUFFER int = 50
 const MAX_MSG_LENGTH int = 512
 const DEFAULT_CHANNEL = "default"
+const DEFAULT_TIMEFORMAT = "[15:04]"
 
 const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /about               - About this chat.
@@ -26,6 +27,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /motd                - Prints the Message of the Day
    /join $CHANNEL       - Join the specified channel.
    /channel             - Print the name of the current channel.
+   /timeformat $FORMAT  - Set the timeformat to the given format.
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -67,18 +69,20 @@ type Client struct {
 	lastTX        time.Time
 	beepMe        bool
 	Channel       string
+	TimeFormat    string
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server:  server,
-		Conn:    conn,
-		Name:    conn.User(),
-		Color:   RandomColor256(),
-		Msg:     make(chan string, MSG_BUFFER),
-		ready:   make(chan struct{}, 1),
-		lastTX:  time.Now(),
-		Channel: DEFAULT_CHANNEL,
+		Server:     server,
+		Conn:       conn,
+		Name:       conn.User(),
+		Color:      RandomColor256(),
+		Msg:        make(chan string, MSG_BUFFER),
+		ready:      make(chan struct{}, 1),
+		lastTX:     time.Now(),
+		Channel:    DEFAULT_CHANNEL,
+		TimeFormat: DEFAULT_TIMEFORMAT,
 	}
 }
 
@@ -91,7 +95,12 @@ func (c *Client) SysMsg(msg string, args ...interface{}) {
 }
 
 func (c *Client) Write(msg string) {
-	c.term.Write([]byte(msg + "\r\n"))
+	time := time.Now()
+	ftime := time.UTC().Format(c.TimeFormat)
+	if ftime != "" {
+		ftime = ftime + " "
+	}
+	c.term.Write([]byte(ftime + msg + "\r\n"))
 }
 
 func (c *Client) WriteLines(msg []string) {
@@ -347,6 +356,12 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.Server.setChannel(c, parts[1])
 			case "/channel":
 				c.SysMsg("You are currently in channel %s.", c.Channel)
+			case "/timeformat":
+				if len(parts) < 2 {
+					c.SysMsg("Missing $FORMAT from: /timeformat $FORMAT.")
+					break
+				}
+				c.Server.setTimeFormat(c, parts[1])
 			default:
 				c.SysMsg("Invalid command: %s", line)
 			}
@@ -425,4 +440,9 @@ func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
 func (c *Client) setChannel(channel string) {
 	c.Channel = channel
 	c.SysMsg("joined channel %s.", channel)
+}
+
+func (c *Client) setTimeFormat(format string) {
+	c.TimeFormat = format
+	c.SysMsg("set timefromat to %s", format)
 }
