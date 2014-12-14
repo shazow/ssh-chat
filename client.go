@@ -23,6 +23,7 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day
+   /join $CHANNEL       - Join channel
 ` + RESET
 
 const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
@@ -63,17 +64,19 @@ type Client struct {
 	silencedUntil time.Time
 	lastTX        time.Time
 	beepMe        bool
+	Channel       string
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server: server,
-		Conn:   conn,
-		Name:   conn.User(),
-		Color:  RandomColor256(),
-		Msg:    make(chan string, MSG_BUFFER),
-		ready:  make(chan struct{}, 1),
-		lastTX: time.Now(),
+		Server:  server,
+		Conn:    conn,
+		Name:    conn.User(),
+		Color:   RandomColor256(),
+		Msg:     make(chan string, MSG_BUFFER),
+		ready:   make(chan struct{}, 1),
+		lastTX:  time.Now(),
+		Channel: "",
 	}
 }
 
@@ -189,6 +192,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("I'll beep you good.")
 				} else {
 					c.SysMsg("No more beeps. :(")
+				}
+			case "/join":
+				if len(parts) == 2 {
+					c.Channel = parts[1]
+					c.SysMsg("You joined #%s", parts[1])
+				} else {
+					c.SysMsg("Missing $CHANNEL from: /join $CHANNEL")
 				}
 			case "/me":
 				me := strings.TrimLeft(line, "/me")
@@ -320,7 +330,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.MotdUnicast(c)
 				} else {
 					var newmotd string
-					if (len(parts) == 2) {
+					if len(parts) == 2 {
 						newmotd = parts[1]
 					} else {
 						newmotd = parts[1] + " " + parts[2]
