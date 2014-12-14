@@ -403,10 +403,3 @@ func (s *Server) setChannel(client *Client, channel string) {
 
 	s.SysMsgChannel(oldchannel, "%s moved to channel %s.", client.ColoredName(), channel)
 }
-
-func (s *Server) setTimeFormat(client *Client, format string) {
-	s.lock.Lock()
-	client.setTimeFormat(format)
-	s.clients[client.Name] = client
-	s.lock.Unlock()
-}

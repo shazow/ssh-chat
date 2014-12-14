@@ -361,7 +361,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $FORMAT from: /timeformat $FORMAT.")
 					break
 				}
-				c.Server.setTimeFormat(c, parts[1])
+				c.setTimeFormat(parts[1])
 			default:
 				c.SysMsg("Invalid command: %s", line)
 			}
