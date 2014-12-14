@@ -12,27 +12,6 @@ import (
 const MSG_BUFFER int = 50
 const MAX_MSG_LENGTH int = 512
 
-const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
-   /about               - About this chat.
-   /exit                - Exit the chat.
-   /help                - Show this help text.
-   /list                - List the users that are currently connected.
-   /beep                - Enable BEL notifications on mention.
-   /me $ACTION          - Show yourself doing an action.
-   /nick $NAME          - Rename yourself to a new name.
-   /whois $NAME         - Display information about another connected user.
-   /msg $NAME $MESSAGE  - Sends a private message to a user.
-   /motd                - Prints the Message of the Day
-` + RESET
-
-const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
-   /ban $NAME           - Banish a user from the chat
-   /kick $NAME          - Kick em' out.
-   /op $NAME            - Promote a user to server operator.
-   /silence $NAME       - Revoke a user's ability to speak.
-   /motd $MESSAGE       - Sets the Message of the Day
-` + RESET
-
 const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
 
    It is a custom ssh server built in Go to serve a chat experience
@@ -153,16 +132,36 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 	}()
 
+HandleLine:
 	for {
 		line, err := c.term.ReadLine()
 		if err != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
 
 		parts := strings.SplitN(line, " ", 3)
+		argc := len(parts)
 		isCmd := strings.HasPrefix(parts[0], "/")
 
 		if isCmd {
+			if cmds, exists := commands[parts[0]]; exists {
+				for _, cmd := range cmds {
+					if cmd.Optional || (cmd.HasMsg && cmd.Args <= argc) || (!cmd.HasMsg && cmd.Args == argc) {
+						if cmd.MustBeAdmin && !c.Server.IsOp(c) {
+							c.SysMsg("You're not an admin.")
+						} else {
+							cmd.Invoke(c, parts)
+						}
+					} else if argc < cmd.Args {
+						args := strings.Split(cmd.Spec, " ")
+						c.SysMsg(fmt.Sprintf("Missing %s from: %s", args[argc], cmd.Spec))
+					} else {
+						continue
+					}
+					continue HandleLine
+				}
+			}
 			// TODO: Factor this out.
 			switch parts[0] {
 			case "/test-colors": // Shh, this command is a secret!
@@ -170,160 +169,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
 			case "/exit":
 				channel.Close()
-			case "/help":
-				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
-				if c.Server.IsOp(c) {
-					c.WriteLines(strings.Split(OP_HELP_TEXT, "\n"))
-				}
-			case "/about":
-				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
 			case "/uptime":
 				c.Write(c.Server.Uptime())
-			case "/beep":
-				c.beepMe = !c.beepMe
-				if c.beepMe {
-					c.SysMsg("I'll beep you good.")
-				} else {
-					c.SysMsg("No more beeps. :(")
-				}
-			case "/me":
-				me := strings.TrimLeft(line, "/me")
-				if me == "" {
-					me = " is at a loss for words."
-				}
-				msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
-				if c.IsSilenced() || len(msg) > 1000 {
-					c.SysMsg("Message rejected.")
-				} else {
-					c.Server.Broadcast(msg, nil)
-				}
-			case "/nick":
-				if len(parts) == 2 {
-					c.Server.Rename(c, parts[1])
-				} else {
-					c.SysMsg("Missing $NAME from: /nick $NAME")
-				}
-			case "/whois":
-				if len(parts) == 2 {
-					client := c.Server.Who(parts[1])
-					if client != nil {
-						version := RE_STRIP_TEXT.ReplaceAllString(string(client.Conn.ClientVersion()), "")
-						if len(version) > 100 {
-							version = "Evil Jerk with a superlong string"
-						}
-						c.SysMsg("%s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
-					} else {
-						c.SysMsg("No such name: %s", parts[1])
-					}
-				} else {
-					c.SysMsg("Missing $NAME from: /whois $NAME")
-				}
-			case "/list":
-				names := ""
-				nameList := c.Server.List(nil)
-				for _, name := range nameList {
-					names += c.Server.Who(name).ColoredName() + SYSTEM_MESSAGE_FORMAT + ", "
-				}
-				if len(names) > 2 {
-					names = names[:len(names)-2]
-				}
-				c.SysMsg("%d connected: %s", len(nameList), names)
-			case "/ban":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /ban $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						fingerprint := client.Fingerprint()
-						client.SysMsg("Banned by %s.", c.ColoredName())
-						c.Server.Ban(fingerprint, nil)
-						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
-					}
-				}
-			case "/op":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /op $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						fingerprint := client.Fingerprint()
-						client.SysMsg("Made op by %s.", c.ColoredName())
-						c.Server.Op(fingerprint)
-					}
-				}
-			case "/kick":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /kick $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						client.SysMsg("Kicked by %s.", c.ColoredName())
-						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
-					}
-				}
-			case "/silence":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) < 2 {
-					c.SysMsg("Missing $NAME from: /silence $NAME")
-				} else {
-					duration := time.Duration(5) * time.Minute
-					if len(parts) >= 3 {
-						parsedDuration, err := time.ParseDuration(parts[2])
-						if err == nil {
-							duration = parsedDuration
-						}
-					}
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						client.Silence(duration)
-						client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
-					}
-				}
-			case "/msg": /* Send a PM */
-				/* Make sure we have a recipient and a message */
-				if len(parts) < 2 {
-					c.SysMsg("Missing $NAME from: /msg $NAME $MESSAGE")
-					break
-				} else if len(parts) < 3 {
-					c.SysMsg("Missing $MESSAGE from: /msg $NAME $MESSAGE")
-					break
-				}
-				/* Ask the server to send the message */
-				if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
-					c.SysMsg("Unable to send message to %v: %v", parts[1], err)
-				}
-			case "/motd": /* print motd */
-				if !c.Server.IsOp(c) {
-					c.Server.MotdUnicast(c)
-				} else if len(parts) < 2 {
-					c.Server.MotdUnicast(c)
-				} else {
-					var newmotd string
-					if (len(parts) == 2) {
-						newmotd = parts[1]
-					} else {
-						newmotd = parts[1] + " " + parts[2]
-					}
-					c.Server.SetMotd(c, newmotd)
-					c.Server.MotdBroadcast(c)
-				}
 
 			default:
 				c.SysMsg("Invalid command: %s", line)
