@@ -123,21 +123,19 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 	return nil
 }
 
-func (s *Server) SetMotd(client *Client, motd string) {
+func (s *Server) SetMotd(motd string) {
 	s.Lock()
 	s.motd = motd
 	s.Unlock()
 }
 
 func (s *Server) MotdUnicast(client *Client) {
-	client.SysMsg("/** MOTD")
-	client.SysMsg(" * " + ColorString("36", s.motd)) /* a nice cyan color */
-	client.SysMsg(" **/")
+	client.SysMsg("MOTD:\r\n" + ColorString("36", s.motd)) /* a nice cyan color */
 }
 
 func (s *Server) MotdBroadcast(client *Client) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+	s.Broadcast(ColorString("36", s.motd), client)
 }
 
 func (s *Server) Add(client *Client) {
