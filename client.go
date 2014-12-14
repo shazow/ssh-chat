@@ -92,6 +92,10 @@ func (c *Client) WriteLines(msg []string) {
 	}
 }
 
+func (c *Client) ClearScreen() {
+	c.Write("\033[2J" + "\033[;H");
+}
+
 func (c *Client) Send(msg string) {
 	if len(msg) > MAX_MSG_LENGTH {
 		return
@@ -171,6 +175,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
 			case "/exit":
 				channel.Close()
+			case "/clear":
+				c.ClearScreen()
 			case "/help":
 				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
 				if c.Server.IsOp(c) {
