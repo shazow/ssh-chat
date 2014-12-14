@@ -14,7 +14,7 @@ import (
 )
 
 const MAX_NAME_LENGTH = 32
-const HISTORY_LEN = 20
+const HISTORY_LEN = 80
 
 const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
 const PRIVATE_MESSAGE_FORMAT string = "\033[3m"
@@ -124,6 +124,11 @@ func (s *Server) SetMotd(client *Client, motd string) {
 	s.lock.Unlock()
 }
 
+func (s *Server) NumMotdLines() int {
+	messageLines := strings.Count(s.motd, "\n") + 1
+	return messageLines + 2 // Add a line for the "wrapper" (the one that starts with /** MOTD )
+}
+
 func (s *Server) MotdUnicast(client *Client) {
 	client.SysMsg("/** MOTD")
 	client.SysMsg(" * " + ColorString("36", s.motd)) /* a nice cyan color */
@@ -137,8 +142,20 @@ func (s *Server) MotdBroadcast(client *Client) {
 
 func (s *Server) Add(client *Client) {
 	go func() {
+		client.ClearScreen()
+	
+		numHistoryLines := client.termHeight
+		numHistoryLines -= s.NumMotdLines()
+		numHistoryLines -= 1 // "Welcome to ssh-chat"
+		numHistoryLines -= 1 // User prompt
+		if (numHistoryLines < 10) {
+			// Make sure to at least send some data, just in case.
+			// Also prevents a server-size crash when `numHistoryLines` is negative.
+			numHistoryLines = 10
+		}
+		
+		client.SendLines(s.history.Get(numHistoryLines))
 		s.MotdUnicast(client)
-		client.SendLines(s.history.Get(10))
 		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
 	}()
 
