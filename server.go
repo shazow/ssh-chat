@@ -146,7 +146,7 @@ func (s *Server) Add(client *Client) {
 	
 		numHistoryLines := client.termHeight
 		numHistoryLines -= s.NumMotdLines()
-		numHistoryLines -= 1 // "Welcome to ssh-chat"
+		numHistoryLines -= 2 // "Welcome to ssh-chat"
 		numHistoryLines -= 1 // User prompt
 		if (numHistoryLines < 10) {
 			// Make sure to at least send some data, just in case.
@@ -157,6 +157,19 @@ func (s *Server) Add(client *Client) {
 		client.SendLines(s.history.Get(numHistoryLines))
 		s.MotdUnicast(client)
 		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
+		
+		numClients := len(s.clients)
+		if (numClients == 1) {
+			client.SysMsg("You are all alone in here.");
+		} else if (numClients == 2) {
+			for _, otherClient := range s.clients {
+				if otherClient != client {
+					client.SysMsg("At least you have %s to keep you company.", otherClient.ColoredName())
+				}
+			}
+		} else {
+			client.SysMsg("There are currently %d users chatting.", numClients)
+		}
 	}()
 
 	s.lock.Lock()
