@@ -28,7 +28,6 @@ type Server struct {
 	sshConfig *ssh.ServerConfig
 	done      chan struct{}
 	clients   Clients
-	lock      sync.Mutex
 	count     int
 	history   *History
 	motd      string
@@ -37,6 +36,7 @@ type Server struct {
 	bannedPk  map[string]*time.Time // fingerprint lookup
 	bannedIp  map[net.Addr]*time.Time
 	started   time.Time
+	sync.Mutex
 }
 
 func NewServer(privateKey []byte) (*Server, error) {
@@ -124,9 +124,9 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 }
 
 func (s *Server) SetMotd(client *Client, motd string) {
-	s.lock.Lock()
+	s.Lock()
 	s.motd = motd
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) MotdUnicast(client *Client) {
@@ -147,7 +147,7 @@ func (s *Server) Add(client *Client) {
 		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
 	}()
 
-	s.lock.Lock()
+	s.Lock()
 	s.count++
 
 	newName, err := s.proposeName(client.Name)
@@ -158,15 +158,15 @@ func (s *Server) Add(client *Client) {
 	client.Rename(newName)
 	s.clients[client.Name] = client
 	num := len(s.clients)
-	s.lock.Unlock()
+	s.Unlock()
 
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
 }
 
 func (s *Server) Remove(client *Client) {
-	s.lock.Lock()
+	s.Lock()
 	delete(s.clients, client.Name)
-	s.lock.Unlock()
+	s.Unlock()
 
 	s.SysMsg("%s left.", client.ColoredName())
 }
@@ -192,12 +192,12 @@ func (s *Server) proposeName(name string) (string, error) {
 }
 
 func (s *Server) Rename(client *Client, newName string) {
-	s.lock.Lock()
+	s.Lock()
 
 	newName, err := s.proposeName(newName)
 	if err != nil {
 		client.SysMsg("%s", err)
-		s.lock.Unlock()
+		s.Unlock()
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) Rename(client *Client, newName string) {
 	oldName := client.Name
 	client.Rename(newName)
 	s.clients[client.Name] = client
-	s.lock.Unlock()
+	s.Unlock()
 
 	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
 }
@@ -230,9 +230,9 @@ func (s *Server) Who(name string) *Client {
 
 func (s *Server) Op(fingerprint string) {
 	logger.Infof("Adding admin: %s", fingerprint)
-	s.lock.Lock()
+	s.Lock()
 	s.admins[fingerprint] = struct{}{}
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) Whitelist(fingerprint string) {
@@ -279,19 +279,19 @@ func (s *Server) IsBanned(fingerprint string) bool {
 
 func (s *Server) Ban(fingerprint string, duration *time.Duration) {
 	var until *time.Time
-	s.lock.Lock()
+	s.Lock()
 	if duration != nil {
 		when := time.Now().Add(*duration)
 		until = &when
 	}
 	s.bannedPk[fingerprint] = until
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) Unban(fingerprint string) {
-	s.lock.Lock()
+	s.Lock()
 	delete(s.bannedPk, fingerprint)
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) Start(laddr string) error {
