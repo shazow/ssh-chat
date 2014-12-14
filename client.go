@@ -71,7 +71,6 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 		lastTX: time.Now(),
-		colorMe: true,
 	}
 }
 
@@ -337,13 +336,17 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.SetMotd(c, newmotd)
 					c.Server.MotdBroadcast(c)
 				}
-			case "/color":
-				c.colorMe = !c.colorMe
-				c.Rename(c.Name)
-				if c.colorMe {
-					c.SysMsg("Turned on color chat")
+			case "/theme":
+				if len(parts) < 2 {
+					c.SysMsg("Missing $THEME from: /theme $THEME")
+					c.SysMsg("Choose either color or mono")
 				} else {
-					c.SysMsg("Turned off color chat")
+					if parts[1] == "mono" {
+						c.colorMe = false
+					} else if parts[1] == "color" {
+						c.colorMe = true
+					}
+					c.Rename(c.Name)
 				}
 
 			default:
