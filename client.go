@@ -321,7 +321,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					} else {
 						newmotd = parts[1] + " " + parts[2]
 					}
-					c.Server.SetMotd(c, newmotd)
+					c.Server.SetMotd(newmotd)
 					c.Server.MotdBroadcast(c)
 				}
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"os"
 	"os/signal"
 
@@ -18,6 +19,7 @@ type Options struct {
 	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
 	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
 	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints that are allowed to connect"`
+	Motd      string   `long:"motd" description:"Message of the Day file (optional)"`
 }
 
 var logLevels = []log.Level{
@@ -78,6 +80,19 @@ func main() {
 		for scanner.Scan() {
 			server.Whitelist(scanner.Text())
 		}
+	}
+
+	if options.Motd != "" {
+		motd, err := ioutil.ReadFile(options.Motd)
+		if err != nil {
+			logger.Errorf("Failed to load MOTD file: %v", err)
+			return
+		}
+		motdString := string(motd[:])
+		/* hack to normalize line endings into \r\n */
+		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
+		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
+		server.SetMotd(motdString)
 	}
 
 	// Construct interrupt handler
