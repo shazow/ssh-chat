@@ -237,9 +237,9 @@ func (s *Server) Op(fingerprint string) {
 
 func (s *Server) Whitelist(fingerprint string) {
 	logger.Infof("Adding whitelist: %s", fingerprint)
-	s.lock.Lock()
+	s.Lock()
 	s.whitelist[fingerprint] = struct{}{}
-	s.lock.Unlock()
+	s.Unlock()
 }
 
 func (s *Server) Uptime() string {
