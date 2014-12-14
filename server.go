@@ -83,13 +83,27 @@ func (s *Server) SysMsg(msg string, args ...interface{}) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * "+fmt.Sprintf(msg, args...)), nil)
 }
 
+func (s *Server) SysMsgChannel(channel, msg string, args ...interface{}) {
+	client := Client{
+		Channel: channel,
+	}
+
+	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * "+fmt.Sprintf(msg, args...)), &client)
+}
+
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
 
 	for _, client := range s.clients {
-		if except != nil && client == except {
-			continue
+		if except != nil {
+			if except.Channel != client.Channel {
+				continue
+			}
+
+			if except != nil && client == except {
+				continue
+			}
 		}
 
 		if strings.Contains(msg, client.Name) {
@@ -98,7 +112,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			if client.beepMe {
 				tmpMsg[0] += BEEP
 			}
-			client.Send(strings.Join(tmpMsg, RESET + BOLD + "\033[31m") + RESET)
+			client.Send(strings.Join(tmpMsg, RESET+BOLD+"\033[31m") + RESET)
 		} else {
 			client.Send(msg)
 		}
@@ -132,7 +146,7 @@ func (s *Server) MotdUnicast(client *Client) {
 
 func (s *Server) MotdBroadcast(client *Client) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+	s.Broadcast(" /**\r\n"+"  * "+ColorString("36", s.motd)+"\r\n  **/", client)
 }
 
 func (s *Server) Add(client *Client) {
@@ -163,7 +177,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, client.Name)
 	s.lock.Unlock()
 
-	s.SysMsg("%s left.", client.ColoredName())
+	s.SysMsgChannel(client.Channel, "%s left.", client.ColoredName())
 }
 
 func (s *Server) proposeName(name string) (string, error) {
@@ -203,17 +217,30 @@ func (s *Server) Rename(client *Client, newName string) {
 	s.clients[client.Name] = client
 	s.lock.Unlock()
 
-	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
+	s.SysMsgChannel(client.Channel, "%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
 }
 
 func (s *Server) List(prefix *string) []string {
 	r := []string{}
 
-	for name, _ := range s.clients {
+	for name := range s.clients {
 		if prefix != nil && !strings.HasPrefix(name, *prefix) {
 			continue
 		}
 		r = append(r, name)
+	}
+
+	return r
+}
+
+func (s *Server) ListChannel(channel string) []string {
+	r := []string{}
+
+	for _, client := range s.clients {
+		if client.Channel != channel {
+			continue
+		}
+		r = append(r, client.Name)
 	}
 
 	return r
@@ -363,4 +390,16 @@ func Fingerprint(k ssh.PublicKey) string {
 	hash := md5.Sum(k.Marshal())
 	r := fmt.Sprintf("% x", hash)
 	return strings.Replace(r, " ", ":", -1)
+}
+
+func (s *Server) setChannel(client *Client, channel string) {
+	oldchannel := client.Channel
+
+	s.SysMsgChannel(channel, "%s joined.", client.ColoredName())
+	s.lock.Lock()
+	client.setChannel(channel)
+	s.clients[client.Name] = client
+	s.lock.Unlock()
+
+	s.SysMsgChannel(oldchannel, "%s moved to channel %s.", client.ColoredName(), channel)
 }
