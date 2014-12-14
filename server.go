@@ -31,6 +31,7 @@ type Server struct {
 	count     int
 	history   *History
 	motd      string
+	whitelist map[string]struct{}   // fingerprint lookup
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPk  map[string]*time.Time // fingerprint lookup
 	bannedIp  map[net.Addr]*time.Time
@@ -45,15 +46,16 @@ func NewServer(privateKey []byte) (*Server, error) {
 	}
 
 	server := Server{
-		done:     make(chan struct{}),
-		clients:  Clients{},
-		count:    0,
-		history:  NewHistory(HISTORY_LEN),
-		motd:     "Message of the Day! Modify with /motd",
-		admins:   map[string]struct{}{},
-		bannedPk: map[string]*time.Time{},
-		bannedIp: map[net.Addr]*time.Time{},
-		started:  time.Now(),
+		done:      make(chan struct{}),
+		clients:   Clients{},
+		count:     0,
+		history:   NewHistory(HISTORY_LEN),
+		motd:      "Message of the Day! Modify with /motd",
+		whitelist: map[string]struct{}{},
+		admins:    map[string]struct{}{},
+		bannedPk:  map[string]*time.Time{},
+		bannedIp:  map[net.Addr]*time.Time{},
+		started:   time.Now(),
 	}
 
 	config := ssh.ServerConfig{
@@ -63,6 +65,9 @@ func NewServer(privateKey []byte) (*Server, error) {
 			fingerprint := Fingerprint(key)
 			if server.IsBanned(fingerprint) {
 				return nil, fmt.Errorf("Banned.")
+			}
+			if !server.IsWhitelisted(fingerprint) {
+				return nil, fmt.Errorf("Not Whitelisted.")
 			}
 			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
 			return perm, nil
@@ -118,21 +123,19 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 	return nil
 }
 
-func (s *Server) SetMotd(client *Client, motd string) {
+func (s *Server) SetMotd(motd string) {
 	s.Lock()
 	s.motd = motd
 	s.Unlock()
 }
 
 func (s *Server) MotdUnicast(client *Client) {
-	client.SysMsg("/** MOTD")
-	client.SysMsg(" * " + ColorString("36", s.motd)) /* a nice cyan color */
-	client.SysMsg(" **/")
+	client.SysMsg("MOTD:\r\n" + ColorString("36", s.motd)) /* a nice cyan color */
 }
 
 func (s *Server) MotdBroadcast(client *Client) {
 	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(" /**\r\n" + "  * " + ColorString("36", s.motd) + "\r\n  **/", client)
+	s.Broadcast(ColorString("36", s.motd), client)
 }
 
 func (s *Server) Add(client *Client) {
@@ -230,12 +233,30 @@ func (s *Server) Op(fingerprint string) {
 	s.Unlock()
 }
 
+func (s *Server) Whitelist(fingerprint string) {
+	logger.Infof("Adding whitelist: %s", fingerprint)
+	s.Lock()
+	s.whitelist[fingerprint] = struct{}{}
+	s.Unlock()
+}
+
 func (s *Server) Uptime() string {
 	return time.Now().Sub(s.started).String()
 }
 
 func (s *Server) IsOp(client *Client) bool {
 	_, r := s.admins[client.Fingerprint()]
+	return r
+}
+
+func (s *Server) IsWhitelisted(fingerprint string) bool {
+	/* if no whitelist, anyone is welcome */
+	if len(s.whitelist) == 0 {
+		return true
+	}
+
+	/* otherwise, check for whitelist presence */
+	_, r := s.whitelist[fingerprint]
 	return r
 }
 
