@@ -59,6 +59,7 @@ type Client struct {
 	silencedUntil time.Time
 	lastTX        time.Time
 	beepMe        bool
+	colorMe		  bool
 }
 
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
@@ -70,6 +71,7 @@ func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 		Msg:    make(chan string, MSG_BUFFER),
 		ready:  make(chan struct{}, 1),
 		lastTX: time.Now(),
+		colorMe: true,
 	}
 }
 
@@ -82,6 +84,9 @@ func (c *Client) SysMsg(msg string, args ...interface{}) {
 }
 
 func (c *Client) Write(msg string) {
+	if(!c.colorMe) {
+		msg = DeColorString(msg)
+	}
 	c.term.Write([]byte(msg + "\r\n"))
 }
 
@@ -129,7 +134,15 @@ func (c *Client) Resize(width int, height int) error {
 
 func (c *Client) Rename(name string) {
 	c.Name = name
-	c.term.SetPrompt(fmt.Sprintf("[%s] ", c.ColoredName()))
+	var prompt string
+
+	if(c.colorMe) {
+		prompt = c.ColoredName()
+	} else {
+		prompt = c.Name
+	}
+
+	c.term.SetPrompt(fmt.Sprintf("[%s] ", prompt))
 }
 
 func (c *Client) Fingerprint() string {
@@ -323,6 +336,14 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					}
 					c.Server.SetMotd(c, newmotd)
 					c.Server.MotdBroadcast(c)
+				}
+			case "/color":
+				c.colorMe = !c.colorMe
+				c.Rename(c.Name)
+				if c.colorMe {
+					c.SysMsg("Turned on color chat")
+				} else {
+					c.SysMsg("Turned off color chat")
 				}
 
 			default:
