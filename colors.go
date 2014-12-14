@@ -17,10 +17,11 @@ const BLINK string =     "\033[5m"
 const INVERT string =    "\033[7m"
 
 var colors = []string { "31", "32", "33", "34", "35", "36", "37", "91", "92", "93", "94", "95", "96", "97" }
-var r *regexp.Regexp = regexp.MustCompile("\033\\[[\\d;]+m")
+// For removing ANSI Escapes
+var deColor *regexp.Regexp = regexp.MustCompile("\033\\[[\\d;]+m")
 
 func DeColorString(s string) string {
-	s = r.ReplaceAllString(s, "")
+	s = deColor.ReplaceAllString(s, "")
 	return s
 }
 

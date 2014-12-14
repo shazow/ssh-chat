@@ -308,6 +308,24 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
 					}
 				}
+			case "/shutdown":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else {
+					var split []string = strings.SplitN(line, " ", 2)
+					var msg string
+					if len(split) > 1 {
+						msg = split[1]
+					} else {
+						msg = ""
+					}
+					// Shutdown after 5 seconds
+					go func() {
+						c.Server.Broadcast(ColorString("31", msg), nil)
+						time.Sleep(time.Second * 5)
+						c.Server.Stop()
+					}()
+				}
 			case "/msg": /* Send a PM */
 				/* Make sure we have a recipient and a message */
 				if len(parts) < 2 {
@@ -341,11 +359,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $THEME from: /theme $THEME")
 					c.SysMsg("Choose either color or mono")
 				} else {
+					// Sets colorMe attribute of client
 					if parts[1] == "mono" {
 						c.colorMe = false
 					} else if parts[1] == "color" {
 						c.colorMe = true
 					}
+					// Rename to reset prompt
 					c.Rename(c.Name)
 				}
 
