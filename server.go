@@ -32,28 +32,30 @@ type Server struct {
 	count     int
 	history   *History
 	motd      string
+	whitelist []string
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPk  map[string]*time.Time // fingerprint lookup
 	bannedIp  map[net.Addr]*time.Time
 	started   time.Time
 }
 
-func NewServer(privateKey []byte) (*Server, error) {
+func NewServer(privateKey []byte, whitelist []string) (*Server, error) {
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
 	server := Server{
-		done:     make(chan struct{}),
-		clients:  Clients{},
-		count:    0,
-		history:  NewHistory(HISTORY_LEN),
-		motd:     "Message of the Day! Modify with /motd",
-		admins:   map[string]struct{}{},
-		bannedPk: map[string]*time.Time{},
-		bannedIp: map[net.Addr]*time.Time{},
-		started:  time.Now(),
+		done:      make(chan struct{}),
+		clients:   Clients{},
+		count:     0,
+		history:   NewHistory(HISTORY_LEN),
+		motd:      "Message of the Day! Modify with /motd",
+		whitelist: whitelist,
+		admins:    map[string]struct{}{},
+		bannedPk:  map[string]*time.Time{},
+		bannedIp:  map[net.Addr]*time.Time{},
+		started:   time.Now(),
 	}
 
 	config := ssh.ServerConfig{
@@ -308,10 +310,26 @@ func (s *Server) Start(laddr string) error {
 					version = "Evil Jerk with a superlong string"
 				}
 				logger.Infof("Connection #%d from: %s, %s, %s", s.count+1, sshConn.RemoteAddr(), sshConn.User(), version)
-
 				go ssh.DiscardRequests(requests)
 
 				client := NewClient(s, sshConn)
+
+				/* check whitelist */
+				if len(s.whitelist) > 0 {
+					found := false
+					for _, fingerprint := range s.whitelist {
+						if fingerprint == client.Fingerprint() {
+							found = true
+							break
+						}
+					}
+					if !found {
+						logger.Infof("client is not in whitelist. disconnecting...")
+						client.Conn.Close()
+						return
+					}
+				}
+
 				go client.handleChannels(channels)
 			}()
 		}

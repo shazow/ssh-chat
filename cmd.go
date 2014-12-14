@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,10 +13,11 @@ import (
 )
 
 type Options struct {
-	Verbose  []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
-	Identity string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind     string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
-	Admin    []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
+	Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
+	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
+	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
+	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints that are allowed to connect"`
 }
 
 var logLevels = []log.Level{
@@ -54,7 +56,24 @@ func main() {
 		return
 	}
 
-	server, err := NewServer(privateKey)
+	whitelistArray := []string{}
+	if len(options.Whitelist) != 0 {
+		file, err := os.Open(options.Whitelist)
+		if err != nil {
+			logger.Errorf("could not open whiltelist file")
+			return
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			whitelistArray = append(whitelistArray, scanner.Text())
+		}
+		logger.Errorf("%v", whitelistArray)
+
+	}
+
+	server, err := NewServer(privateKey, whitelistArray)
 	if err != nil {
 		logger.Errorf("Failed to create server: %v", err)
 		return
