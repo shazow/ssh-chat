@@ -18,6 +18,7 @@ const (
 	historyLength        = 20
 	systemMessageFormat  = "\033[1;90m"
 	privateMessageFormat = "\033[1m"
+	highlightFormat      = Bold + "\033[48;5;11m\033[38;5;16m"
 	beep                 = "\007"
 )
 
@@ -106,11 +107,11 @@ func (s *Server) Broadcast(msg string, except *Client) {
 
 		if strings.Contains(msg, client.Name) {
 			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
-			tmpMsg := strings.Split(msg, Reset)
+			personalMsg := strings.Replace(msg, client.Name, highlightFormat+client.Name+Reset, -1)
 			if client.beepMe {
-				tmpMsg[0] += beep
+				personalMsg += beep
 			}
-			client.Send(strings.Join(tmpMsg, Reset+Bold+"\033[31m") + Reset)
+			client.Send(personalMsg)
 		} else {
 			client.Send(msg)
 		}
