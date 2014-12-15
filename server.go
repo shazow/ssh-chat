@@ -38,8 +38,7 @@ type Server struct {
 	motd      string
 	whitelist map[string]struct{}   // fingerprint lookup
 	admins    map[string]struct{}   // fingerprint lookup
-	bannedPk  map[string]*time.Time // fingerprint lookup
-	bannedIP  map[net.Addr]*time.Time
+	bannedPK  map[string]*time.Time // fingerprint lookup
 	started   time.Time
 	sync.Mutex
 }
@@ -59,8 +58,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		motd:      "Message of the Day! Modify with /motd",
 		whitelist: map[string]struct{}{},
 		admins:    map[string]struct{}{},
-		bannedPk:  map[string]*time.Time{},
-		bannedIP:  map[net.Addr]*time.Time{},
+		bannedPK:  map[string]*time.Time{},
 		started:   time.Now(),
 	}
 
@@ -284,7 +282,7 @@ func (s *Server) IsWhitelisted(fingerprint string) bool {
 
 // IsBanned checks if the given fingerprint is banned
 func (s *Server) IsBanned(fingerprint string) bool {
-	ban, hasBan := s.bannedPk[fingerprint]
+	ban, hasBan := s.bannedPK[fingerprint]
 	if !hasBan {
 		return false
 	}
@@ -306,14 +304,14 @@ func (s *Server) Ban(fingerprint string, duration *time.Duration) {
 		when := time.Now().Add(*duration)
 		until = &when
 	}
-	s.bannedPk[fingerprint] = until
+	s.bannedPK[fingerprint] = until
 	s.Unlock()
 }
 
 // Unban unbans a banned fingerprint
 func (s *Server) Unban(fingerprint string) {
 	s.Lock()
-	delete(s.bannedPk, fingerprint)
+	delete(s.bannedPK, fingerprint)
 	s.Unlock()
 }
 
