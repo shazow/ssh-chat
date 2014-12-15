@@ -27,6 +27,6 @@ run: $(BINARY) $(KEY)
 debug: $(BINARY) $(KEY)
 	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv
 
-
 test:
 	go test .
+	golint
