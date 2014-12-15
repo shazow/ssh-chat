@@ -255,7 +255,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				} else {
 					c.SysMsg("Missing $NAME from: /whois $NAME")
 				}
-			case "/list":
+			case "/names", "/list":
 				names := ""
 				nameList := c.Server.List(nil)
 				for _, name := range nameList {
