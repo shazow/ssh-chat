@@ -59,6 +59,7 @@ See notes in the header of our Dockerfile for details on building your own image
 If you're developing on this repo, there is a handy Makefile that should set
 things up with `make run`.
 
+Additionally, `make debug` runs the server with an http `pprof` server. This allows you to open [http://localhost:6060/debug/pprof/]() and view profiling data. See [net/http/pprof](http://golang.org/pkg/net/http/pprof/) for more information about `pprof`.
 
 ## License
 
