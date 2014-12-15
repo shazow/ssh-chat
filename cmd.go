@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"os/user"
 	"strings"
 	"net/http"
 
@@ -61,7 +62,15 @@ func main() {
 	logLevel := logLevels[numVerbose]
 	logger = golog.New(os.Stderr, logLevel)
 
-	privateKey, err := ioutil.ReadFile(options.Identity)
+	privateKeyPath := options.Identity
+	if strings.HasPrefix(privateKeyPath, "~") {
+		user, err := user.Current()
+		if err == nil {
+			privateKeyPath = strings.Replace(privateKeyPath, "~", user.HomeDir, 1)
+		}
+	}
+
+	privateKey, err := ioutil.ReadFile(privateKeyPath)
 	if err != nil {
 		logger.Errorf("Failed to load identity: %v", err)
 		return
