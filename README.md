@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/shazow/ssh-chat.svg?branch=master)](https://travis-ci.org/shazow/ssh-chat)
+
 # ssh-chat
 
 Custom SSH server written in Go. Instead of a shell, you get a chat prompt.
