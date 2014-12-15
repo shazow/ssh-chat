@@ -120,7 +120,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 // Privmsg sends a message to a particular nick, if it exists
 func (s *Server) Privmsg(nick, message string, sender *Client) error {
 	// Get the recipient
-	target, ok := s.clients[nick]
+	target, ok := s.clients[strings.ToLower(nick)]
 	if !ok {
 		return fmt.Errorf("no client with that nick")
 	}
@@ -165,7 +165,7 @@ func (s *Server) Add(client *Client) {
 	}
 
 	client.Rename(newName)
-	s.clients[client.Name] = client
+	s.clients[strings.ToLower(client.Name)] = client
 	num := len(s.clients)
 	s.Unlock()
 
@@ -175,7 +175,7 @@ func (s *Server) Add(client *Client) {
 // Remove removes the given client from the list of clients
 func (s *Server) Remove(client *Client) {
 	s.Lock()
-	delete(s.clients, client.Name)
+	delete(s.clients, strings.ToLower(client.Name))
 	s.Unlock()
 
 	s.SysMsg("%s left.", client.ColoredName())
@@ -192,7 +192,7 @@ func (s *Server) proposeName(name string) (string, error) {
 		name = fmt.Sprintf("Guest%d", s.count)
 	}
 
-	_, collision := s.clients[name]
+	_, collision := s.clients[strings.ToLower(name)]
 	if collision {
 		err = fmt.Errorf("%s is not available", name)
 		name = fmt.Sprintf("Guest%d", s.count)
@@ -204,21 +204,25 @@ func (s *Server) proposeName(name string) (string, error) {
 // Rename renames the given client (user)
 func (s *Server) Rename(client *Client, newName string) {
 	s.Lock()
+	var oldName string
+	if strings.ToLower(newName) == strings.ToLower(client.Name) {
+		oldName = client.Name
+		client.Rename(newName)
+	} else {
+		newName, err := s.proposeName(newName)
+		if err != nil {
+			client.SysMsg("%s", err)
+			s.Unlock()
+			return
+		}
 
-	newName, err := s.proposeName(newName)
-	if err != nil {
-		client.SysMsg("%s", err)
+		// TODO: Use a channel/goroutine for adding clients, rather than locks?
+		delete(s.clients, strings.ToLower(client.Name))
+		oldName = client.Name
+		client.Rename(newName)
+		s.clients[strings.ToLower(client.Name)] = client
 		s.Unlock()
-		return
 	}
-
-	// TODO: Use a channel/goroutine for adding clients, rather than locks?
-	delete(s.clients, client.Name)
-	oldName := client.Name
-	client.Rename(newName)
-	s.clients[client.Name] = client
-	s.Unlock()
-
 	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
 }
 
@@ -238,7 +242,7 @@ func (s *Server) List(prefix *string) []string {
 
 // Who returns the client with a given name
 func (s *Server) Who(name string) *Client {
-	return s.clients[name]
+	return s.clients[strings.ToLower(name)]
 }
 
 // Op adds the given fingerprint to the list of admins
