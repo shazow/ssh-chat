@@ -233,7 +233,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if c.IsSilenced() || len(msg) > 1000 {
 					c.SysMsg("Message rejected.")
 				} else {
-					c.Server.Broadcast(msg, nil)
+					c.Server.Broadcast(msg, nil, false)
 				}
 			case "/nick":
 				if len(parts) == 2 {
@@ -280,7 +280,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						client.SysMsg("Banned by %s.", c.ColoredName())
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
+						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil, true)
 					}
 				}
 			case "/op":
@@ -310,7 +310,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					} else {
 						client.SysMsg("Kicked by %s.", c.ColoredName())
 						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
+						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil, true)
 					}
 				}
 			case "/silence":
@@ -347,7 +347,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					}
 					// Shutdown after 5 seconds
 					go func() {
-						c.Server.Broadcast(ColorString("31", msg), nil)
+						c.Server.Broadcast(ColorString("31", msg), nil, true)
 						time.Sleep(time.Second * 5)
 						c.Server.Stop()
 					}()
@@ -422,7 +422,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			c.SysMsg("Message rejected.")
 			continue
 		}
-		c.Server.Broadcast(msg, c)
+		c.Server.Broadcast(msg, c, true)
 		c.lastTX = time.Now()
 	}
 

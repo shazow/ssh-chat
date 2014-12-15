@@ -92,11 +92,11 @@ func (s *Server) Len() int {
 
 // SysMsg broadcasts the given message to everyone
 func (s *Server) SysMsg(msg string, args ...interface{}) {
-	s.Broadcast(ContinuousFormat(systemMessageFormat, " * "+fmt.Sprintf(msg, args...)), nil)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, " * "+fmt.Sprintf(msg, args...)), nil, false)
 }
 
 // Broadcast broadcasts the given message to everyone except for the given client
-func (s *Server) Broadcast(msg string, except *Client) {
+func (s *Server) Broadcast(msg string, except *Client, canHighlight bool) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
 
@@ -105,7 +105,7 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			continue
 		}
 
-		if strings.Contains(msg, client.Name) {
+		if strings.Contains(msg, client.Name) && canHighlight {
 			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
 			personalMsg := strings.Replace(msg, client.Name, highlightFormat+client.Name+Reset, -1)
 			if client.beepMe {
@@ -151,8 +151,8 @@ func (s *Server) MotdBroadcast(client *Client) {
 	if s.motd == "" {
 		return
 	}
-	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(s.motd, client)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client, false)
+	s.Broadcast(s.motd, client, false)
 }
 
 // Add adds the client to the list of clients
@@ -175,7 +175,7 @@ func (s *Server) Add(client *Client) {
 	num := len(s.clients)
 	s.Unlock()
 
-	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client, false)
 }
 
 // Remove removes the given client from the list of clients
