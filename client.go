@@ -338,7 +338,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
 				} else {
-					var split []string = strings.SplitN(line, " ", 2)
+					var split = strings.SplitN(line, " ", 2)
 					var msg string
 					if len(split) > 1 {
 						msg = split[1]
