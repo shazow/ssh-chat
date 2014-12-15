@@ -55,7 +55,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 		clients:   Clients{},
 		count:     0,
 		history:   NewHistory(historyLength),
-		motd:      "Message of the Day! Modify with /motd",
+		motd:      "",
 		whitelist: map[string]struct{}{},
 		admins:    map[string]struct{}{},
 		bannedPK:  map[string]*time.Time{},
@@ -139,13 +139,19 @@ func (s *Server) SetMotd(motd string) {
 
 // MotdUnicast sends the MOTD as a SysMsg
 func (s *Server) MotdUnicast(client *Client) {
-	client.SysMsg("MOTD:\r\n" + ColorString("36", s.motd)) /* a nice cyan color */
+	if s.motd == "" {
+		return
+	}
+	client.SysMsg(s.motd)
 }
 
 // MotdBroadcast broadcasts the MOTD
 func (s *Server) MotdBroadcast(client *Client) {
+	if s.motd == "" {
+		return
+	}
 	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
-	s.Broadcast(ColorString("36", s.motd), client)
+	s.Broadcast(s.motd, client)
 }
 
 // Add adds the client to the list of clients
@@ -153,7 +159,6 @@ func (s *Server) Add(client *Client) {
 	go func() {
 		s.MotdUnicast(client)
 		client.SendLines(s.history.Get(10))
-		client.SysMsg("Welcome to ssh-chat. Enter /help for more.")
 	}()
 
 	s.Lock()

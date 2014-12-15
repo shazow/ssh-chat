@@ -27,9 +27,8 @@ const (
    /nick $NAME          - Rename yourself to a new name.
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
-   /motd                - Prints the Message of the Day
-   /theme [color|mono]  - Set client theme
-` + Reset
+   /motd                - Prints the Message of the Day.
+   /theme [color|mono]  - Set client theme.` + Reset
 
 	// OpHelpText is the additional text returned by /help if the client is an Op
 	OpHelpText string = systemMessageFormat + `-> Available operator commands:
@@ -37,10 +36,9 @@ const (
    /kick $NAME               - Kick em' out.
    /op $NAME                 - Promote a user to server operator.
    /silence $NAME            - Revoke a user's ability to speak.
-   /shutdown $MESSAGE        - Broadcast message and shutdown server
-   /motd $MESSAGE            - Sets the Message of the Day
-   /whitelist $FINGERPRINT   - Adds pubkey fingerprint to the connection whitelist
-` + Reset
+   /shutdown $MESSAGE        - Broadcast message and shutdown server.
+   /motd $MESSAGE            - Set message shown whenever somebody joins.
+   /whitelist $FINGERPRINT   - Add fingerprint to whitelist, prevent anyone else from joining.` + Reset
 
 	// AboutText is the text returned by /about
 	AboutText string = systemMessageFormat + `-> ssh-chat is made by @shazow.
