@@ -4,9 +4,13 @@ notifications:
   email: false
 
 install:
+  - export PATH=$PATH:$HOME/gopath/bin
+  - go get github.com/GeertJohan/fgt
+  - go get github.com/golang/lint/golint
   - make deps
 
-default:
+script:
+  - fgt golint
   - make test
 
 go:
