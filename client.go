@@ -28,6 +28,7 @@ const (
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day
+   /theme [color|mono]  - Set client theme
 ` + Reset
 
 	// OpHelpText is the additional text returned by /help if the client is an Op
@@ -36,6 +37,7 @@ const (
    /kick $NAME               - Kick em' out.
    /op $NAME                 - Promote a user to server operator.
    /silence $NAME            - Revoke a user's ability to speak.
+   /shutdown $MESSAGE        - Broadcast message and shutdown server
    /motd $MESSAGE            - Sets the Message of the Day
    /whitelist $FINGERPRINT   - Adds pubkey fingerprint to the connection whitelist
 ` + Reset
@@ -70,18 +72,20 @@ type Client struct {
 	silencedUntil time.Time
 	lastTX        time.Time
 	beepMe        bool
+	colorMe       bool
 }
 
 // NewClient constructs a new client
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server: server,
-		Conn:   conn,
-		Name:   conn.User(),
-		Color:  RandomColor256(),
-		Msg:    make(chan string, MsgBuffer),
-		ready:  make(chan struct{}, 1),
-		lastTX: time.Now(),
+		Server:  server,
+		Conn:    conn,
+		Name:    conn.User(),
+		Color:   RandomColor256(),
+		Msg:     make(chan string, MsgBuffer),
+		ready:   make(chan struct{}, 1),
+		lastTX:  time.Now(),
+		colorMe: true,
 	}
 }
 
@@ -97,6 +101,9 @@ func (c *Client) SysMsg(msg string, args ...interface{}) {
 
 // Write writes the given message
 func (c *Client) Write(msg string) {
+	if !c.colorMe {
+		msg = DeColorString(msg)
+	}
 	c.term.Write([]byte(msg + "\r\n"))
 }
 
@@ -151,7 +158,15 @@ func (c *Client) Resize(width, height int) error {
 // Rename renames the client to the given name
 func (c *Client) Rename(name string) {
 	c.Name = name
-	c.term.SetPrompt(fmt.Sprintf("[%s] ", c.ColoredName()))
+	var prompt string
+
+	if c.colorMe {
+		prompt = c.ColoredName()
+	} else {
+		prompt = c.Name
+	}
+
+	c.term.SetPrompt(fmt.Sprintf("[%s] ", prompt))
 }
 
 // Fingerprint returns the fingerprint
@@ -319,6 +334,24 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
 					}
 				}
+			case "/shutdown":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else {
+					var split []string = strings.SplitN(line, " ", 2)
+					var msg string
+					if len(split) > 1 {
+						msg = split[1]
+					} else {
+						msg = ""
+					}
+					// Shutdown after 5 seconds
+					go func() {
+						c.Server.Broadcast(ColorString("31", msg), nil)
+						time.Sleep(time.Second * 5)
+						c.Server.Stop()
+					}()
+				}
 			case "/msg": /* Send a PM */
 				/* Make sure we have a recipient and a message */
 				if len(parts) < 2 {
@@ -347,6 +380,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.SetMotd(newmotd)
 					c.Server.MotdBroadcast(c)
 				}
+			case "/theme":
+				if len(parts) < 2 {
+					c.SysMsg("Missing $THEME from: /theme $THEME")
+					c.SysMsg("Choose either color or mono")
+				} else {
+					// Sets colorMe attribute of client
+					if parts[1] == "mono" {
+						c.colorMe = false
+					} else if parts[1] == "color" {
+						c.colorMe = true
+					}
+					// Rename to reset prompt
+					c.Rename(c.Name)
+				}
+
 			case "/whitelist": /* whitelist a fingerprint */
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")

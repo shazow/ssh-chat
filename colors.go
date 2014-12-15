@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -31,6 +32,15 @@ const (
 )
 
 var colors = []string{"31", "32", "33", "34", "35", "36", "37", "91", "92", "93", "94", "95", "96", "97"}
+
+// deColor is used for removing ANSI Escapes
+var deColor *regexp.Regexp = regexp.MustCompile("\033\\[[\\d;]+m")
+
+// DeColorString removes all color from the given string
+func DeColorString(s string) string {
+	s = deColor.ReplaceAllString(s, "")
+	return s
+}
 
 // RandomColor256 returns a random (of 256) color
 func RandomColor256() string {
