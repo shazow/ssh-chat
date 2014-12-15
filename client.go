@@ -160,6 +160,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 	go func() {
 		// Block until done, then remove.
 		c.Conn.Wait()
+		close(c.Msg)
 		c.Server.Remove(c)
 	}()
 
