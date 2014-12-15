@@ -42,9 +42,20 @@ func DeColorString(s string) string {
 	return s
 }
 
+func randomReadableColor() int {
+	for {
+		i := rand.Intn(256)
+		if (16 <= i && i <= 18) || (232 <= i && i <= 237) {
+			// Remove the ones near black, this is kinda sadpanda.
+			continue
+		}
+		return i
+	}
+}
+
 // RandomColor256 returns a random (of 256) color
 func RandomColor256() string {
-	return fmt.Sprintf("38;05;%d", rand.Intn(256))
+	return fmt.Sprintf("38;05;%d", randomReadableColor())
 }
 
 // RandomColor returns a random color
