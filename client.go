@@ -9,10 +9,15 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const MSG_BUFFER int = 50
-const MAX_MSG_LENGTH int = 512
+const (
+	// MsgBuffer is the length of the message buffer
+	MsgBuffer int = 50
 
-const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
+	// MaxMsgLength is the maximum length of a message
+	MaxMsgLength int = 512
+
+	// HelpText is the text returned by /help
+	HelpText string = systemMessageFormat + `-> Available commands:
    /about               - About this chat.
    /exit                - Exit the chat.
    /help                - Show this help text.
@@ -24,9 +29,10 @@ const HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available commands:
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day
    /theme [color|mono]  - Set client theme
-` + RESET
+` + Reset
 
-const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator commands:
+	// OpHelpText is the additional text returned by /help if the client is an Op
+	OpHelpText string = systemMessageFormat + `-> Available operator commands:
    /ban $NAME                - Banish a user from the chat
    /kick $NAME               - Kick em' out.
    /op $NAME                 - Promote a user to server operator.
@@ -34,9 +40,10 @@ const OP_HELP_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> Available operator comma
    /shutdown $MESSAGE        - Broadcast message and shutdown server
    /motd $MESSAGE            - Sets the Message of the Day
    /whitelist $FINGERPRINT   - Adds pubkey fingerprint to the connection whitelist
-` + RESET
+` + Reset
 
-const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazow.
+	// AboutText is the text returned by /about
+	AboutText string = systemMessageFormat + `-> ssh-chat is made by @shazow.
 
    It is a custom ssh server built in Go to serve a chat experience
    instead of a shell.
@@ -44,10 +51,13 @@ const ABOUT_TEXT string = SYSTEM_MESSAGE_FORMAT + `-> ssh-chat is made by @shazo
    Source: https://github.com/shazow/ssh-chat
 
    For more, visit shazow.net or follow at twitter.com/shazow
-` + RESET
+` + Reset
 
-const REQUIRED_WAIT time.Duration = time.Second / 2
+	// RequiredWait is the time a client is required to wait between messages
+	RequiredWait time.Duration = time.Second / 2
+)
 
+// Client holds all the fields used by the client
 type Client struct {
 	Server        *Server
 	Conn          *ssh.ServerConn
@@ -65,42 +75,48 @@ type Client struct {
 	colorMe       bool
 }
 
+// NewClient constructs a new client
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server: server,
-		Conn:   conn,
-		Name:   conn.User(),
-		Color:  RandomColor256(),
-		Msg:    make(chan string, MSG_BUFFER),
-		ready:  make(chan struct{}, 1),
-		lastTX: time.Now(),
+		Server:  server,
+		Conn:    conn,
+		Name:    conn.User(),
+		Color:   RandomColor256(),
+		Msg:     make(chan string, MsgBuffer),
+		ready:   make(chan struct{}, 1),
+		lastTX:  time.Now(),
 		colorMe: true,
 	}
 }
 
+// ColoredName returns the client name in its color
 func (c *Client) ColoredName() string {
 	return ColorString(c.Color, c.Name)
 }
 
+// SysMsg sends a message in continuous format over the message channel
 func (c *Client) SysMsg(msg string, args ...interface{}) {
-	c.Msg <- ContinuousFormat(SYSTEM_MESSAGE_FORMAT, "-> "+fmt.Sprintf(msg, args...))
+	c.Msg <- ContinuousFormat(systemMessageFormat, "-> "+fmt.Sprintf(msg, args...))
 }
 
+// Write writes the given message
 func (c *Client) Write(msg string) {
-	if(!c.colorMe) {
+	if !c.colorMe {
 		msg = DeColorString(msg)
 	}
 	c.term.Write([]byte(msg + "\r\n"))
 }
 
+// WriteLines writes multiple messages
 func (c *Client) WriteLines(msg []string) {
 	for _, line := range msg {
 		c.Write(line)
 	}
 }
 
+// Send sends the given message
 func (c *Client) Send(msg string) {
-	if len(msg) > MAX_MSG_LENGTH {
+	if len(msg) > MaxMsgLength {
 		return
 	}
 	select {
@@ -111,21 +127,25 @@ func (c *Client) Send(msg string) {
 	}
 }
 
+// SendLines sends multiple messages
 func (c *Client) SendLines(msg []string) {
 	for _, line := range msg {
 		c.Send(line)
 	}
 }
 
+// IsSilenced checks if the client is silenced
 func (c *Client) IsSilenced() bool {
 	return c.silencedUntil.After(time.Now())
 }
 
+// Silence silences a client for the given duration
 func (c *Client) Silence(d time.Duration) {
 	c.silencedUntil = time.Now().Add(d)
 }
 
-func (c *Client) Resize(width int, height int) error {
+// Resize resizes the client to the given width and height
+func (c *Client) Resize(width, height int) error {
 	err := c.term.SetSize(width, height)
 	if err != nil {
 		logger.Errorf("Resize failed: %dx%d", width, height)
@@ -135,11 +155,12 @@ func (c *Client) Resize(width int, height int) error {
 	return nil
 }
 
+// Rename renames the client to the given name
 func (c *Client) Rename(name string) {
 	c.Name = name
 	var prompt string
 
-	if(c.colorMe) {
+	if c.colorMe {
 		prompt = c.ColoredName()
 	} else {
 		prompt = c.Name
@@ -148,6 +169,7 @@ func (c *Client) Rename(name string) {
 	c.term.SetPrompt(fmt.Sprintf("[%s] ", prompt))
 }
 
+// Fingerprint returns the fingerprint
 func (c *Client) Fingerprint() string {
 	return c.Conn.Permissions.Extensions["fingerprint"]
 }
@@ -188,12 +210,12 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/exit":
 				channel.Close()
 			case "/help":
-				c.WriteLines(strings.Split(HELP_TEXT, "\n"))
+				c.WriteLines(strings.Split(HelpText, "\n"))
 				if c.Server.IsOp(c) {
-					c.WriteLines(strings.Split(OP_HELP_TEXT, "\n"))
+					c.WriteLines(strings.Split(OpHelpText, "\n"))
 				}
 			case "/about":
-				c.WriteLines(strings.Split(ABOUT_TEXT, "\n"))
+				c.WriteLines(strings.Split(AboutText, "\n"))
 			case "/uptime":
 				c.Write(c.Server.Uptime())
 			case "/beep":
@@ -224,7 +246,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if len(parts) == 2 {
 					client := c.Server.Who(parts[1])
 					if client != nil {
-						version := RE_STRIP_TEXT.ReplaceAllString(string(client.Conn.ClientVersion()), "")
+						version := reStripText.ReplaceAllString(string(client.Conn.ClientVersion()), "")
 						if len(version) > 100 {
 							version = "Evil Jerk with a superlong string"
 						}
@@ -239,7 +261,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				names := ""
 				nameList := c.Server.List(nil)
 				for _, name := range nameList {
-					names += c.Server.Who(name).ColoredName() + SYSTEM_MESSAGE_FORMAT + ", "
+					names += c.Server.Who(name).ColoredName() + systemMessageFormat + ", "
 				}
 				if len(names) > 2 {
 					names = names[:len(names)-2]
@@ -317,7 +339,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
 				} else {
-					var split []string = strings.SplitN(line, " ", 2)
+					var split = strings.SplitN(line, " ", 2)
 					var msg string
 					if len(split) > 1 {
 						msg = split[1]
@@ -351,7 +373,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.Server.MotdUnicast(c)
 				} else {
 					var newmotd string
-					if (len(parts) == 2) {
+					if len(parts) == 2 {
 						newmotd = parts[1]
 					} else {
 						newmotd = parts[1] + " " + parts[2]
@@ -393,7 +415,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
 		/* Rate limit */
-		if time.Now().Sub(c.lastTX) < REQUIRED_WAIT {
+		if time.Now().Sub(c.lastTX) < RequiredWait {
 			c.SysMsg("Rate limiting in effect.")
 			continue
 		}

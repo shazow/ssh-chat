@@ -3,6 +3,7 @@ package main
 
 import "sync"
 
+// History contains the history entries
 type History struct {
 	entries []string
 	head    int
@@ -10,12 +11,14 @@ type History struct {
 	lock    sync.Mutex
 }
 
+// NewHistory constructs a new history of the given size
 func NewHistory(size int) *History {
 	return &History{
 		entries: make([]string, size),
 	}
 }
 
+// Add adds the given entry to the entries in the history
 func (h *History) Add(entry string) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -28,10 +31,12 @@ func (h *History) Add(entry string) {
 	}
 }
 
+// Len returns the number of entries in the history
 func (h *History) Len() int {
 	return h.size
 }
 
+// Get the entry with the given number
 func (h *History) Get(num int) []string {
 	h.lock.Lock()
 	defer h.lock.Unlock()

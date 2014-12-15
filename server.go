@@ -13,17 +13,22 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const MAX_NAME_LENGTH = 32
-const HISTORY_LEN = 20
+const (
+	maxNameLength        = 32
+	historyLength        = 20
+	systemMessageFormat  = "\033[1;3;90m"
+	privateMessageFormat = "\033[3m"
+	beep                 = "\007"
+)
 
-const SYSTEM_MESSAGE_FORMAT string = "\033[1;3;90m"
-const PRIVATE_MESSAGE_FORMAT string = "\033[3m"
-const BEEP string = "\007"
+var (
+	reStripText = regexp.MustCompile("[^0-9A-Za-z_.-]")
+)
 
-var RE_STRIP_TEXT = regexp.MustCompile("[^0-9A-Za-z_.-]")
-
+// Clients is a map of clients
 type Clients map[string]*Client
 
+// Server holds all the fields used by a server
 type Server struct {
 	sshConfig *ssh.ServerConfig
 	done      chan struct{}
@@ -33,12 +38,12 @@ type Server struct {
 	motd      string
 	whitelist map[string]struct{}   // fingerprint lookup
 	admins    map[string]struct{}   // fingerprint lookup
-	bannedPk  map[string]*time.Time // fingerprint lookup
-	bannedIp  map[net.Addr]*time.Time
+	bannedPK  map[string]*time.Time // fingerprint lookup
 	started   time.Time
 	sync.Mutex
 }
 
+// NewServer constructs a new server
 func NewServer(privateKey []byte) (*Server, error) {
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
@@ -49,12 +54,11 @@ func NewServer(privateKey []byte) (*Server, error) {
 		done:      make(chan struct{}),
 		clients:   Clients{},
 		count:     0,
-		history:   NewHistory(HISTORY_LEN),
+		history:   NewHistory(historyLength),
 		motd:      "Message of the Day! Modify with /motd",
 		whitelist: map[string]struct{}{},
 		admins:    map[string]struct{}{},
-		bannedPk:  map[string]*time.Time{},
-		bannedIp:  map[net.Addr]*time.Time{},
+		bannedPK:  map[string]*time.Time{},
 		started:   time.Now(),
 	}
 
@@ -80,14 +84,17 @@ func NewServer(privateKey []byte) (*Server, error) {
 	return &server, nil
 }
 
+// Len returns the number of clients
 func (s *Server) Len() int {
 	return len(s.clients)
 }
 
+// SysMsg broadcasts the given message to everyone
 func (s *Server) SysMsg(msg string, args ...interface{}) {
-	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, " * "+fmt.Sprintf(msg, args...)), nil)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, " * "+fmt.Sprintf(msg, args...)), nil)
 }
 
+// Broadcast broadcasts the given message to everyone except for the given client
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
@@ -99,45 +106,49 @@ func (s *Server) Broadcast(msg string, except *Client) {
 
 		if strings.Contains(msg, client.Name) {
 			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
-			tmpMsg := strings.Split(msg, RESET)
+			tmpMsg := strings.Split(msg, Reset)
 			if client.beepMe {
-				tmpMsg[0] += BEEP
+				tmpMsg[0] += beep
 			}
-			client.Send(strings.Join(tmpMsg, RESET + BOLD + "\033[31m") + RESET)
+			client.Send(strings.Join(tmpMsg, Reset+Bold+"\033[31m") + Reset)
 		} else {
 			client.Send(msg)
 		}
 	}
 }
 
-/* Send a message to a particular nick, if it exists */
+// Privmsg sends a message to a particular nick, if it exists
 func (s *Server) Privmsg(nick, message string, sender *Client) error {
-	/* Get the recipient */
+	// Get the recipient
 	target, ok := s.clients[nick]
 	if !ok {
 		return fmt.Errorf("no client with that nick")
 	}
-	/* Send the message */
-	target.Msg <- fmt.Sprintf(BEEP+"[PM from %v] %s%v%s", sender.ColoredName(), PRIVATE_MESSAGE_FORMAT, message, RESET)
+	// Send the message
+	target.Msg <- fmt.Sprintf(beep+"[PM from %v] %s%v%s", sender.ColoredName(), privateMessageFormat, message, Reset)
 	logger.Debugf("PM from %v to %v: %v", sender.Name, nick, message)
 	return nil
 }
 
+// SetMotd sets the Message of the Day (MOTD)
 func (s *Server) SetMotd(motd string) {
 	s.Lock()
 	s.motd = motd
 	s.Unlock()
 }
 
+// MotdUnicast sends the MOTD as a SysMsg
 func (s *Server) MotdUnicast(client *Client) {
 	client.SysMsg("MOTD:\r\n" + ColorString("36", s.motd)) /* a nice cyan color */
 }
 
+// MotdBroadcast broadcasts the MOTD
 func (s *Server) MotdBroadcast(client *Client) {
-	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * New MOTD set by %s.", client.ColoredName())), client)
 	s.Broadcast(ColorString("36", s.motd), client)
 }
 
+// Add adds the client to the list of clients
 func (s *Server) Add(client *Client) {
 	go func() {
 		s.MotdUnicast(client)
@@ -158,9 +169,10 @@ func (s *Server) Add(client *Client) {
 	num := len(s.clients)
 	s.Unlock()
 
-	s.Broadcast(ContinuousFormat(SYSTEM_MESSAGE_FORMAT, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client)
 }
 
+// Remove removes the given client from the list of clients
 func (s *Server) Remove(client *Client) {
 	s.Lock()
 	delete(s.clients, client.Name)
@@ -172,23 +184,24 @@ func (s *Server) Remove(client *Client) {
 func (s *Server) proposeName(name string) (string, error) {
 	// Assumes caller holds lock.
 	var err error
-	name = RE_STRIP_TEXT.ReplaceAllString(name, "")
+	name = reStripText.ReplaceAllString(name, "")
 
-	if len(name) > MAX_NAME_LENGTH {
-		name = name[:MAX_NAME_LENGTH]
+	if len(name) > maxNameLength {
+		name = name[:maxNameLength]
 	} else if len(name) == 0 {
 		name = fmt.Sprintf("Guest%d", s.count)
 	}
 
 	_, collision := s.clients[name]
 	if collision {
-		err = fmt.Errorf("%s is not available.", name)
+		err = fmt.Errorf("%s is not available", name)
 		name = fmt.Sprintf("Guest%d", s.count)
 	}
 
 	return name, err
 }
 
+// Rename renames the given client (user)
 func (s *Server) Rename(client *Client, newName string) {
 	s.Lock()
 
@@ -209,10 +222,11 @@ func (s *Server) Rename(client *Client, newName string) {
 	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
 }
 
+// List lists the clients with the given prefix
 func (s *Server) List(prefix *string) []string {
 	r := []string{}
 
-	for name, _ := range s.clients {
+	for name := range s.clients {
 		if prefix != nil && !strings.HasPrefix(name, *prefix) {
 			continue
 		}
@@ -222,10 +236,12 @@ func (s *Server) List(prefix *string) []string {
 	return r
 }
 
+// Who returns the client with a given name
 func (s *Server) Who(name string) *Client {
 	return s.clients[name]
 }
 
+// Op adds the given fingerprint to the list of admins
 func (s *Server) Op(fingerprint string) {
 	logger.Infof("Adding admin: %s", fingerprint)
 	s.Lock()
@@ -233,6 +249,7 @@ func (s *Server) Op(fingerprint string) {
 	s.Unlock()
 }
 
+// Whitelist adds the given fingerprint to the whitelist
 func (s *Server) Whitelist(fingerprint string) {
 	logger.Infof("Adding whitelist: %s", fingerprint)
 	s.Lock()
@@ -240,15 +257,18 @@ func (s *Server) Whitelist(fingerprint string) {
 	s.Unlock()
 }
 
+// Uptime returns the time since the server was started
 func (s *Server) Uptime() string {
 	return time.Now().Sub(s.started).String()
 }
 
+// IsOp checks if the given client is Op
 func (s *Server) IsOp(client *Client) bool {
 	_, r := s.admins[client.Fingerprint()]
 	return r
 }
 
+// IsWhitelisted checks if the given fingerprint is whitelisted
 func (s *Server) IsWhitelisted(fingerprint string) bool {
 	/* if no whitelist, anyone is welcome */
 	if len(s.whitelist) == 0 {
@@ -260,8 +280,9 @@ func (s *Server) IsWhitelisted(fingerprint string) bool {
 	return r
 }
 
+// IsBanned checks if the given fingerprint is banned
 func (s *Server) IsBanned(fingerprint string) bool {
-	ban, hasBan := s.bannedPk[fingerprint]
+	ban, hasBan := s.bannedPK[fingerprint]
 	if !hasBan {
 		return false
 	}
@@ -275,6 +296,7 @@ func (s *Server) IsBanned(fingerprint string) bool {
 	return true
 }
 
+// Ban bans a fingerprint for the given duration
 func (s *Server) Ban(fingerprint string, duration *time.Duration) {
 	var until *time.Time
 	s.Lock()
@@ -282,16 +304,18 @@ func (s *Server) Ban(fingerprint string, duration *time.Duration) {
 		when := time.Now().Add(*duration)
 		until = &when
 	}
-	s.bannedPk[fingerprint] = until
+	s.bannedPK[fingerprint] = until
 	s.Unlock()
 }
 
+// Unban unbans a banned fingerprint
 func (s *Server) Unban(fingerprint string) {
 	s.Lock()
-	delete(s.bannedPk, fingerprint)
+	delete(s.bannedPK, fingerprint)
 	s.Unlock()
 }
 
+// Start starts the server
 func (s *Server) Start(laddr string) error {
 	// Once a ServerConfig has been configured, connections can be
 	// accepted.
@@ -324,7 +348,7 @@ func (s *Server) Start(laddr string) error {
 					return
 				}
 
-				version := RE_STRIP_TEXT.ReplaceAllString(string(sshConn.ClientVersion()), "")
+				version := reStripText.ReplaceAllString(string(sshConn.ClientVersion()), "")
 				if len(version) > 100 {
 					version = "Evil Jerk with a superlong string"
 				}
@@ -346,6 +370,7 @@ func (s *Server) Start(laddr string) error {
 	return nil
 }
 
+// AutoCompleteFunction handles auto completion of nicks
 func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	if key == 9 {
 		shortLine := strings.Split(line[:pos], " ")
@@ -372,6 +397,7 @@ func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine s
 	return
 }
 
+// Stop stops the server
 func (s *Server) Stop() {
 	for _, client := range s.clients {
 		client.Conn.Close()
@@ -380,6 +406,7 @@ func (s *Server) Stop() {
 	close(s.done)
 }
 
+// Fingerprint returns the fingerprint based on a public key
 func Fingerprint(k ssh.PublicKey) string {
 	hash := md5.Sum(k.Marshal())
 	r := fmt.Sprintf("% x", hash)

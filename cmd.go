@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
 	"github.com/jessevdk/go-flags"
 )
 
+// Options contains the flag options
 type Options struct {
 	Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
 	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
