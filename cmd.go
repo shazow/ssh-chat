@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
 	"strings"
-	"net/http"
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
@@ -22,9 +22,9 @@ type Options struct {
 	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
 	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
 	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
-	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints that are allowed to connect"`
-	Motd      string   `long:"motd" description:"Message of the Day file (optional)"`
-	Pprof     int      `long:"pprof" description:"enable http server for pprof"`
+	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints who are allowed to connect."`
+	Motd      string   `long:"motd" description:"Optional Message of the Day file."`
+	Pprof     int      `long:"pprof" description:"Enable pprof http server for profiling."`
 }
 
 var logLevels = []log.Level{
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	if options.Pprof != 0 {
-		go func(){
+		go func() {
 			fmt.Println(http.ListenAndServe(fmt.Sprintf("localhost:%d", options.Pprof), nil))
 		}()
 	}

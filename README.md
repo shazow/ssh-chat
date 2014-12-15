@@ -24,12 +24,16 @@ Usage:
   ssh-chat [OPTIONS]
 
 Application Options:
-  -v, --verbose   Show verbose logging.
-  -b, --bind=     Host and port to listen on. (0.0.0.0:22)
-  -i, --identity= Private key to identify server with. (~/.ssh/id_rsa)
+  -v, --verbose    Show verbose logging.
+  -i, --identity=  Private key to identify server with. (~/.ssh/id_rsa)
+      --bind=      Host and port to listen on. (0.0.0.0:22)
+      --admin=     Fingerprint of pubkey to mark as admin.
+      --whitelist= Optional file of pubkey fingerprints that are allowed to connect
+      --motd=      Message of the Day file (optional)
+      --pprof=     enable http server for pprof
 
 Help Options:
-  -h, --help      Show this help message
+  -h, --help       Show this help message
 ```
 
 After doing `go get github.com/shazow/ssh-chat` on this repo, you should be able
