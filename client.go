@@ -22,7 +22,7 @@ const (
    /exit                - Exit the chat.
    /help                - Show this help text.
    /list                - List the users that are currently connected.
-   /beep                - Enable BEL notifications on mention.
+   /alert               - Enable mentions notification.
    /me $ACTION          - Show yourself doing an action.
    /nick $NAME          - Rename yourself to a new name.
    /whois $NAME         - Display information about another connected user.
@@ -217,7 +217,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				c.WriteLines(strings.Split(AboutText, "\n"))
 			case "/uptime":
 				c.Write(c.Server.Uptime())
-			case "/beep":
+			case "/alert", "/beep":
 				c.beepMe = !c.beepMe
 				if c.beepMe {
 					c.SysMsg("I'll beep you good.")
