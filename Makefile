@@ -24,5 +24,9 @@ $(KEY):
 run: $(BINARY) $(KEY)
 	./$(BINARY) -i $(KEY) --bind ":$(PORT)" -vv
 
+debug: $(BINARY) $(KEY)
+	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv
+
+
 test:
 	go test .
