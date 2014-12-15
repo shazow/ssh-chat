@@ -144,6 +144,7 @@ func (c *Client) Silence(d time.Duration) {
 
 // Resize resizes the client to the given width and height
 func (c *Client) Resize(width, height int) error {
+	width = 1000000 // TODO: Remove this dirty workaround for text overflow once ssh/terminal is fixed
 	err := c.term.SetSize(width, height)
 	if err != nil {
 		logger.Errorf("Resize failed: %dx%d", width, height)

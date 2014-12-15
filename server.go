@@ -16,8 +16,8 @@ import (
 const (
 	maxNameLength        = 32
 	historyLength        = 20
-	systemMessageFormat  = "\033[1;3;90m"
-	privateMessageFormat = "\033[3m"
+	systemMessageFormat  = "\033[1;90m"
+	privateMessageFormat = "\033[1m"
 	beep                 = "\007"
 )
 
