@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"net/http"
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
 	"github.com/jessevdk/go-flags"
 )
+import _ "net/http/pprof"
 
 // Options contains the flag options
 type Options struct {
@@ -21,6 +23,7 @@ type Options struct {
 	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
 	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints that are allowed to connect"`
 	Motd      string   `long:"motd" description:"Message of the Day file (optional)"`
+	Pprof     int      `long:"pprof" description:"enable http server for pprof"`
 }
 
 var logLevels = []log.Level{
@@ -32,13 +35,18 @@ var logLevels = []log.Level{
 func main() {
 	options := Options{}
 	parser := flags.NewParser(&options, flags.Default)
-
 	p, err := parser.Parse()
 	if err != nil {
 		if p == nil {
 			fmt.Print(err)
 		}
 		return
+	}
+
+	if options.Pprof != 0 {
+		go func(){
+			fmt.Println(http.ListenAndServe(fmt.Sprintf("localhost:%d", options.Pprof), nil))
+		}()
 	}
 
 	// Initialize seed for random colors
