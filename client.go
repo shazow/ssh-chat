@@ -173,6 +173,15 @@ func (c *Client) Fingerprint() string {
 	return c.Conn.Permissions.Extensions["fingerprint"]
 }
 
+// Emote formats and sends an emote
+func (c *Client) Emote(message string) {
+	formatted := fmt.Sprintf("** %s%s", c.ColoredName(), message)
+	if c.IsSilenced() || len(message) > 1000 {
+		c.SysMsg("Message rejected")
+	}
+	c.Server.Broadcast(formatted, nil)
+}
+
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
 
@@ -229,12 +238,16 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				if me == "" {
 					me = " is at a loss for words."
 				}
-				msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
-				if c.IsSilenced() || len(msg) > 1000 {
-					c.SysMsg("Message rejected.")
-				} else {
-					c.Server.Broadcast(msg, nil)
+				c.Emote(me)
+			case "/slap":
+				slappee := "themself"
+				if len(parts) > 1 {
+					slappee = parts[1]
+					if len(parts[1]) > 100 {
+						slappee = "some long-named jerk"
+					}
 				}
+				c.Emote(fmt.Sprintf(" slaps %s around a bit with a large trout", slappee))
 			case "/nick":
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
