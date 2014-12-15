@@ -7,7 +7,7 @@ type History struct {
 	entries []string
 	head    int
 	size    int
-	lock    sync.Mutex
+	sync.Mutex
 }
 
 func NewHistory(size int) *History {
@@ -17,8 +17,8 @@ func NewHistory(size int) *History {
 }
 
 func (h *History) Add(entry string) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.Lock()
+	defer h.Unlock()
 
 	max := cap(h.entries)
 	h.head = (h.head + 1) % max
@@ -33,8 +33,8 @@ func (h *History) Len() int {
 }
 
 func (h *History) Get(num int) []string {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.Lock()
+	defer h.Unlock()
 
 	max := cap(h.entries)
 	if num > h.size {
