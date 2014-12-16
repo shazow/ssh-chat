@@ -237,7 +237,7 @@ func (s *Server) List(prefix *string) []string {
 	r := []string{}
 
 	for name := range s.clients {
-		if prefix != nil && !strings.HasPrefix(name, *prefix) {
+		if prefix != nil && !strings.HasPrefix(name, strings.ToLower(*prefix)) {
 			continue
 		}
 		r = append(r, name)
