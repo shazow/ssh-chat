@@ -184,7 +184,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, strings.ToLower(client.Name))
 	s.Unlock()
 
-	s.SysMsg("%s left.", client.Name)
+	s.SysMsg("%s left.(Total connected: %d)", client.Name)
 }
 
 func (s *Server) proposeName(name string) (string, error) {
