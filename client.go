@@ -201,159 +201,39 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		isCmd := strings.HasPrefix(parts[0], "/")
 
 		if isCmd {
-			// TODO: Factor this out.
 			switch parts[0] {
 			case "/test-colors": // Shh, this command is a secret!
-				c.Write(ColorString("32", "Lorem ipsum dolor sit amet,"))
-				c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
+				c.testColorsCommand()
 			case "/exit":
 				channel.Close()
 			case "/help":
-				c.WriteLines(strings.Split(HelpText, "\n"))
-				if c.Server.IsOp(c) {
-					c.WriteLines(strings.Split(OpHelpText, "\n"))
-				}
+				c.helpCommand()
 			case "/about":
-				c.WriteLines(strings.Split(AboutText, "\n"))
+				c.aboutCommand()
 			case "/uptime":
-				c.Write(c.Server.Uptime())
+				c.uptimeCommand()
 			case "/beep":
-				c.beepMe = !c.beepMe
-				if c.beepMe {
-					c.SysMsg("I'll beep you good.")
-				} else {
-					c.SysMsg("No more beeps. :(")
-				}
+				c.beepCommand()
 			case "/me":
-				me := strings.TrimLeft(line, "/me")
-				if me == "" {
-					me = " is at a loss for words."
-				}
-				msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
-				if c.IsSilenced() || len(msg) > 1000 {
-					c.SysMsg("Message rejected.")
-				} else {
-					c.Server.Broadcast(msg, nil)
-				}
+				c.meCommand(line)
 			case "/nick":
-				if len(parts) == 2 {
-					c.Server.Rename(c, parts[1])
-				} else {
-					c.SysMsg("Missing $NAME from: /nick $NAME")
-				}
+				c.nickCommand(parts)
 			case "/whois":
-				if len(parts) == 2 {
-					client := c.Server.Who(parts[1])
-					if client != nil {
-						version := reStripText.ReplaceAllString(string(client.Conn.ClientVersion()), "")
-						if len(version) > 100 {
-							version = "Evil Jerk with a superlong string"
-						}
-						c.SysMsg("%s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
-					} else {
-						c.SysMsg("No such name: %s", parts[1])
-					}
-				} else {
-					c.SysMsg("Missing $NAME from: /whois $NAME")
-				}
+				c.whoisCommand(parts)
 			case "/names", "/list":
-				names := ""
-				nameList := c.Server.List(nil)
-				for _, name := range nameList {
-					names += c.Server.Who(name).ColoredName() + systemMessageFormat + ", "
-				}
-				if len(names) > 2 {
-					names = names[:len(names)-2]
-				}
-				c.SysMsg("%d connected: %s", len(nameList), names)
+				c.listCommand()
 			case "/ban":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /ban $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						fingerprint := client.Fingerprint()
-						client.SysMsg("Banned by %s.", c.ColoredName())
-						c.Server.Ban(fingerprint, nil)
-						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
-					}
-				}
+				c.banCommand(parts)
 			case "/op":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /op $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						fingerprint := client.Fingerprint()
-						client.SysMsg("Made op by %s.", c.ColoredName())
-						c.Server.Op(fingerprint)
-					}
-				}
+				c.opCommand(parts)
 			case "/kick":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $NAME from: /kick $NAME")
-				} else {
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						client.SysMsg("Kicked by %s.", c.ColoredName())
-						client.Conn.Close()
-						c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
-					}
-				}
+				c.kickCommand(parts)
 			case "/silence":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) < 2 {
-					c.SysMsg("Missing $NAME from: /silence $NAME")
-				} else {
-					duration := time.Duration(5) * time.Minute
-					if len(parts) >= 3 {
-						parsedDuration, err := time.ParseDuration(parts[2])
-						if err == nil {
-							duration = parsedDuration
-						}
-					}
-					client := c.Server.Who(parts[1])
-					if client == nil {
-						c.SysMsg("No such name: %s", parts[1])
-					} else {
-						client.Silence(duration)
-						client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
-					}
-				}
+				c.silenceCommand(parts)
 			case "/shutdown":
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else {
-					var split = strings.SplitN(line, " ", 2)
-					var msg string
-					if len(split) > 1 {
-						msg = split[1]
-					} else {
-						msg = ""
-					}
-					// Shutdown after 5 seconds
-					go func() {
-						c.Server.Broadcast(ColorString("31", msg), nil)
-						time.Sleep(time.Second * 5)
-						c.Server.Stop()
-					}()
-				}
-			case "/msg": /* Send a PM */
-				/* Make sure we have a recipient and a message */
+				c.shutdownCommand(line)
+			case "/msg":
+				// Make sure we have a recipient and a message
 				if len(parts) < 2 {
 					c.SysMsg("Missing $NAME from: /msg $NAME $MESSAGE")
 					break
@@ -361,51 +241,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $MESSAGE from: /msg $NAME $MESSAGE")
 					break
 				}
-				/* Ask the server to send the message */
-				if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
-					c.SysMsg("Unable to send message to %v: %v", parts[1], err)
-				}
-			case "/motd": /* print motd */
-				if !c.Server.IsOp(c) {
-					c.Server.MotdUnicast(c)
-				} else if len(parts) < 2 {
-					c.Server.MotdUnicast(c)
-				} else {
-					var newmotd string
-					if len(parts) == 2 {
-						newmotd = parts[1]
-					} else {
-						newmotd = parts[1] + " " + parts[2]
-					}
-					c.Server.SetMotd(newmotd)
-					c.Server.MotdBroadcast(c)
-				}
+				c.msgCommand(parts)
+			case "/motd":
+				c.motdCommand(parts)
 			case "/theme":
-				if len(parts) < 2 {
-					c.SysMsg("Missing $THEME from: /theme $THEME")
-					c.SysMsg("Choose either color or mono")
-				} else {
-					// Sets colorMe attribute of client
-					if parts[1] == "mono" {
-						c.colorMe = false
-					} else if parts[1] == "color" {
-						c.colorMe = true
-					}
-					// Rename to reset prompt
-					c.Rename(c.Name)
-				}
-
-			case "/whitelist": /* whitelist a fingerprint */
-				if !c.Server.IsOp(c) {
-					c.SysMsg("You're not an admin.")
-				} else if len(parts) != 2 {
-					c.SysMsg("Missing $FINGERPRINT from: /whitelist $FINGERPRINT")
-				} else {
-					fingerprint := parts[1]
-					c.Server.Whitelist(fingerprint)
-					c.SysMsg("Added %s to the whitelist", fingerprint)
-				}
-
+				c.themeCommand(parts)
+			case "/whitelist":
+				c.whitelistCommand(parts)
 			default:
 				c.SysMsg("Invalid command: %s", line)
 			}
@@ -413,11 +255,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		}
 
 		msg := fmt.Sprintf("%s: %s", c.ColoredName(), line)
-		/* Rate limit */
+
+		// Rate limit
 		if time.Now().Sub(c.lastTX) < RequiredWait {
 			c.SysMsg("Rate limiting in effect.")
 			continue
 		}
+
 		if c.IsSilenced() || len(msg) > 1000 || len(line) < 1 {
 			c.SysMsg("Message rejected.")
 			continue
@@ -425,7 +269,242 @@ func (c *Client) handleShell(channel ssh.Channel) {
 		c.Server.Broadcast(msg, c)
 		c.lastTX = time.Now()
 	}
+}
 
+func (c *Client) testColorsCommand() {
+	c.Write(ColorString("32", "Lorem ipsum dolor sit amet,"))
+	c.Write("consectetur " + ColorString("31;1", "adipiscing") + " elit.")
+}
+
+func (c *Client) helpCommand() {
+	c.WriteLines(strings.Split(HelpText, "\n"))
+	if c.Server.IsOp(c) {
+		c.WriteLines(strings.Split(OpHelpText, "\n"))
+	}
+}
+
+func (c *Client) aboutCommand() {
+	c.WriteLines(strings.Split(AboutText, "\n"))
+}
+
+func (c *Client) uptimeCommand() {
+	c.Write(c.Server.Uptime())
+}
+
+func (c *Client) beepCommand() {
+	c.beepMe = !c.beepMe
+	if c.beepMe {
+		c.SysMsg("I'll beep you good.")
+	} else {
+		c.SysMsg("No more beeps. :(")
+	}
+}
+
+func (c *Client) meCommand(line string) {
+	me := strings.TrimLeft(line, "/me")
+	if me == "" {
+		me = " is at a loss for words."
+	}
+	msg := fmt.Sprintf("** %s%s", c.ColoredName(), me)
+	if c.IsSilenced() || len(msg) > 1000 {
+		c.SysMsg("Message rejected.")
+	} else {
+		c.Server.Broadcast(msg, nil)
+	}
+}
+
+func (c *Client) nickCommand(parts []string) {
+	if len(parts) == 2 {
+		c.Server.Rename(c, parts[1])
+	} else {
+		c.SysMsg("Missing $NAME from: /nick $NAME")
+	}
+}
+
+func (c *Client) whoisCommand(parts []string) {
+	if len(parts) == 2 {
+		client := c.Server.Who(parts[1])
+		if client != nil {
+			version := reStripText.ReplaceAllString(string(client.Conn.ClientVersion()), "")
+			if len(version) > 100 {
+				version = "Evil Jerk with a superlong string"
+			}
+			c.SysMsg("%s is %s via %s", client.ColoredName(), client.Fingerprint(), version)
+		} else {
+			c.SysMsg("No such name: %s", parts[1])
+		}
+	} else {
+		c.SysMsg("Missing $NAME from: /whois $NAME")
+	}
+}
+
+func (c *Client) listCommand() {
+	names := ""
+	nameList := c.Server.List(nil)
+
+	for _, name := range nameList {
+		names += c.Server.Who(name).ColoredName() + systemMessageFormat + ", "
+	}
+
+	if len(names) > 2 {
+		names = names[:len(names)-2]
+	}
+
+	c.SysMsg("%d connected: %s", len(nameList), names)
+}
+
+func (c *Client) banCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else if len(parts) != 2 {
+		c.SysMsg("Missing $NAME from: /ban $NAME")
+	} else {
+		client := c.Server.Who(parts[1])
+		if client == nil {
+			c.SysMsg("No such name: %s", parts[1])
+		} else {
+			fingerprint := client.Fingerprint()
+			client.SysMsg("Banned by %s.", c.ColoredName())
+			c.Server.Ban(fingerprint, nil)
+			client.Conn.Close()
+			c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
+		}
+	}
+}
+
+func (c *Client) opCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else if len(parts) != 2 {
+		c.SysMsg("Missing $NAME from: /op $NAME")
+	} else {
+		client := c.Server.Who(parts[1])
+		if client == nil {
+			c.SysMsg("No such name: %s", parts[1])
+		} else {
+			fingerprint := client.Fingerprint()
+			client.SysMsg("Made op by %s.", c.ColoredName())
+			c.Server.Op(fingerprint)
+		}
+	}
+}
+
+func (c *Client) kickCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else if len(parts) != 2 {
+		c.SysMsg("Missing $NAME from: /kick $NAME")
+	} else {
+		client := c.Server.Who(parts[1])
+		if client == nil {
+			c.SysMsg("No such name: %s", parts[1])
+			return
+		}
+
+		client.SysMsg("Kicked by %s.", c.ColoredName())
+		client.Conn.Close()
+		c.Server.Broadcast(fmt.Sprintf("* %s was kicked by %s", parts[1], c.ColoredName()), nil)
+	}
+}
+
+func (c *Client) silenceCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else if len(parts) < 2 {
+		c.SysMsg("Missing $NAME from: /silence $NAME")
+	} else {
+		duration := time.Duration(5) * time.Minute
+		if len(parts) >= 3 {
+			parsedDuration, err := time.ParseDuration(parts[2])
+			if err == nil {
+				duration = parsedDuration
+			}
+		}
+		client := c.Server.Who(parts[1])
+		if client == nil {
+			c.SysMsg("No such name: %s", parts[1])
+		} else {
+			client.Silence(duration)
+			client.SysMsg("Silenced for %s by %s.", duration, c.ColoredName())
+		}
+	}
+}
+
+func (c *Client) shutdownCommand(line string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else {
+		var split = strings.SplitN(line, " ", 2)
+		var msg string
+
+		if len(split) > 1 {
+			msg = split[1]
+		} else {
+			msg = ""
+		}
+
+		// Shutdown after 5 seconds
+		go func() {
+			c.Server.Broadcast(ColorString("31", msg), nil)
+			time.Sleep(time.Second * 5)
+			c.Server.Stop()
+		}()
+	}
+}
+
+func (c *Client) msgCommand(parts []string) {
+	// Ask the server to send the message
+	if err := c.Server.Privmsg(parts[1], parts[2], c); nil != err {
+		c.SysMsg("Unable to send message to %v: %v", parts[1], err)
+	}
+}
+
+func (c *Client) motdCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.Server.MotdUnicast(c)
+	} else if len(parts) < 2 {
+		c.Server.MotdUnicast(c)
+	} else {
+		var newmotd string
+
+		if len(parts) == 2 {
+			newmotd = parts[1]
+		} else {
+			newmotd = parts[1] + " " + parts[2]
+		}
+
+		c.Server.SetMotd(newmotd)
+		c.Server.MotdBroadcast(c)
+	}
+}
+
+func (c *Client) themeCommand(parts []string) {
+	if len(parts) < 2 {
+		c.SysMsg("Missing $THEME from: /theme $THEME")
+		c.SysMsg("Choose either color or mono")
+	} else {
+		// Sets colorMe attribute of client
+		if parts[1] == "mono" {
+			c.colorMe = false
+		} else if parts[1] == "color" {
+			c.colorMe = true
+		}
+
+		// Rename to reset prompt
+		c.Rename(c.Name)
+	}
+}
+
+func (c *Client) whitelistCommand(parts []string) {
+	if !c.Server.IsOp(c) {
+		c.SysMsg("You're not an admin.")
+	} else if len(parts) != 2 {
+		c.SysMsg("Missing $FINGERPRINT from: /whitelist $FINGERPRINT")
+	} else {
+		fingerprint := parts[1]
+		c.Server.Whitelist(fingerprint)
+		c.SysMsg("Added %s to the whitelist", fingerprint)
+	}
 }
 
 func (c *Client) handleChannels(channels <-chan ssh.NewChannel) {
