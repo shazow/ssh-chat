@@ -247,7 +247,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						slappee = "some long-named jerk"
 					}
 				}
-				c.Emote(fmt.Sprintf(" slaps %s around a bit with a large trout", slappee))
+				c.Emote(fmt.Sprintf(" slaps %s around a bit with a large trout.", slappee))
 			case "/nick":
 				if len(parts) == 2 {
 					c.Server.Rename(c, parts[1])
