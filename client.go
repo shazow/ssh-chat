@@ -255,7 +255,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $NAME from: /nick $NAME")
 				}
 			case "/whois":
-				if len(parts) == 2 {
+				if len(parts) >= 2 {
 					client := c.Server.Who(parts[1])
 					if client != nil {
 						version := reStripText.ReplaceAllString(string(client.Conn.ClientVersion()), "")
