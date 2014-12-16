@@ -94,7 +94,7 @@ func (c *Client) ColoredName() string {
 
 // SysMsg sends a message in continuous format over the message channel
 func (c *Client) SysMsg(msg string, args ...interface{}) {
-	c.Msg <- ContinuousFormat(systemMessageFormat, "-> "+fmt.Sprintf(msg, args...))
+	c.Send(ContinuousFormat(systemMessageFormat, "-> "+fmt.Sprintf(msg, args...)))
 }
 
 // Write writes the given message
