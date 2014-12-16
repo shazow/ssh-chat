@@ -267,7 +267,7 @@ func (s *Server) Whitelist(fingerprint string) error {
 	if strings.HasPrefix(fingerprint, "github.com/") {
 		logger.Infof("Adding github account %s to whitelist", fingerprint)
 
-		keys, err := getGithubKey(fingerprint)
+		keys, err := getGithubPubKeys(fingerprint)
 		if err != nil {
 			return err
 		}
@@ -290,8 +290,9 @@ func (s *Server) Whitelist(fingerprint string) error {
 	return nil
 }
 
-var r = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
-func getGithubKey(url string) ([]ssh.PublicKey, error) {
+var pubKeyRegex = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
+// Returns an array of public keys for the given github user URL
+func getGithubPubKeys(url string) ([]ssh.PublicKey, error) {
 	resp, err := http.Get("http://" + url + ".keys")
 	if err != nil {
 		return nil, err
@@ -302,7 +303,7 @@ func getGithubKey(url string) ([]ssh.PublicKey, error) {
 		return nil, err
 	}
 	bodyStr := string(body)
-	keys := r.FindAllStringSubmatch(bodyStr, -1)
+	keys := pubKeyRegex.FindAllStringSubmatch(bodyStr, -1)
 	pubs := make([]ssh.PublicKey, 0, 3)
 	for _, key := range keys {
 		if(len(key) < 2) {
