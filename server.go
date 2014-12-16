@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"io/ioutil"
 	"encoding/base64"
-	"errors"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -273,7 +272,7 @@ func (s *Server) Whitelist(fingerprint string) error {
 			return err
 		}
 		if len(keys) == 0 {
-			return errors.New(fmt.Sprintf("No github user %s", fingerprint))
+			return fmt.Errorf("No github user %s", fingerprint)
 		}
 		for _, key := range keys {
 			fingerprint = Fingerprint(key)
@@ -291,7 +290,7 @@ func (s *Server) Whitelist(fingerprint string) error {
 	return nil
 }
 
-var r *regexp.Regexp = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
+var r = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
 func getGithubKey(url string) ([]ssh.PublicKey, error) {
 	resp, err := http.Get("http://" + url + ".keys")
 	if err != nil {
@@ -302,20 +301,20 @@ func getGithubKey(url string) ([]ssh.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	body_str := string(body)
-	keys := r.FindAllStringSubmatch(body_str, -1)
+	bodyStr := string(body)
+	keys := r.FindAllStringSubmatch(bodyStr, -1)
 	pubs := make([]ssh.PublicKey, 0, 3)
 	for _, key := range keys {
 		if(len(key) < 2) {
 			continue
 		}
 
-		body_decoded, err := base64.StdEncoding.DecodeString(key[1])
+		bodyDecoded, err := base64.StdEncoding.DecodeString(key[1])
 		if err != nil {
 			return nil, err
 		}
 
-		pub, err := ssh.ParsePublicKey(body_decoded)
+		pub, err := ssh.ParsePublicKey(bodyDecoded)
 		if err != nil {
 			return nil, err
 		}
