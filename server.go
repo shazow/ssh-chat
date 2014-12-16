@@ -167,7 +167,7 @@ func (s *Server) Add(client *Client) {
 
 	newName, err := s.proposeName(client.Name)
 	if err != nil {
-		client.SysMsg("Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.ColoredName(), ColorString(client.Color, newName))
+		client.SysMsg("Your name '%s' is not available, renamed to '%s'. Use /nick <name> to change it.", client.Name, ColorString(client.Color, newName))
 	}
 
 	client.Rename(newName)
@@ -175,7 +175,7 @@ func (s *Server) Add(client *Client) {
 	num := len(s.clients)
 	s.Unlock()
 
-	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.ColoredName(), num)), client, false)
+	s.Broadcast(ContinuousFormat(systemMessageFormat, fmt.Sprintf(" * %s joined. (Total connected: %d)", client.Name, num)), client)
 }
 
 // Remove removes the given client from the list of clients
@@ -184,7 +184,7 @@ func (s *Server) Remove(client *Client) {
 	delete(s.clients, strings.ToLower(client.Name))
 	s.Unlock()
 
-	s.SysMsg("%s left.", client.ColoredName())
+	s.SysMsg("%s left.", client.Name)
 }
 
 func (s *Server) proposeName(name string) (string, error) {
