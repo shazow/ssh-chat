@@ -415,8 +415,12 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $FINGERPRINT from: /whitelist $FINGERPRINT")
 				} else {
 					fingerprint := parts[1]
-					c.Server.Whitelist(fingerprint)
-					c.SysMsg("Added %s to the whitelist", fingerprint)
+					err = c.Server.Whitelist(fingerprint)
+					if err != nil {
+						c.SysMsg("Error adding to whitelist: %s", err)
+					} else {
+						c.SysMsg("Added %s to the whitelist", fingerprint)
+					}
 				}
 
 			default:
