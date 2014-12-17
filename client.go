@@ -32,13 +32,14 @@ const (
 
 	// OpHelpText is the additional text returned by /help if the client is an Op
 	OpHelpText string = systemMessageFormat + `-> Available operator commands:
-   /ban $NAME                - Banish a user from the chat
-   /kick $NAME               - Kick em' out.
-   /op $NAME                 - Promote a user to server operator.
-   /silence $NAME            - Revoke a user's ability to speak.
-   /shutdown $MESSAGE        - Broadcast message and shutdown server.
-   /motd $MESSAGE            - Set message shown whenever somebody joins.
-   /whitelist $FINGERPRINT   - Add fingerprint to whitelist, prevent anyone else from joining.` + Reset
+   /ban $NAME                   - Banish a user from the chat
+   /kick $NAME                  - Kick em' out.
+   /op $NAME                    - Promote a user to server operator.
+   /silence $NAME               - Revoke a user's ability to speak.
+   /shutdown $MESSAGE           - Broadcast message and shutdown server.
+   /motd $MESSAGE               - Set message shown whenever somebody joins.
+   /whitelist $FINGERPRINT      - Add fingerprint to whitelist, prevent anyone else from joining.
+   /whitelist github.com/$USER  - Add github user's pubkeys to whitelist.` + Reset
 
 	// AboutText is the text returned by /about
 	AboutText string = systemMessageFormat + `-> ssh-chat is made by @shazow.
@@ -415,8 +416,14 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $FINGERPRINT from: /whitelist $FINGERPRINT")
 				} else {
 					fingerprint := parts[1]
-					c.Server.Whitelist(fingerprint)
-					c.SysMsg("Added %s to the whitelist", fingerprint)
+					go func() {
+						err = c.Server.Whitelist(fingerprint)
+						if err != nil {
+							c.SysMsg("Error adding to whitelist: %s", err)
+						} else {
+							c.SysMsg("Added %s to the whitelist", fingerprint)
+						}
+					}()
 				}
 
 			default:

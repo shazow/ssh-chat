@@ -9,6 +9,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"net/http"
+	"bufio"
+	"encoding/base64"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -263,11 +266,81 @@ func (s *Server) Op(fingerprint string) {
 }
 
 // Whitelist adds the given fingerprint to the whitelist
-func (s *Server) Whitelist(fingerprint string) {
+func (s *Server) Whitelist(fingerprint string) error {
+	if strings.HasPrefix(fingerprint, "github.com/") {
+		return s.whitelistIdentityURL(fingerprint)
+	}
+
+	return s.whitelistFingerprint(fingerprint)
+}
+
+func (s *Server) whitelistIdentityURL(user string) error {
+	logger.Infof("Adding github account %s to whitelist", user)
+
+	user = strings.Replace(user, "github.com/", "", -1)
+	keys, err := getGithubPubKeys(user)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return fmt.Errorf("No keys for github user %s", user)
+	}
+	for _, key := range keys {
+		fingerprint := Fingerprint(key)
+		s.whitelistFingerprint(fingerprint)
+	}
+	return nil
+}
+
+func (s *Server) whitelistFingerprint(fingerprint string) error {
 	logger.Infof("Adding whitelist: %s", fingerprint)
 	s.Lock()
 	s.whitelist[fingerprint] = struct{}{}
 	s.Unlock()
+	return nil
+}
+
+// Client for getting github pub keys
+var timeout = time.Duration(10 * time.Second)
+var client = http.Client{
+    Timeout: timeout,
+}
+// Returns an array of public keys for the given github user URL
+func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
+	resp, err := client.Get("http://github.com/" + user + ".keys")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	pubs := []ssh.PublicKey{}
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text == "Not Found" {
+			continue
+		}
+
+		splitKey := strings.SplitN(text, " ", -1)
+
+		// In case of malformated key
+		if len(splitKey) < 2 {
+			continue
+		}
+
+		bodyDecoded, err := base64.StdEncoding.DecodeString(splitKey[1])
+		if err != nil {
+			return nil, err
+		}
+
+		pub, err := ssh.ParsePublicKey(bodyDecoded)
+		if err != nil {
+			return nil, err
+		}
+
+		pubs = append(pubs, pub)
+	}
+	return pubs, nil
 }
 
 // Uptime returns the time since the server was started
