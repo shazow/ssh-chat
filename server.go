@@ -81,7 +81,7 @@ func NewServer(privateKey []byte) (*Server, error) {
 			return perm, nil
 		},
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
-			return nil, nil
+			return nil, fmt.Errorf("Must have an SSH keypair to connect.")
 		},
 	}
 	config.AddHostKey(signer)
