@@ -296,7 +296,12 @@ func (s *Server) Whitelist(fingerprint string) error {
 var pubKeyRegex = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
 // Returns an array of public keys for the given github user URL
 func getGithubPubKeys(url string) ([]ssh.PublicKey, error) {
-	resp, err := http.Get("http://" + url + ".keys")
+	timeout := time.Duration(10 * time.Second)
+	client := http.Client{
+	    Timeout: timeout,
+	}
+	resp, err := client.Get("http://" + url + ".keys")
+
 	if err != nil {
 		return nil, err
 	}
