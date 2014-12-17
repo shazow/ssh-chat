@@ -1,17 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"net/http"
-	"bufio"
-	"encoding/base64"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -81,6 +82,10 @@ func NewServer(privateKey []byte) (*Server, error) {
 			return perm, nil
 		},
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			if !server.IsWhitelisted("") {
+				// if whitelist is enabled, PublicKey is required.
+				return nil, fmt.Errorf("Not Whitelisted.")
+			}
 			return nil, nil
 		},
 	}
@@ -293,6 +298,11 @@ func (s *Server) whitelistIdentityURL(user string) error {
 }
 
 func (s *Server) whitelistFingerprint(fingerprint string) error {
+	if !IsFingerprint(fingerprint) {
+		// this is mainly for preventing adding empty ("") fingerprint values which
+		// essentially means IsWhitelested("") would return true.
+		return fmt.Errorf("invalid fingerprint: %s", fingerprint)
+	}
 	logger.Infof("Adding whitelist: %s", fingerprint)
 	s.Lock()
 	s.whitelist[fingerprint] = struct{}{}
@@ -303,8 +313,9 @@ func (s *Server) whitelistFingerprint(fingerprint string) error {
 // Client for getting github pub keys
 var timeout = time.Duration(10 * time.Second)
 var client = http.Client{
-    Timeout: timeout,
+	Timeout: timeout,
 }
+
 // Returns an array of public keys for the given github user URL
 func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
 	resp, err := client.Get("http://github.com/" + user + ".keys")
@@ -497,4 +508,12 @@ func Fingerprint(k ssh.PublicKey) string {
 	hash := md5.Sum(k.Marshal())
 	r := fmt.Sprintf("% x", hash)
 	return strings.Replace(r, " ", ":", -1)
+}
+
+func IsFingerprint(str string) bool {
+	b, err := hex.DecodeString(strings.Replace(str, ":", "", 15))
+	if err != nil || len(b) != 16 {
+		return false
+	}
+	return true
 }
