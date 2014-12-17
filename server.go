@@ -268,13 +268,13 @@ func (s *Server) Op(fingerprint string) {
 // Whitelist adds the given fingerprint to the whitelist
 func (s *Server) Whitelist(fingerprint string) error {
 	if strings.HasPrefix(fingerprint, "github.com/") {
-		return s.whitelistIdentityUrl(fingerprint)
-	} else {
-		return s.whitelistFingerprint(fingerprint)
+		return s.whitelistIdentityURL(fingerprint)
 	}
+
+	return s.whitelistFingerprint(fingerprint)
 }
 
-func (s *Server) whitelistIdentityUrl(user string) error {
+func (s *Server) whitelistIdentityURL(user string) error {
 	logger.Infof("Adding github account %s to whitelist", user)
 
 	user = strings.Replace(user, "github.com/", "", -1)
