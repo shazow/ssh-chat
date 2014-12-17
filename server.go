@@ -81,7 +81,13 @@ func NewServer(privateKey []byte) (*Server, error) {
 			return perm, nil
 		},
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
-			return nil, fmt.Errorf("Must have an SSH keypair to connect.")
+			if server.IsBanned("") {
+				return nil, fmt.Errorf("Interactive login disabled.")
+			}
+			if !server.IsWhitelisted("") {
+				return nil, fmt.Errorf("Not Whitelisted.")
+			}
+			return nil, nil
 		},
 	}
 	config.AddHostKey(signer)
@@ -267,6 +273,9 @@ func (s *Server) Op(fingerprint string) {
 
 // Whitelist adds the given fingerprint to the whitelist
 func (s *Server) Whitelist(fingerprint string) error {
+	if fingerprint == "" {
+		return fmt.Errorf("Invalid fingerprint.")
+	}
 	if strings.HasPrefix(fingerprint, "github.com/") {
 		return s.whitelistIdentityURL(fingerprint)
 	}

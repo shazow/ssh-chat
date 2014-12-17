@@ -14,10 +14,10 @@ const (
 	MsgBuffer int = 50
 
 	// MaxMsgLength is the maximum length of a message
-	MaxMsgLength int = 512
+	MaxMsgLength int = 1024
 
 	// HelpText is the text returned by /help
-	HelpText string = systemMessageFormat + `-> Available commands:
+	HelpText string = `Available commands:
    /about               - About this chat.
    /exit                - Exit the chat.
    /help                - Show this help text.
@@ -28,10 +28,10 @@ const (
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day.
-   /theme [color|mono]  - Set client theme.` + Reset
+   /theme [color|mono]  - Set client theme.`
 
 	// OpHelpText is the additional text returned by /help if the client is an Op
-	OpHelpText string = systemMessageFormat + `-> Available operator commands:
+	OpHelpText string = `Available operator commands:
    /ban $NAME                   - Banish a user from the chat
    /kick $NAME                  - Kick em' out.
    /op $NAME                    - Promote a user to server operator.
@@ -39,18 +39,17 @@ const (
    /shutdown $MESSAGE           - Broadcast message and shutdown server.
    /motd $MESSAGE               - Set message shown whenever somebody joins.
    /whitelist $FINGERPRINT      - Add fingerprint to whitelist, prevent anyone else from joining.
-   /whitelist github.com/$USER  - Add github user's pubkeys to whitelist.` + Reset
+   /whitelist github.com/$USER  - Add github user's pubkeys to whitelist.`
 
 	// AboutText is the text returned by /about
-	AboutText string = systemMessageFormat + `-> ssh-chat is made by @shazow.
+	AboutText string = `ssh-chat is made by @shazow.
 
    It is a custom ssh server built in Go to serve a chat experience
    instead of a shell.
 
    Source: https://github.com/shazow/ssh-chat
 
-   For more, visit shazow.net or follow at twitter.com/shazow
-` + Reset
+   For more, visit shazow.net or follow at twitter.com/shazow`
 
 	// RequiredWait is the time a client is required to wait between messages
 	RequiredWait time.Duration = time.Second / 2
@@ -222,14 +221,14 @@ func (c *Client) handleShell(channel ssh.Channel) {
 			case "/exit":
 				channel.Close()
 			case "/help":
-				c.WriteLines(strings.Split(HelpText, "\n"))
+				c.SysMsg(strings.Replace(HelpText, "\n", "\r\n", -1))
 				if c.Server.IsOp(c) {
-					c.WriteLines(strings.Split(OpHelpText, "\n"))
+					c.SysMsg(strings.Replace(OpHelpText, "\n", "\r\n", -1))
 				}
 			case "/about":
-				c.WriteLines(strings.Split(AboutText, "\n"))
+				c.SysMsg(strings.Replace(AboutText, "\n", "\r\n", -1))
 			case "/uptime":
-				c.Write(c.Server.Uptime())
+				c.SysMsg(c.Server.Uptime())
 			case "/beep":
 				c.beepMe = !c.beepMe
 				if c.beepMe {

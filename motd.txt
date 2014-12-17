@@ -1,1 +1,1 @@
-[39;05;91mWelcome to chat.shazow.net, enter /help for more.  [0m
+[39;91mWelcome to chat.shazow.net, enter /help for more.  [0m
