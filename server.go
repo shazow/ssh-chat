@@ -1,17 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"crypto/md5"
+	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"net/http"
-	"bufio"
-	"encoding/base64"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -301,10 +301,10 @@ func (s *Server) whitelistFingerprint(fingerprint string) error {
 }
 
 // Client for getting github pub keys
-var timeout = time.Duration(10 * time.Second)
 var client = http.Client{
-    Timeout: timeout,
+	Timeout: time.Duration(10 * time.Second),
 }
+
 // Returns an array of public keys for the given github user URL
 func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
 	resp, err := client.Get("http://github.com/" + user + ".keys")
