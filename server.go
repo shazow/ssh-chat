@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 	"net/http"
-	"io/ioutil"
+	"bufio"
 	"encoding/base64"
 
 	"golang.org/x/crypto/ssh"
@@ -313,21 +313,15 @@ func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	bodyStr := string(body)
-
-	// More informative error than that from base64 DecodeString
-	if bodyStr == "Not Found" {
-		return nil, fmt.Errorf("No github user %s found", user)
-	}
-
 	pubs := []ssh.PublicKey{}
-	for _, key := range strings.SplitN(bodyStr, "\n", -1) {
-		splitKey := strings.SplitN(key, " ", -1)
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text == "Not Found" {
+			continue
+		}
+
+		splitKey := strings.SplitN(text, " ", -1)
 
 		// In case of malformated key
 		if len(splitKey) < 2 {
