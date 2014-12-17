@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -71,6 +72,8 @@ type Client struct {
 	lastTX        time.Time
 	beepMe        bool
 	colorMe       bool
+	closed        bool
+	sync.Mutex
 }
 
 // NewClient constructs a new client
@@ -114,7 +117,7 @@ func (c *Client) WriteLines(msg []string) {
 
 // Send sends the given message
 func (c *Client) Send(msg string) {
-	if len(msg) > MaxMsgLength {
+	if len(msg) > MaxMsgLength || c.closed {
 		return
 	}
 	select {
@@ -193,8 +196,9 @@ func (c *Client) handleShell(channel ssh.Channel) {
 	go func() {
 		// Block until done, then remove.
 		c.Conn.Wait()
-		close(c.Msg)
+		c.closed = true
 		c.Server.Remove(c)
+		close(c.Msg)
 	}()
 
 	go func() {
