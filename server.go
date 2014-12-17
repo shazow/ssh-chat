@@ -222,12 +222,12 @@ func (s *Server) proposeName(name string) (string, error) {
 
 // Rename renames the given client (user)
 func (s *Server) Rename(client *Client, newName string) {
-	s.Lock()
 	var oldName string
 	if strings.ToLower(newName) == strings.ToLower(client.Name) {
 		oldName = client.Name
 		client.Rename(newName)
 	} else {
+		s.Lock()
 		newName, err := s.proposeName(newName)
 		if err != nil {
 			client.SysMsg("%s", err)
