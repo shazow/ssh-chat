@@ -73,7 +73,7 @@ type Client struct {
 	beepMe        bool
 	colorMe       bool
 	closed        bool
-	sync.Mutex
+	sync.RWMutex
 }
 
 // NewClient constructs a new client

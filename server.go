@@ -44,7 +44,7 @@ type Server struct {
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPK  map[string]*time.Time // fingerprint lookup
 	started   time.Time
-	sync.Mutex
+	sync.RWMutex
 }
 
 // NewServer constructs a new server
@@ -112,6 +112,9 @@ func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
 
+	s.RLock()
+	defer s.RUnlock()
+
 	for _, client := range s.clients {
 		if except != nil && client == except {
 			continue
@@ -145,9 +148,7 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 
 // SetMotd sets the Message of the Day (MOTD)
 func (s *Server) SetMotd(motd string) {
-	s.Lock()
 	s.motd = motd
-	s.Unlock()
 }
 
 // MotdUnicast sends the MOTD as a SysMsg
@@ -247,6 +248,9 @@ func (s *Server) Rename(client *Client, newName string) {
 // List lists the clients with the given prefix
 func (s *Server) List(prefix *string) []string {
 	r := []string{}
+
+	s.RLock()
+	defer s.RUnlock()
 
 	for name := range s.clients {
 		if prefix != nil && !strings.HasPrefix(name, *prefix) {
@@ -494,9 +498,11 @@ func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine s
 
 // Stop stops the server
 func (s *Server) Stop() {
+	s.Lock()
 	for _, client := range s.clients {
 		client.Conn.Close()
 	}
+	s.Unlock()
 
 	close(s.done)
 }
