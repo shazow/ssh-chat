@@ -171,6 +171,9 @@ func (c *Client) Rename(name string) {
 
 // Fingerprint returns the fingerprint
 func (c *Client) Fingerprint() string {
+	if c.Conn.Permissions == nil {
+		return ""
+	}
 	return c.Conn.Permissions.Extensions["fingerprint"]
 }
 
