@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"crypto/md5"
+	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -41,7 +44,7 @@ type Server struct {
 	admins    map[string]struct{}   // fingerprint lookup
 	bannedPK  map[string]*time.Time // fingerprint lookup
 	started   time.Time
-	sync.Mutex
+	sync.RWMutex
 }
 
 // NewServer constructs a new server
@@ -77,6 +80,15 @@ func NewServer(privateKey []byte) (*Server, error) {
 			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
 			return perm, nil
 		},
+		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			if server.IsBanned("") {
+				return nil, fmt.Errorf("Interactive login disabled.")
+			}
+			if !server.IsWhitelisted("") {
+				return nil, fmt.Errorf("Not Whitelisted.")
+			}
+			return nil, nil
+		},
 	}
 	config.AddHostKey(signer)
 
@@ -99,6 +111,9 @@ func (s *Server) SysMsg(msg string, args ...interface{}) {
 func (s *Server) Broadcast(msg string, except *Client) {
 	logger.Debugf("Broadcast to %d: %s", s.Len(), msg)
 	s.history.Add(msg)
+
+	s.RLock()
+	defer s.RUnlock()
 
 	for _, client := range s.clients {
 		if except != nil && client == except {
@@ -133,9 +148,7 @@ func (s *Server) Privmsg(nick, message string, sender *Client) error {
 
 // SetMotd sets the Message of the Day (MOTD)
 func (s *Server) SetMotd(motd string) {
-	s.Lock()
 	s.motd = motd
-	s.Unlock()
 }
 
 // MotdUnicast sends the MOTD as a SysMsg
@@ -209,12 +222,12 @@ func (s *Server) proposeName(name string) (string, error) {
 
 // Rename renames the given client (user)
 func (s *Server) Rename(client *Client, newName string) {
-	s.Lock()
 	var oldName string
 	if strings.ToLower(newName) == strings.ToLower(client.Name) {
 		oldName = client.Name
 		client.Rename(newName)
 	} else {
+		s.Lock()
 		newName, err := s.proposeName(newName)
 		if err != nil {
 			client.SysMsg("%s", err)
@@ -235,6 +248,9 @@ func (s *Server) Rename(client *Client, newName string) {
 // List lists the clients with the given prefix
 func (s *Server) List(prefix *string) []string {
 	r := []string{}
+
+	s.RLock()
+	defer s.RUnlock()
 
 	for name, client := range s.clients {
 		if prefix != nil && !strings.HasPrefix(name, strings.ToLower(*prefix)) {
@@ -260,11 +276,84 @@ func (s *Server) Op(fingerprint string) {
 }
 
 // Whitelist adds the given fingerprint to the whitelist
-func (s *Server) Whitelist(fingerprint string) {
+func (s *Server) Whitelist(fingerprint string) error {
+	if fingerprint == "" {
+		return fmt.Errorf("Invalid fingerprint.")
+	}
+	if strings.HasPrefix(fingerprint, "github.com/") {
+		return s.whitelistIdentityURL(fingerprint)
+	}
+
+	return s.whitelistFingerprint(fingerprint)
+}
+
+func (s *Server) whitelistIdentityURL(user string) error {
+	logger.Infof("Adding github account %s to whitelist", user)
+
+	user = strings.Replace(user, "github.com/", "", -1)
+	keys, err := getGithubPubKeys(user)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return fmt.Errorf("No keys for github user %s", user)
+	}
+	for _, key := range keys {
+		fingerprint := Fingerprint(key)
+		s.whitelistFingerprint(fingerprint)
+	}
+	return nil
+}
+
+func (s *Server) whitelistFingerprint(fingerprint string) error {
 	logger.Infof("Adding whitelist: %s", fingerprint)
 	s.Lock()
 	s.whitelist[fingerprint] = struct{}{}
 	s.Unlock()
+	return nil
+}
+
+// Client for getting github pub keys
+var client = http.Client{
+	Timeout: time.Duration(10 * time.Second),
+}
+
+// Returns an array of public keys for the given github user URL
+func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
+	resp, err := client.Get("http://github.com/" + user + ".keys")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	pubs := []ssh.PublicKey{}
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text == "Not Found" {
+			continue
+		}
+
+		splitKey := strings.SplitN(text, " ", -1)
+
+		// In case of malformated key
+		if len(splitKey) < 2 {
+			continue
+		}
+
+		bodyDecoded, err := base64.StdEncoding.DecodeString(splitKey[1])
+		if err != nil {
+			return nil, err
+		}
+
+		pub, err := ssh.ParsePublicKey(bodyDecoded)
+		if err != nil {
+			return nil, err
+		}
+
+		pubs = append(pubs, pub)
+	}
+	return pubs, nil
 }
 
 // Uptime returns the time since the server was started
@@ -409,9 +498,11 @@ func (s *Server) AutoCompleteFunction(line string, pos int, key rune) (newLine s
 
 // Stop stops the server
 func (s *Server) Stop() {
+	s.Lock()
 	for _, client := range s.clients {
 		client.Conn.Close()
 	}
+	s.Unlock()
 
 	close(s.done)
 }
