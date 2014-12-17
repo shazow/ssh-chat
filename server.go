@@ -236,11 +236,11 @@ func (s *Server) Rename(client *Client, newName string) {
 func (s *Server) List(prefix *string) []string {
 	r := []string{}
 
-	for name := range s.clients {
+	for name, client := range s.clients {
 		if prefix != nil && !strings.HasPrefix(name, strings.ToLower(*prefix)) {
 			continue
 		}
-		r = append(r, name)
+		r = append(r, client.Name)
 	}
 
 	return r
