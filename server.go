@@ -268,28 +268,35 @@ func (s *Server) Op(fingerprint string) {
 // Whitelist adds the given fingerprint to the whitelist
 func (s *Server) Whitelist(fingerprint string) error {
 	if strings.HasPrefix(fingerprint, "github.com/") {
-		logger.Infof("Adding github account %s to whitelist", fingerprint)
-
-		keys, err := getGithubPubKeys(fingerprint)
-		if err != nil {
-			return err
-		}
-		if len(keys) == 0 {
-			return fmt.Errorf("No github user %s", fingerprint)
-		}
-		for _, key := range keys {
-			fingerprint = Fingerprint(key)
-			logger.Infof("Adding whitelist: %s", fingerprint)
-			s.Lock()
-			s.whitelist[fingerprint] = struct{}{}
-			s.Unlock()
-		}
+		return s.whitelistIdentityUrl(fingerprint)
 	} else {
-		logger.Infof("Adding whitelist: %s", fingerprint)
-		s.Lock()
-		s.whitelist[fingerprint] = struct{}{}
-		s.Unlock()
+		return s.whitelistFingerprint(fingerprint)
 	}
+}
+
+func (s *Server) whitelistIdentityUrl(user string) error {
+	logger.Infof("Adding github account %s to whitelist", user)
+
+	user = strings.Replace(user, "github.com/", "", -1)
+	keys, err := getGithubPubKeys(user)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return fmt.Errorf("No keys for github user %s", user)
+	}
+	for _, key := range keys {
+		fingerprint := Fingerprint(key)
+		s.whitelistFingerprint(fingerprint)
+	}
+	return nil
+}
+
+func (s *Server) whitelistFingerprint(fingerprint string) error {
+	logger.Infof("Adding whitelist: %s", fingerprint)
+	s.Lock()
+	s.whitelist[fingerprint] = struct{}{}
+	s.Unlock()
 	return nil
 }
 
@@ -299,8 +306,8 @@ var client = http.Client{
     Timeout: timeout,
 }
 // Returns an array of public keys for the given github user URL
-func getGithubPubKeys(url string) ([]ssh.PublicKey, error) {
-	resp, err := client.Get("http://" + url + ".keys")
+func getGithubPubKeys(user string) ([]ssh.PublicKey, error) {
+	resp, err := client.Get("http://github.com/" + user + ".keys")
 	if err != nil {
 		return nil, err
 	}
@@ -312,6 +319,12 @@ func getGithubPubKeys(url string) ([]ssh.PublicKey, error) {
 	}
 
 	bodyStr := string(body)
+
+	// More informative error than that from base64 DecodeString
+	if bodyStr == "Not Found" {
+		return nil, fmt.Errorf("No github user %s found", user)
+	}
+
 	pubs := []ssh.PublicKey{}
 	for _, key := range strings.SplitN(bodyStr, "\n", -1) {
 		splitKey := strings.SplitN(key, " ", -1)
