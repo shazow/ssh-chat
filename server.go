@@ -111,12 +111,10 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			continue
 		}
 
-		if strings.Contains(msg, client.Name) {
+		if client.beepMe && strings.Contains(msg, client.Name) {
 			// Turn message red if client's name is mentioned, and send BEL if they have enabled beeping
 			personalMsg := strings.Replace(msg, client.Name, highlightFormat+client.Name+Reset, -1)
-			if client.beepMe {
-				personalMsg += beep
-			}
+			personalMsg += beep
 			client.Send(personalMsg)
 		} else {
 			client.Send(msg)
