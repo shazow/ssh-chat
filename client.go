@@ -95,7 +95,7 @@ func (c *Client) ColoredName() string {
 
 // SysMsg sends a message in continuous format over the message channel
 func (c *Client) SysMsg(msg string, args ...interface{}) {
-	c.Msg <- ContinuousFormat(systemMessageFormat, "-> "+fmt.Sprintf(msg, args...))
+	c.Send(ContinuousFormat(systemMessageFormat, "-> "+fmt.Sprintf(msg, args...)))
 }
 
 // Write writes the given message
@@ -256,7 +256,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $NAME from: /nick $NAME")
 				}
 			case "/whois":
-				if len(parts) == 2 {
+				if len(parts) >= 2 {
 					client := c.Server.Who(parts[1])
 					if client != nil {
 						version := reStripText.ReplaceAllString(string(client.Conn.ClientVersion()), "")

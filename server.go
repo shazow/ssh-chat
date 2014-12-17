@@ -80,6 +80,9 @@ func NewServer(privateKey []byte) (*Server, error) {
 			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
 			return perm, nil
 		},
+		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			return nil, nil
+		},
 	}
 	config.AddHostKey(signer)
 
