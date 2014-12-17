@@ -293,32 +293,35 @@ func (s *Server) Whitelist(fingerprint string) error {
 	return nil
 }
 
-var pubKeyRegex = regexp.MustCompile(`ssh-rsa ([A-Za-z0-9\+=\/]+)\s*`)
+// Client for getting github pub keys
+var timeout = time.Duration(10 * time.Second)
+var client = http.Client{
+    Timeout: timeout,
+}
 // Returns an array of public keys for the given github user URL
 func getGithubPubKeys(url string) ([]ssh.PublicKey, error) {
-	timeout := time.Duration(10 * time.Second)
-	client := http.Client{
-	    Timeout: timeout,
-	}
 	resp, err := client.Get("http://" + url + ".keys")
-
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+
 	bodyStr := string(body)
-	keys := pubKeyRegex.FindAllStringSubmatch(bodyStr, -1)
-	pubs := make([]ssh.PublicKey, 0, 3)
-	for _, key := range keys {
-		if(len(key) < 2) {
+	pubs := []ssh.PublicKey{}
+	for _, key := range strings.SplitN(bodyStr, "\n", -1) {
+		splitKey := strings.SplitN(key, " ", -1)
+
+		// In case of malformated key
+		if len(splitKey) < 2 {
 			continue
 		}
 
-		bodyDecoded, err := base64.StdEncoding.DecodeString(key[1])
+		bodyDecoded, err := base64.StdEncoding.DecodeString(splitKey[1])
 		if err != nil {
 			return nil, err
 		}
