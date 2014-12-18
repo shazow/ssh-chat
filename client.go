@@ -431,6 +431,8 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						}
 					}()
 				}
+			case "/version":
+				c.SysMsg("Version " + buildCommit)
 
 			default:
 				c.SysMsg("Invalid command: %s", line)
