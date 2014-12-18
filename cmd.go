@@ -33,6 +33,7 @@ var logLevels = []log.Level{
 	log.Debug,
 }
 
+var buildCommit string
 func main() {
 	options := Options{}
 	parser := flags.NewParser(&options, flags.Default)
