@@ -16,6 +16,17 @@ The server's RSA key fingerprint is `e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6
 
 (Apologies if the server is down, try again shortly.)
 
+## Compiling / Developing
+
+You can compile ssh-chat by using `make build`. The resulting binary is portable and
+can be run on any system with a similar OS and CPU arch. Go 1.3 or higher is required to compile.
+
+If you're developing on this repo, there is a handy Makefile that should set
+things up with `make run`.
+
+Additionally, `make debug` runs the server with an http `pprof` server. This allows you to open
+[http://localhost:6060/debug/pprof/]() and view profiling data. See
+[net/http/pprof](http://golang.org/pkg/net/http/pprof/) for more information about `pprof`.
 
 ## Quick Start
 
@@ -57,14 +68,6 @@ $ docker run -d -p 0.0.0.0:(your host machine port):2022 --name ssh-chat alvin/s
 
 See notes in the header of our Dockerfile for details on building your own image.
 
-
-## Developing
-
-If you're developing on this repo, there is a handy Makefile that should set
-things up with `make run`.
-
-Additionally, `make debug` runs the server with an http `pprof` server. This allows you to open [http://localhost:6060/debug/pprof/]() and view profiling data. See [net/http/pprof](http://golang.org/pkg/net/http/pprof/) for more information about `pprof`.
-
 ## License
 
-MIT
+This project is licensed under the MIT open source license.
