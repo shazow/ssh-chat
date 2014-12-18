@@ -46,6 +46,11 @@ $ ssh-chat --verbose --bind ":2022" --identity ~/.ssh/id_dsa
 To bind on port 22, you'll need to make sure it's free (move any other ssh
 daemons to another port) and run ssh-chat as root (or with sudo).
 
+## Compiling
+
+You can compile ssh chat by using `make build`. The ssh chat binary is portable and
+can be run on any system with a similar OS. Go 1.3 or higher is required to compile.
+
 ## Deploying with Docker
 
 You can run ssh-chat using a Docker image without manually installing go-lang:
