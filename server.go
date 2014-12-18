@@ -252,11 +252,11 @@ func (s *Server) List(prefix *string) []string {
 	s.RLock()
 	defer s.RUnlock()
 
-	for name := range s.clients {
-		if prefix != nil && !strings.HasPrefix(name, *prefix) {
+	for name, client := range s.clients {
+		if prefix != nil && !strings.HasPrefix(name, strings.ToLower(*prefix)) {
 			continue
 		}
-		r = append(r, name)
+		r = append(r, client.Name)
 	}
 
 	return r
