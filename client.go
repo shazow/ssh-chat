@@ -190,6 +190,7 @@ func (c *Client) Emote(message string) {
 
 func (c *Client) handleShell(channel ssh.Channel) {
 	defer channel.Close()
+	defer c.Conn.Close()
 
 	// FIXME: This shouldn't live here, need to restructure the call chaining.
 	c.Server.Add(c)
