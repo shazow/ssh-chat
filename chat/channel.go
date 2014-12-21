@@ -30,19 +30,21 @@ func (ch *Channel) Send(m Message) {
 func (ch *Channel) Join(u *User) error {
 	err := ch.users.Add(u)
 	if err != nil {
-		s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), ch.users.Len())
-		ch.Send(*NewMessage(s))
+		return err
 	}
-	return err
+	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), ch.users.Len())
+	ch.Send(*NewMessage(s))
+	return nil
 }
 
 func (ch *Channel) Leave(u *User) error {
 	err := ch.users.Remove(u)
 	if err != nil {
-		s := fmt.Sprintf("%s left.", u.Name())
-		ch.Send(*NewMessage(s))
+		return err
 	}
-	return err
+	s := fmt.Sprintf("%s left.", u.Name())
+	ch.Send(*NewMessage(s))
+	return nil
 }
 
 func (ch *Channel) Topic() string {
