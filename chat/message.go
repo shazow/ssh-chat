@@ -42,9 +42,9 @@ func (m *Message) Render(*Theme) string {
 	// TODO: Cache based on theme
 	var msg string
 	if m.to != nil && m.from != nil {
-		msg = fmt.Sprintf("[PM from %s] %s", m.from, m.Body)
+		msg = fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.Body)
 	} else if m.from != nil {
-		msg = fmt.Sprintf("%s: %s", m.from, m.Body)
+		msg = fmt.Sprintf("%s: %s", m.from.Name(), m.Body)
 	} else if m.to != nil {
 		msg = fmt.Sprintf("-> %s", m.Body)
 	} else {

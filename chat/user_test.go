@@ -5,16 +5,9 @@ import (
 	"testing"
 )
 
-type MockScreen struct {
-	received []byte
-}
-
-func (s *MockScreen) Write(data []byte) (n int, err error) {
-	s.received = append(s.received, data...)
-	return len(data), nil
-}
-
 func TestMakeUser(t *testing.T) {
+	var actual, expected []byte
+
 	s := &MockScreen{}
 	u := NewUser("foo")
 	m := NewMessage("hello")
@@ -23,7 +16,9 @@ func TestMakeUser(t *testing.T) {
 	u.Send(*m)
 	u.ConsumeOne(s)
 
-	if !reflect.DeepEqual(string(s.received), m.String()) {
-		t.Errorf("Got: `%s`; Expected: `%s`", s.received, m.String())
+	s.Read(&actual)
+	expected = []byte(m.String())
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 }

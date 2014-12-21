@@ -80,6 +80,7 @@ func (u *User) Close() {
 
 // Consume message buffer into an io.Writer. Will block, should be called in a
 // goroutine.
+// TODO: Not sure if this is a great API.
 func (u *User) Consume(out io.Writer) {
 	for m := range u.msg {
 		u.consumeMsg(m, out)
@@ -126,7 +127,6 @@ func init() {
 	DefaultUserConfig = &UserConfig{
 		Highlight: true,
 		Bell:      false,
-		Theme:     DefaultTheme,
 	}
 
 	// TODO: Seed random?
