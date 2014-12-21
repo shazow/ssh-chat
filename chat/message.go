@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -14,10 +15,9 @@ type Message struct {
 	themeCache *map[*Theme]string
 }
 
-func NewMessage(from *User, body string) *Message {
+func NewMessage(body string) *Message {
 	m := Message{
 		Body:      body,
-		from:      from,
 		timestamp: time.Now(),
 	}
 	return &m
@@ -37,19 +37,35 @@ func (m *Message) From(u *User) *Message {
 
 // Render message based on the given theme
 func (m *Message) Render(*Theme) string {
-	// TODO: Render based on theme.
+	// TODO: Render based on theme
 	// TODO: Cache based on theme
 	var msg string
-	if m.to != nil {
-		msg = fmt.Sprintf("[PM from %s] %s", m.to, m.Body)
+	if m.to != nil && m.from != nil {
+		msg = fmt.Sprintf("[PM from %s] %s", m.from, m.Body)
 	} else if m.from != nil {
 		msg = fmt.Sprintf("%s: %s", m.from, m.Body)
+	} else if m.to != nil {
+		msg = fmt.Sprintf("-> %s", m.Body)
 	} else {
 		msg = fmt.Sprintf(" * %s", m.Body)
 	}
 	return msg
 }
 
+// Render message without a theme
 func (m *Message) String() string {
 	return m.Render(nil)
+}
+
+// Wether message is a command (starts with /)
+func (m *Message) IsCommand() bool {
+	return strings.HasPrefix(m.Body, "/")
+}
+
+// Parse command (assumes IsCommand was already called)
+func (m *Message) ParseCommand() (string, []string) {
+	// TODO: Tokenize this properly, to support quoted args?
+	cmd := strings.Split(m.Body, " ")
+	args := cmd[1:]
+	return cmd[0][1:], args
 }

@@ -1,21 +1,27 @@
 package chat
 
 import (
+	"io"
 	"math/rand"
 	"time"
 )
 
-// User definition, implemented set Item interface
+// User definition, implemented set Item interface and io.Writer
 type User struct {
 	name     string
 	op       bool
 	colorIdx int
 	joined   time.Time
+	screen   io.Writer
 	Config   UserConfig
 }
 
-func NewUser(name string) *User {
-	u := User{Config: *DefaultUserConfig}
+func NewUser(name string, screen io.Writer) *User {
+	u := User{
+		screen: screen,
+		joined: time.Now(),
+		Config: *DefaultUserConfig,
+	}
 	u.SetName(name)
 	return &u
 }
@@ -44,6 +50,11 @@ func (u *User) Op() bool {
 // Set whether user is an admin
 func (u *User) SetOp(op bool) {
 	u.op = op
+}
+
+// Write to user's screen
+func (u *User) Write(p []byte) (n int, err error) {
+	return u.screen.Write(p)
 }
 
 // Container for per-user configurations.
