@@ -16,7 +16,7 @@ func TestChannel(t *testing.T) {
 		}
 	}()
 
-	u := NewUser("foo", s)
+	u := NewUserScreen("foo", s)
 	ch := NewChannel("", out)
 	err := ch.Join(u)
 
@@ -26,6 +26,6 @@ func TestChannel(t *testing.T) {
 
 	expected := []byte(" * foo joined. (Connected: 1)")
 	if !reflect.DeepEqual(s.received, expected) {
-		t.Errorf("Got: `%s`, Expected: `%s`", s.received, expected)
+		t.Errorf("Got: `%s`; Expected: `%s`", s.received, expected)
 	}
 }

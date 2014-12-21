@@ -37,6 +37,7 @@ func (m *Message) From(u *User) *Message {
 
 // Render message based on the given theme
 func (m *Message) Render(*Theme) string {
+	// TODO: Return []byte?
 	// TODO: Render based on theme
 	// TODO: Cache based on theme
 	var msg string

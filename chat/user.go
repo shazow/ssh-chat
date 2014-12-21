@@ -1,10 +1,15 @@
 package chat
 
 import (
+	"errors"
 	"io"
 	"math/rand"
 	"time"
 )
+
+const messageBuffer = 20
+
+var ErrUserClosed = errors.New("user closed")
 
 // User definition, implemented set Item interface and io.Writer
 type User struct {
@@ -12,18 +17,28 @@ type User struct {
 	op       bool
 	colorIdx int
 	joined   time.Time
-	screen   io.Writer
+	msg      chan Message
+	done     chan struct{}
 	Config   UserConfig
 }
 
-func NewUser(name string, screen io.Writer) *User {
+func NewUser(name string) *User {
 	u := User{
-		screen: screen,
-		joined: time.Now(),
 		Config: *DefaultUserConfig,
+		joined: time.Now(),
+		msg:    make(chan Message, messageBuffer),
+		done:   make(chan struct{}, 1),
 	}
 	u.SetName(name)
+
 	return &u
+}
+
+func NewUserScreen(name string, screen io.Writer) *User {
+	u := NewUser(name)
+	go u.Consume(screen)
+
+	return u
 }
 
 // Return unique identifier for user
@@ -52,9 +67,49 @@ func (u *User) SetOp(op bool) {
 	u.op = op
 }
 
-// Write to user's screen
-func (u *User) Write(p []byte) (n int, err error) {
-	return u.screen.Write(p)
+// Block until user is closed
+func (u *User) Wait() {
+	<-u.done
+}
+
+// Disconnect user, stop accepting messages
+func (u *User) Close() {
+	close(u.done)
+	close(u.msg)
+}
+
+// Consume message buffer into an io.Writer. Will block, should be called in a
+// goroutine.
+func (u *User) Consume(out io.Writer) {
+	for m := range u.msg {
+		u.consumeMsg(m, out)
+	}
+}
+
+// Consume one message and stop, mostly for testing
+func (u *User) ConsumeOne(out io.Writer) {
+	u.consumeMsg(<-u.msg, out)
+}
+
+func (u *User) consumeMsg(m Message, out io.Writer) {
+	s := m.Render(u.Config.Theme)
+	_, err := out.Write([]byte(s))
+	if err != nil {
+		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
+		u.Close()
+	}
+}
+
+// Add message to consume by user
+func (u *User) Send(m Message) error {
+	select {
+	case u.msg <- m:
+	default:
+		logger.Printf("Msg buffer full, closing: %s", u.Name())
+		u.Close()
+		return ErrUserClosed
+	}
+	return nil
 }
 
 // Container for per-user configurations.

@@ -1,7 +1,5 @@
 package chat
 
-const messageBuffer = 20
-
 // Host knows about all the commands and channels.
 type Host struct {
 	defaultChannel *Channel

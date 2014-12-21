@@ -16,11 +16,14 @@ func (s *MockScreen) Write(data []byte) (n int, err error) {
 
 func TestMakeUser(t *testing.T) {
 	s := &MockScreen{}
-	u := NewUser("foo", s)
+	u := NewUser("foo")
+	m := NewMessage("hello")
 
-	line := []byte("hello")
-	u.Write(line)
-	if !reflect.DeepEqual(s.received, line) {
-		t.Errorf("Expected hello but got: %s", s.received)
+	defer u.Close()
+	u.Send(*m)
+	u.ConsumeOne(s)
+
+	if !reflect.DeepEqual(string(s.received), m.String()) {
+		t.Errorf("Got: `%s`; Expected: `%s`", s.received, m.String())
 	}
 }
