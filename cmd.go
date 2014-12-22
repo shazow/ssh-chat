@@ -34,6 +34,7 @@ var logLevels = []log.Level{
 }
 
 var buildCommit string
+
 func main() {
 	options := Options{}
 	parser := flags.NewParser(&options, flags.Default)
