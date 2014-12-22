@@ -2,7 +2,6 @@ package sshd
 
 import (
 	"net"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -19,8 +18,7 @@ func ListenSSH(laddr string, config *ssh.ServerConfig) (*SSHListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	l := socket.(SSHListener)
-	l.config = config
+	l := SSHListener{socket, config}
 	return &l, nil
 }
 
@@ -41,15 +39,14 @@ func (l *SSHListener) ServeTerminal() <-chan *Terminal {
 
 	go func() {
 		defer l.Close()
+		defer close(ch)
 
 		for {
 			conn, err := l.Accept()
 
 			if err != nil {
 				logger.Printf("Failed to accept connection: %v", err)
-				if err == syscall.EINVAL {
-					return
-				}
+				return
 			}
 
 			// Goroutineify to resume accepting sockets early

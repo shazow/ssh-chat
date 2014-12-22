@@ -7,7 +7,7 @@ var logger *stdlog.Logger
 
 func SetLogger(w io.Writer) {
 	flags := stdlog.Flags()
-	prefix := "[chat] "
+	prefix := "[sshd] "
 	logger = stdlog.New(w, prefix, flags)
 }
 

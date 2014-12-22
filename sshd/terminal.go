@@ -10,7 +10,7 @@ import (
 
 // Extending ssh/terminal to include a closer interface
 type Terminal struct {
-	*terminal.Terminal
+	terminal.Terminal
 	Conn    ssh.Conn
 	Channel ssh.Channel
 }
@@ -25,7 +25,7 @@ func NewTerminal(conn ssh.Conn, ch ssh.NewChannel) (*Terminal, error) {
 		return nil, err
 	}
 	term := Terminal{
-		terminal.NewTerminal(channel, "Connecting..."),
+		*terminal.NewTerminal(channel, "Connecting..."),
 		conn,
 		channel,
 	}
