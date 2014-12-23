@@ -7,7 +7,6 @@ const channelBuffer = 10
 
 // Channel definition, also a Set of User Items
 type Channel struct {
-	id        string
 	topic     string
 	history   *History
 	users     *Set
@@ -15,11 +14,10 @@ type Channel struct {
 }
 
 // Create new channel and start broadcasting goroutine.
-func NewChannel(id string) *Channel {
+func NewChannel() *Channel {
 	broadcast := make(chan Message, channelBuffer)
 
 	ch := Channel{
-		id:        id,
 		broadcast: broadcast,
 		history:   NewHistory(historyLen),
 		users:     NewSet(),
@@ -27,8 +25,14 @@ func NewChannel(id string) *Channel {
 
 	go func() {
 		for m := range broadcast {
+			// TODO: Handle commands etc?
 			ch.users.Each(func(u Item) {
-				u.(*User).Send(m)
+				user := u.(*User)
+				if m.from == user {
+					// Skip
+					return
+				}
+				user.Send(m)
 			})
 		}
 	}()

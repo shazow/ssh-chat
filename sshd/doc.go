@@ -11,6 +11,7 @@ package sshd
 	if err != nil {
 		// Handle opening socket error
 	}
+	defer s.Close()
 
 	terminals := s.ServeTerminal()
 
@@ -21,7 +22,7 @@ package sshd
 			term.AutoCompleteCallback = nil // ...
 
 			for {
-				line, err := term.Readline()
+				line, err := term.ReadLine()
 				if err != nil {
 					break
 				}

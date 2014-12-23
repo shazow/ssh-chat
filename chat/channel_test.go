@@ -11,7 +11,7 @@ func TestChannel(t *testing.T) {
 	s := &MockScreen{}
 	u := NewUser("foo")
 
-	ch := NewChannel("")
+	ch := NewChannel()
 	defer ch.Close()
 
 	err := ch.Join(u)

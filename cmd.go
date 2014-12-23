@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +12,10 @@ import (
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
 	"github.com/jessevdk/go-flags"
+	"golang.org/x/crypto/ssh"
+
+	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/sshd"
 )
 import _ "net/http/pprof"
 
@@ -52,9 +55,6 @@ func main() {
 		}()
 	}
 
-	// Initialize seed for random colors
-	RandomColorInit()
-
 	// Figure out the log level
 	numVerbose := len(options.Verbose)
 	if numVerbose > len(logLevels) {
@@ -78,12 +78,55 @@ func main() {
 		return
 	}
 
-	server, err := NewServer(privateKey)
+	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		logger.Errorf("Failed to create server: %v", err)
+		logger.Errorf("Failed to prase key: %v", err)
 		return
 	}
 
+	// TODO: MakeAuth
+	config := sshd.MakeNoAuth()
+	config.AddHostKey(signer)
+
+	s, err := sshd.ListenSSH(options.Bind, config)
+	if err != nil {
+		logger.Errorf("Failed to listen on socket: %v", err)
+		return
+	}
+	defer s.Close()
+
+	terminals := s.ServeTerminal()
+	channel := chat.NewChannel()
+
+	// TODO: Move this elsewhere
+	go func() {
+		for term := range terminals {
+			go func() {
+				defer term.Close()
+				name := term.Conn.User()
+				term.SetPrompt(fmt.Sprintf("[%s]", name))
+				// TODO: term.AutoCompleteCallback = ...
+				user := chat.NewUserScreen(name, term)
+				channel.Join(user)
+
+				for {
+					// TODO: Handle commands etc?
+					line, err := term.ReadLine()
+					if err != nil {
+						break
+					}
+					m := chat.NewMessage(line).From(user)
+					channel.Send(*m)
+				}
+
+				// TODO: Handle disconnect sooner (currently closes channel before removing)
+				channel.Leave(user)
+				user.Close()
+			}()
+		}
+	}()
+
+	/* TODO:
 	for _, fingerprint := range options.Admin {
 		server.Op(fingerprint)
 	}
@@ -109,23 +152,17 @@ func main() {
 			return
 		}
 		motdString := string(motd[:])
-		/* hack to normalize line endings into \r\n */
+		// hack to normalize line endings into \r\n
 		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
 		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
 		server.SetMotd(motdString)
 	}
+	*/
 
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
-	err = server.Start(options.Bind)
-	if err != nil {
-		logger.Errorf("Failed to start server: %v", err)
-		return
-	}
-
 	<-sig // Wait for ^C signal
 	logger.Warningf("Interrupt signal detected, shutting down.")
-	server.Stop()
 }

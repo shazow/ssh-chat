@@ -9,8 +9,9 @@ import (
 // Container for messages sent to chat
 type Message struct {
 	Body       string
-	from       *User // Not set for Sys messages
-	to         *User // Only set for PMs
+	from       *User    // Not set for Sys messages
+	to         *User    // Only set for PMs
+	channel    *Channel // Not set for global commands
 	timestamp  time.Time
 	themeCache *map[*Theme]string
 }
@@ -32,6 +33,12 @@ func (m *Message) To(u *User) *Message {
 // Set message sender
 func (m *Message) From(u *User) *Message {
 	m.from = u
+	return m
+}
+
+// Set channel
+func (m *Message) Channel(ch *Channel) *Message {
+	m.channel = ch
 	return m
 }
 

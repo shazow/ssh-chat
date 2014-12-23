@@ -8,7 +8,7 @@ import (
 var ErrInvalidCommand error = errors.New("invalid command")
 var ErrNoOwner error = errors.New("command without owner")
 
-type CmdHandler func(host Host, msg Message, args []string) error
+type CmdHandler func(msg Message, args []string) error
 
 type Commands map[string]CmdHandler
 
@@ -18,7 +18,7 @@ func (c Commands) Add(cmd string, handler CmdHandler) {
 }
 
 // Execute command message, assumes IsCommand was checked
-func (c Commands) Run(host Host, msg Message) error {
+func (c Commands) Run(msg Message) error {
 	if msg.from == nil {
 		return ErrNoOwner
 	}
@@ -29,7 +29,7 @@ func (c Commands) Run(host Host, msg Message) error {
 		return ErrInvalidCommand
 	}
 
-	return handler(host, msg, args)
+	return handler(msg, args)
 }
 
 var defaultCmdHandlers Commands
@@ -37,7 +37,7 @@ var defaultCmdHandlers Commands
 func init() {
 	c := Commands{}
 
-	c.Add("me", func(host Host, msg Message, args []string) error {
+	c.Add("me", func(msg Message, args []string) error {
 		me := strings.TrimLeft(msg.Body, "/me")
 		if me == "" {
 			me = " is at a loss for words."
