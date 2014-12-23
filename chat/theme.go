@@ -23,6 +23,9 @@ const (
 
 	// Invert inverts the following text
 	Invert = "\033[7m"
+
+	// Newline
+	Newline = "\r\n"
 )
 
 // Interface for Colors

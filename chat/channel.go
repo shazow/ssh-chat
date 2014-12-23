@@ -32,7 +32,11 @@ func NewChannel() *Channel {
 					// Skip
 					return
 				}
-				user.Send(m)
+				err := user.Send(m)
+				if err != nil {
+					ch.Leave(user)
+					user.Close()
+				}
 			})
 		}
 	}()
@@ -41,6 +45,10 @@ func NewChannel() *Channel {
 }
 
 func (ch *Channel) Close() {
+	ch.users.Each(func(u Item) {
+		u.(*User).Close()
+	})
+	ch.users.Clear()
 	close(ch.broadcast)
 }
 

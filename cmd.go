@@ -104,10 +104,17 @@ func main() {
 			go func() {
 				defer term.Close()
 				name := term.Conn.User()
-				term.SetPrompt(fmt.Sprintf("[%s]", name))
+				term.SetPrompt(fmt.Sprintf("[%s] ", name))
 				// TODO: term.AutoCompleteCallback = ...
 				user := chat.NewUserScreen(name, term)
+				defer user.Close()
 				channel.Join(user)
+
+				go func() {
+					// FIXME: This isn't working.
+					user.Wait()
+					channel.Leave(user)
+				}()
 
 				for {
 					// TODO: Handle commands etc?
@@ -120,8 +127,6 @@ func main() {
 				}
 
 				// TODO: Handle disconnect sooner (currently closes channel before removing)
-				channel.Leave(user)
-				user.Close()
 			}()
 		}
 	}()

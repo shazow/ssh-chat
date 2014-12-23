@@ -34,6 +34,15 @@ func NewSet() *Set {
 	}
 }
 
+// Remove all items and return the number removed
+func (s *Set) Clear() int {
+	s.Lock()
+	n := len(s.lookup)
+	s.lookup = map[Id]Item{}
+	s.Unlock()
+	return n
+}
+
 // Size of the set right now
 func (s *Set) Len() int {
 	return len(s.lookup)

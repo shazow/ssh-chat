@@ -19,6 +19,7 @@ type User struct {
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
+	closed   bool
 	Config   UserConfig
 }
 
@@ -74,6 +75,7 @@ func (u *User) Wait() {
 
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
+	u.closed = true
 	close(u.done)
 	close(u.msg)
 }
@@ -94,7 +96,7 @@ func (u *User) ConsumeOne(out io.Writer) {
 
 func (u *User) consumeMsg(m Message, out io.Writer) {
 	s := m.Render(u.Config.Theme)
-	_, err := out.Write([]byte(s))
+	_, err := out.Write([]byte(s + Newline))
 	if err != nil {
 		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
 		u.Close()
@@ -103,6 +105,10 @@ func (u *User) consumeMsg(m Message, out io.Writer) {
 
 // Add message to consume by user
 func (u *User) Send(m Message) error {
+	if u.closed {
+		return ErrUserClosed
+	}
+
 	select {
 	case u.msg <- m:
 	default:
