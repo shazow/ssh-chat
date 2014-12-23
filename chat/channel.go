@@ -3,6 +3,7 @@ package chat
 import "fmt"
 
 const historyLen = 20
+const channelBuffer = 10
 
 // Channel definition, also a Set of User Items
 type Channel struct {
@@ -10,17 +11,33 @@ type Channel struct {
 	topic     string
 	history   *History
 	users     *Set
-	broadcast chan<- Message
+	broadcast chan Message
 }
 
-func NewChannel(id string, broadcast chan<- Message) *Channel {
+// Create new channel and start broadcasting goroutine.
+func NewChannel(id string) *Channel {
+	broadcast := make(chan Message, channelBuffer)
+
 	ch := Channel{
 		id:        id,
 		broadcast: broadcast,
 		history:   NewHistory(historyLen),
 		users:     NewSet(),
 	}
+
+	go func() {
+		for m := range broadcast {
+			ch.users.Each(func(u Item) {
+				u.(*User).Send(m)
+			})
+		}
+	}()
+
 	return &ch
+}
+
+func (ch *Channel) Close() {
+	close(ch.broadcast)
 }
 
 func (ch *Channel) Send(m Message) {

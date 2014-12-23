@@ -87,6 +87,15 @@ func (s *Set) Remove(item Item) error {
 	return nil
 }
 
+// Loop over every item while holding a read lock and apply fn
+func (s *Set) Each(fn func(item Item)) {
+	s.RLock()
+	for _, item := range s.lookup {
+		fn(item)
+	}
+	s.RUnlock()
+}
+
 // List users by prefix, case insensitive
 func (s *Set) ListPrefix(prefix string) []Item {
 	r := []Item{}

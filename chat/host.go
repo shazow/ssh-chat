@@ -24,18 +24,5 @@ func (h *Host) broadcast(ch *Channel, m Message) {
 }
 
 func (h *Host) CreateChannel(id string) *Channel {
-	out := make(chan Message, 20)
-	ch := NewChannel(id, out)
-
-	go func() {
-		for msg := range out {
-			if msg.IsCommand() {
-				go h.handleCommand(msg)
-				continue
-			}
-			h.broadcast(ch, msg)
-		}
-	}()
-
-	return ch
+	return NewChannel(id)
 }

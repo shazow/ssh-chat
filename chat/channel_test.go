@@ -8,20 +8,12 @@ import (
 func TestChannel(t *testing.T) {
 	var expected, actual []byte
 
-	out := make(chan Message)
-	defer close(out)
-
 	s := &MockScreen{}
 	u := NewUser("foo")
 
-	go func() {
-		for msg := range out {
-			t.Logf("Broadcasted: ", msg.String())
-			u.Send(msg)
-		}
-	}()
+	ch := NewChannel("")
+	defer ch.Close()
 
-	ch := NewChannel("", out)
 	err := ch.Join(u)
 	if err != nil {
 		t.Error(err)
