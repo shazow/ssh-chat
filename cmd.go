@@ -71,7 +71,7 @@ func main() {
 	}
 
 	privateKeyPath := options.Identity
-	if strings.HasPrefix(privateKeyPath, "~") {
+	if strings.HasPrefix(privateKeyPath, "~/") {
 		user, err := user.Current()
 		if err == nil {
 			privateKeyPath = strings.Replace(privateKeyPath, "~", user.HomeDir, 1)
@@ -101,7 +101,8 @@ func main() {
 	}
 	defer s.Close()
 
-	go Serve(s)
+	host := NewHost(s)
+	go host.Serve()
 
 	/* TODO:
 	for _, fingerprint := range options.Admin {
