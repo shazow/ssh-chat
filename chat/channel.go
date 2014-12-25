@@ -83,3 +83,14 @@ func (ch *Channel) Topic() string {
 func (ch *Channel) SetTopic(s string) {
 	ch.topic = s
 }
+
+// NamesPrefix lists all members' names with a given prefix, used to query
+// for autocompletion purposes.
+func (ch *Channel) NamesPrefix(prefix string) []string {
+	users := ch.users.ListPrefix(prefix)
+	names := make([]string, len(users))
+	for i, u := range users {
+		names[i] = u.(*User).Name()
+	}
+	return names
+}

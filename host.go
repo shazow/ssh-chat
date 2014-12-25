@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
@@ -29,7 +30,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	defer term.Close()
 	name := term.Conn.User()
 	term.SetPrompt(fmt.Sprintf("[%s] ", name))
-	// TODO: term.AutoCompleteCallback = ...
+	term.AutoCompleteCallback = h.AutoCompleteFunction
 
 	user := chat.NewUserScreen(name, term)
 	defer user.Close()
@@ -70,30 +71,34 @@ func (h *Host) Serve() {
 	}
 }
 
-/* TODO: ...
+// AutoCompleteFunction is a callback for terminal autocompletion
 func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	if key != 9 {
 		return
 	}
 
-	shortLine := strings.Split(line[:pos], " ")
-	partialNick := shortLine[len(shortLine)-1]
-	nicks := h.channel.users.ListPrefix(&partialNick)
-	if len(nicks) == 0 {
+	fields := strings.Fields(line[:pos])
+	partial := fields[len(fields)-1]
+	names := h.channel.NamesPrefix(partial)
+	if len(names) == 0 {
+		// Didn't find anything
 		return
 	}
 
-	nick := nicks[len(nicks)-1]
-	posPartialNick := pos - len(partialNick)
-	if len(shortLine) < 2 {
-		nick += ": "
+	name := names[len(names)-1]
+	posPartial := pos - len(partial)
+
+	// Append suffix separator
+	if len(fields) < 2 {
+		name += ": "
 	} else {
-		nick += " "
+		name += " "
 	}
-	newLine = strings.Replace(line[posPartialNick:], partialNick, nick, 1)
-	newLine = line[:posPartialNick] + newLine
-	newPos = pos + (len(nick) - len(partialNick))
+
+	// Reposition the cursor
+	newLine = strings.Replace(line[posPartial:], partial, name, 1)
+	newLine = line[:posPartial] + newLine
+	newPos = pos + (len(name) - len(partial))
 	ok = true
 	return
 }
-*/
