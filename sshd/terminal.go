@@ -31,6 +31,12 @@ func NewTerminal(conn ssh.Conn, ch ssh.NewChannel) (*Terminal, error) {
 	}
 
 	go term.listen(requests)
+	go func() {
+		// FIXME: Is this necessary?
+		conn.Wait()
+		channel.Close()
+	}()
+
 	return &term, nil
 }
 
@@ -48,12 +54,22 @@ func NewSession(conn ssh.Conn, channels <-chan ssh.NewChannel) (term *Terminal, 
 		}
 	}
 
+	if term != nil {
+		// Reject the rest.
+		// FIXME: Do we need this?
+		go func() {
+			for ch := range channels {
+				ch.Reject(ssh.Prohibited, "only one session allowed")
+			}
+		}()
+	}
+
 	return term, err
 }
 
 // Close terminal and ssh connection
 func (t *Terminal) Close() error {
-	return MultiCloser{t.Channel, t.Conn}.Close()
+	return t.Conn.Close()
 }
 
 // Negotiate terminal type and settings

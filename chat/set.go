@@ -89,7 +89,7 @@ func (s *Set) Remove(item Item) error {
 	defer s.Unlock()
 	id := item.Id()
 	_, found := s.lookup[id]
-	if found {
+	if !found {
 		return ErrItemMissing
 	}
 	delete(s.lookup, id)

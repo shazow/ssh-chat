@@ -64,6 +64,12 @@ func main() {
 	logLevel := logLevels[numVerbose]
 	logger = golog.New(os.Stderr, logLevel)
 
+	if logLevel == log.Debug {
+		// Enable logging from submodules
+		chat.SetLogger(os.Stderr)
+		sshd.SetLogger(os.Stderr)
+	}
+
 	privateKeyPath := options.Identity
 	if strings.HasPrefix(privateKeyPath, "~") {
 		user, err := user.Current()
@@ -95,41 +101,7 @@ func main() {
 	}
 	defer s.Close()
 
-	terminals := s.ServeTerminal()
-	channel := chat.NewChannel()
-
-	// TODO: Move this elsewhere
-	go func() {
-		for term := range terminals {
-			go func() {
-				defer term.Close()
-				name := term.Conn.User()
-				term.SetPrompt(fmt.Sprintf("[%s] ", name))
-				// TODO: term.AutoCompleteCallback = ...
-				user := chat.NewUserScreen(name, term)
-				defer user.Close()
-				channel.Join(user)
-
-				go func() {
-					// FIXME: This isn't working.
-					user.Wait()
-					channel.Leave(user)
-				}()
-
-				for {
-					// TODO: Handle commands etc?
-					line, err := term.ReadLine()
-					if err != nil {
-						break
-					}
-					m := chat.NewMessage(line).From(user)
-					channel.Send(*m)
-				}
-
-				// TODO: Handle disconnect sooner (currently closes channel before removing)
-			}()
-		}
-	}()
+	go Serve(s)
 
 	/* TODO:
 	for _, fingerprint := range options.Admin {
