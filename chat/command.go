@@ -40,6 +40,8 @@ func init() {
 		me := strings.TrimLeft(msg.body, "/me")
 		if me == "" {
 			me = " is at a loss for words."
+		} else {
+			me = me[1:]
 		}
 
 		channel.Send(NewEmoteMsg(me, msg.From()))

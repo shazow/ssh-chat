@@ -50,4 +50,12 @@ func TestChannelJoin(t *testing.T) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
+
+	ch.Send(ParseInput("/me says hello.", u))
+	u.ConsumeOne(s)
+	expected = []byte("** foo says hello." + Newline)
+	s.Read(&actual)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
 }

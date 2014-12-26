@@ -96,13 +96,22 @@ func (m *PublicMsg) String() string {
 	return m.Render(nil)
 }
 
-// EmoteMsg is a /me message sent to the channel.
+// EmoteMsg is a /me message sent to the channel. It specifically does not
+// extend PublicMsg because it doesn't implement MessageFrom to allow the
+// sender to see the emote.
 type EmoteMsg struct {
-	PublicMsg
+	Msg
+	from *User
 }
 
 func NewEmoteMsg(body string, from *User) *EmoteMsg {
-	return &EmoteMsg{*NewPublicMsg(body, from)}
+	return &EmoteMsg{
+		Msg: Msg{
+			body:      body,
+			timestamp: time.Now(),
+		},
+		from: from,
+	}
 }
 
 func (m *EmoteMsg) Render(t *Theme) string {
