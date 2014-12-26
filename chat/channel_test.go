@@ -5,14 +5,26 @@ import (
 	"testing"
 )
 
-func TestChannel(t *testing.T) {
+func TestChannelServe(t *testing.T) {
+	ch := NewChannel()
+	ch.Send(NewAnnounceMsg("hello"))
+
+	received := <-ch.broadcast
+	actual := received.String()
+	expected := " * hello"
+
+	if actual != expected {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
+}
+
+func TestChannelJoin(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
 	u := NewUser("foo")
 
 	ch := NewChannel()
-	go ch.Serve()
 	defer ch.Close()
 
 	err := ch.Join(u)
@@ -20,20 +32,23 @@ func TestChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	m := <-ch.broadcast
+	if m.(*AnnounceMsg) == nil {
+		t.Fatal("Did not receive correct msg: %v", m)
+	}
+	ch.handleMsg(m)
+
 	u.ConsumeOne(s)
 	expected = []byte(" * foo joined. (Connected: 1)" + Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
-	// XXX
-	t.Skip()
 
-	m := NewPublicMsg("hello", u)
-	ch.Send(m)
+	ch.Send(NewSystemMsg("hello", u))
 
 	u.ConsumeOne(s)
-	expected = []byte("foo: hello" + Newline)
+	expected = []byte("-> hello" + Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)

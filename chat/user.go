@@ -85,16 +85,16 @@ func (u *User) Close() {
 // TODO: Not sure if this is a great API.
 func (u *User) Consume(out io.Writer) {
 	for m := range u.msg {
-		u.consumeMsg(m, out)
+		u.handleMsg(m, out)
 	}
 }
 
 // Consume one message and stop, mostly for testing
 func (u *User) ConsumeOne(out io.Writer) {
-	u.consumeMsg(<-u.msg, out)
+	u.handleMsg(<-u.msg, out)
 }
 
-func (u *User) consumeMsg(m Message, out io.Writer) {
+func (u *User) handleMsg(m Message, out io.Writer) {
 	s := m.Render(u.Config.Theme)
 	_, err := out.Write([]byte(s + Newline))
 	if err != nil {

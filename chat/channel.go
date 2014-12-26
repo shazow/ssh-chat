@@ -3,6 +3,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 const historyLen = 20
@@ -18,6 +19,7 @@ type Channel struct {
 	broadcast chan Message
 	commands  Commands
 	closed    bool
+	closeOnce *sync.Once
 }
 
 // Create new channel and start broadcasting goroutine.
@@ -33,26 +35,28 @@ func NewChannel() *Channel {
 }
 
 func (ch *Channel) Close() {
-	ch.closed = true
-	ch.users.Each(func(u Item) {
-		u.(*User).Close()
+	ch.closeOnce.Do(func() {
+		ch.closed = true
+		ch.users.Each(func(u Item) {
+			u.(*User).Close()
+		})
+		ch.users.Clear()
+		close(ch.broadcast)
 	})
-	ch.users.Clear()
-	close(ch.broadcast)
 }
 
 // Handle a message, will block until done.
 func (ch *Channel) handleMsg(m Message) {
-	switch m.(type) {
-	case CommandMsg:
-		cmd := m.(CommandMsg)
-		err := ch.commands.Run(cmd)
+	switch m := m.(type) {
+	case *CommandMsg:
+		cmd := *m
+		err := ch.commands.Run(ch, cmd)
 		if err != nil {
 			m := NewSystemMsg(fmt.Sprintf("Err: %s", err), cmd.from)
 			go ch.handleMsg(m)
 		}
 	case MessageTo:
-		user := m.(MessageTo).To()
+		user := m.To()
 		user.Send(m)
 	default:
 		fromMsg, skip := m.(MessageFrom)

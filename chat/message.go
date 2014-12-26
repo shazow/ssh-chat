@@ -101,6 +101,10 @@ type EmoteMsg struct {
 	PublicMsg
 }
 
+func NewEmoteMsg(body string, from *User) *EmoteMsg {
+	return &EmoteMsg{*NewPublicMsg(body, from)}
+}
+
 func (m *EmoteMsg) Render(t *Theme) string {
 	return fmt.Sprintf("** %s %s", m.from.Name(), m.body)
 }

@@ -18,6 +18,12 @@ func TestMessage(t *testing.T) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 
+	expected = "** foo sighs."
+	actual = NewEmoteMsg("sighs.", u).String()
+	if actual != expected {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
+
 	expected = "-> hello"
 	actual = NewSystemMsg("hello", u).String()
 	if actual != expected {
