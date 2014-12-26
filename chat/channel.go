@@ -30,7 +30,7 @@ func NewChannel() *Channel {
 		broadcast: broadcast,
 		history:   NewHistory(historyLen),
 		users:     NewSet(),
-		commands:  defaultCmdHandlers,
+		commands:  *defaultCmdHandlers,
 	}
 }
 
@@ -47,15 +47,15 @@ func (ch *Channel) Close() {
 }
 
 // Handle a message, will block until done.
-func (ch *Channel) handleMsg(m Message) {
-	logger.Printf("ch.handleMsg(%v)", m)
+func (ch *Channel) HandleMsg(m Message) {
+	logger.Printf("ch.HandleMsg(%v)", m)
 	switch m := m.(type) {
 	case *CommandMsg:
 		cmd := *m
 		err := ch.commands.Run(ch, cmd)
 		if err != nil {
 			m := NewSystemMsg(fmt.Sprintf("Err: %s", err), cmd.from)
-			go ch.handleMsg(m)
+			go ch.HandleMsg(m)
 		}
 	case MessageTo:
 		user := m.To()
@@ -86,7 +86,7 @@ func (ch *Channel) handleMsg(m Message) {
 // run in a goroutine.
 func (ch *Channel) Serve() {
 	for m := range ch.broadcast {
-		go ch.handleMsg(m)
+		go ch.HandleMsg(m)
 	}
 }
 

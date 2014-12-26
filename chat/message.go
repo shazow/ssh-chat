@@ -10,6 +10,7 @@ import (
 type Message interface {
 	Render(*Theme) string
 	String() string
+	Command() string
 }
 
 type MessageTo interface {
@@ -48,6 +49,10 @@ func (m *Msg) Render(t *Theme) string {
 
 func (m *Msg) String() string {
 	return m.Render(nil)
+}
+
+func (m *Msg) Command() string {
+	return ""
 }
 
 // PublicMsg is any message from a user sent to the channel.

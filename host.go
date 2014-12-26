@@ -29,13 +29,21 @@ func NewHost(listener *sshd.SSHListener) *Host {
 
 // Connect a specific Terminal to this host and its channel
 func (h *Host) Connect(term *sshd.Terminal) {
-	defer term.Close()
 	name := term.Conn.User()
-	term.SetPrompt(fmt.Sprintf("[%s] ", name))
 	term.AutoCompleteCallback = h.AutoCompleteFunction
 
 	user := chat.NewUserScreen(name, term)
+	go func() {
+		// Close term once user is closed.
+		user.Wait()
+		term.Close()
+	}()
 	defer user.Close()
+
+	refreshPrompt := func() {
+		term.SetPrompt(fmt.Sprintf("[%s] ", user.Name()))
+	}
+	refreshPrompt()
 
 	err := h.channel.Join(user)
 	if err != nil {
@@ -54,7 +62,14 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			break
 		}
 		m := chat.ParseInput(line, user)
-		h.channel.Send(m)
+		// FIXME: Any reason to use h.channel.Send(m) instead?
+		h.channel.HandleMsg(m)
+		if m.Command() == "/nick" {
+			// Hijack /nick command to update terminal synchronously. Wouldn't
+			// work if we use h.channel.Send(m) above.
+			// FIXME: This is hacky, how do we improve the API to allow for this?
+			refreshPrompt()
+		}
 	}
 
 	err = h.channel.Leave(user)

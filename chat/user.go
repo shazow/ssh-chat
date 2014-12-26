@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -13,14 +14,15 @@ var ErrUserClosed = errors.New("user closed")
 
 // User definition, implemented set Item interface and io.Writer
 type User struct {
-	name     string
-	op       bool
-	colorIdx int
-	joined   time.Time
-	msg      chan Message
-	done     chan struct{}
-	closed   bool
-	Config   UserConfig
+	Config    UserConfig
+	name      string
+	op        bool
+	colorIdx  int
+	joined    time.Time
+	msg       chan Message
+	done      chan struct{}
+	closed    bool
+	closeOnce sync.Once
 }
 
 func NewUser(name string) *User {
@@ -75,9 +77,11 @@ func (u *User) Wait() {
 
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
-	u.closed = true
-	close(u.done)
-	close(u.msg)
+	u.closeOnce.Do(func() {
+		u.closed = true
+		close(u.done)
+		close(u.msg)
+	})
 }
 
 // Consume message buffer into an io.Writer. Will block, should be called in a
@@ -85,16 +89,16 @@ func (u *User) Close() {
 // TODO: Not sure if this is a great API.
 func (u *User) Consume(out io.Writer) {
 	for m := range u.msg {
-		u.handleMsg(m, out)
+		u.HandleMsg(m, out)
 	}
 }
 
 // Consume one message and stop, mostly for testing
 func (u *User) ConsumeOne(out io.Writer) {
-	u.handleMsg(<-u.msg, out)
+	u.HandleMsg(<-u.msg, out)
 }
 
-func (u *User) handleMsg(m Message, out io.Writer) {
+func (u *User) HandleMsg(m Message, out io.Writer) {
 	s := m.Render(u.Config.Theme)
 	_, err := out.Write([]byte(s + Newline))
 	if err != nil {
