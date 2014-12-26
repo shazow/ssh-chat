@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"os"
 	"reflect"
 	"testing"
 )
@@ -21,22 +22,19 @@ func TestChannelServe(t *testing.T) {
 func TestChannelJoin(t *testing.T) {
 	var expected, actual []byte
 
+	SetLogger(os.Stderr)
+
 	s := &MockScreen{}
 	u := NewUser("foo")
 
 	ch := NewChannel()
+	go ch.Serve()
 	defer ch.Close()
 
 	err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	m := <-ch.broadcast
-	if m.(*AnnounceMsg) == nil {
-		t.Fatal("Did not receive correct msg: %v", m)
-	}
-	ch.handleMsg(m)
 
 	u.ConsumeOne(s)
 	expected = []byte(" * foo joined. (Connected: 1)" + Newline)
@@ -46,7 +44,6 @@ func TestChannelJoin(t *testing.T) {
 	}
 
 	ch.Send(NewSystemMsg("hello", u))
-
 	u.ConsumeOne(s)
 	expected = []byte("-> hello" + Newline)
 	s.Read(&actual)

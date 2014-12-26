@@ -19,7 +19,7 @@ type Channel struct {
 	broadcast chan Message
 	commands  Commands
 	closed    bool
-	closeOnce *sync.Once
+	closeOnce sync.Once
 }
 
 // Create new channel and start broadcasting goroutine.
@@ -34,6 +34,7 @@ func NewChannel() *Channel {
 	}
 }
 
+// Close the channel and all the users it contains.
 func (ch *Channel) Close() {
 	ch.closeOnce.Do(func() {
 		ch.closed = true
@@ -47,6 +48,7 @@ func (ch *Channel) Close() {
 
 // Handle a message, will block until done.
 func (ch *Channel) handleMsg(m Message) {
+	logger.Printf("ch.handleMsg(%v)", m)
 	switch m := m.(type) {
 	case *CommandMsg:
 		cmd := *m
@@ -88,10 +90,12 @@ func (ch *Channel) Serve() {
 	}
 }
 
+// Send message, buffered by a chan.
 func (ch *Channel) Send(m Message) {
 	ch.broadcast <- m
 }
 
+// Join the channel as a user, will announce.
 func (ch *Channel) Join(u *User) error {
 	if ch.closed {
 		return ErrChannelClosed
@@ -105,6 +109,7 @@ func (ch *Channel) Join(u *User) error {
 	return nil
 }
 
+// Leave the channel as a user, will announce.
 func (ch *Channel) Leave(u *User) error {
 	err := ch.users.Remove(u)
 	if err != nil {
@@ -115,10 +120,12 @@ func (ch *Channel) Leave(u *User) error {
 	return nil
 }
 
+// Topic of the channel.
 func (ch *Channel) Topic() string {
 	return ch.topic
 }
 
+// SetTopic will set the topic of the channel.
 func (ch *Channel) SetTopic(s string) {
 	ch.topic = s
 }
