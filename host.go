@@ -18,10 +18,12 @@ type Host struct {
 
 // NewHost creates a Host on top of an existing listener
 func NewHost(listener *sshd.SSHListener) *Host {
+	ch := chat.NewChannel()
 	h := Host{
 		listener: listener,
-		channel:  chat.NewChannel(),
+		channel:  ch,
 	}
+	go ch.Serve()
 	return &h
 }
 
@@ -51,8 +53,8 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			logger.Errorf("Terminal reading error: %s", err)
 			break
 		}
-		m := chat.NewMessage(line).From(user)
-		h.channel.Send(*m)
+		m := chat.ParseInput(line, user)
+		h.channel.Send(m)
 	}
 
 	err = h.channel.Leave(user)

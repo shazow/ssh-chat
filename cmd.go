@@ -46,6 +46,7 @@ func main() {
 		if p == nil {
 			fmt.Print(err)
 		}
+		os.Exit(1)
 		return
 	}
 
@@ -81,12 +82,14 @@ func main() {
 	privateKey, err := ioutil.ReadFile(privateKeyPath)
 	if err != nil {
 		logger.Errorf("Failed to load identity: %v", err)
+		os.Exit(2)
 		return
 	}
 
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		logger.Errorf("Failed to prase key: %v", err)
+		logger.Errorf("Failed to parse key: %v", err)
+		os.Exit(3)
 		return
 	}
 
@@ -97,6 +100,7 @@ func main() {
 	s, err := sshd.ListenSSH(options.Bind, config)
 	if err != nil {
 		logger.Errorf("Failed to listen on socket: %v", err)
+		os.Exit(4)
 		return
 	}
 	defer s.Close()
@@ -143,4 +147,5 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	logger.Warningf("Interrupt signal detected, shutting down.")
+	os.Exit(0)
 }

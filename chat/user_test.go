@@ -10,14 +10,14 @@ func TestMakeUser(t *testing.T) {
 
 	s := &MockScreen{}
 	u := NewUser("foo")
-	m := NewMessage("hello")
+	m := NewAnnounceMsg("hello")
 
 	defer u.Close()
-	u.Send(*m)
+	u.Send(m)
 	u.ConsumeOne(s)
 
 	s.Read(&actual)
-	expected = []byte(m.String())
+	expected = []byte(m.String() + Newline)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
