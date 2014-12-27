@@ -33,6 +33,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.AutoCompleteCallback = h.AutoCompleteFunction
 
 	user := chat.NewUserScreen(name, term)
+	user.Config.Theme = &chat.Themes[0]
 	go func() {
 		// Close term once user is closed.
 		user.Wait()
@@ -40,10 +41,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}()
 	defer user.Close()
 
-	refreshPrompt := func() {
-		term.SetPrompt(fmt.Sprintf("[%s] ", user.Name()))
-	}
-	refreshPrompt()
+	term.SetPrompt(GetPrompt(user))
 
 	err := h.channel.Join(user)
 	if err != nil {
@@ -52,7 +50,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	for {
-		// TODO: Handle commands etc?
 		line, err := term.ReadLine()
 		if err == io.EOF {
 			// Closed
@@ -62,13 +59,18 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			break
 		}
 		m := chat.ParseInput(line, user)
+
 		// FIXME: Any reason to use h.channel.Send(m) instead?
 		h.channel.HandleMsg(m)
-		if m.Command() == "/nick" {
+
+		cmd := m.Command()
+		if cmd == "/nick" || cmd == "/theme" {
 			// Hijack /nick command to update terminal synchronously. Wouldn't
 			// work if we use h.channel.Send(m) above.
-			// FIXME: This is hacky, how do we improve the API to allow for this?
-			refreshPrompt()
+			//
+			// FIXME: This is hacky, how do we improve the API to allow for
+			// this? Chat module shouldn't know about terminals.
+			term.SetPrompt(GetPrompt(user))
 		}
 	}
 
@@ -118,4 +120,13 @@ func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine str
 	newPos = pos + (len(name) - len(partial))
 	ok = true
 	return
+}
+
+// RefreshPrompt will update the terminal prompt with the latest user name.
+func GetPrompt(user *chat.User) string {
+	name := user.Name()
+	if user.Config.Theme != nil {
+		name = user.Config.Theme.ColorName(user)
+	}
+	return fmt.Sprintf("[%s] ", name)
 }

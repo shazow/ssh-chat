@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"os"
 	"reflect"
 	"testing"
 )
@@ -21,8 +20,6 @@ func TestChannelServe(t *testing.T) {
 
 func TestChannelJoin(t *testing.T) {
 	var expected, actual []byte
-
-	SetLogger(os.Stderr)
 
 	s := &MockScreen{}
 	u := NewUser("foo")

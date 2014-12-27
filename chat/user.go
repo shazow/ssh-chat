@@ -44,20 +44,26 @@ func NewUserScreen(name string, screen io.Writer) *User {
 	return u
 }
 
-// Return unique identifier for user
+// Id of the user, a unique identifier within a set
 func (u *User) Id() Id {
 	return Id(u.name)
 }
 
-// Return user's name
+// Name of the user
 func (u *User) Name() string {
 	return u.name
 }
 
-// Return set user's name
+// SetName will change the name of the user and reset the colorIdx
 func (u *User) SetName(name string) {
 	u.name = name
-	u.colorIdx = rand.Int()
+	u.SetColorIdx(rand.Int())
+}
+
+// SetColorIdx will set the colorIdx to a specific value, primarily used for
+// testing.
+func (u *User) SetColorIdx(idx int) {
+	u.colorIdx = idx
 }
 
 // Return whether user is an admin

@@ -44,11 +44,11 @@ type Msg struct {
 func (m *Msg) Render(t *Theme) string {
 	// TODO: Render based on theme
 	// TODO: Cache based on theme
-	return m.body
+	return m.String()
 }
 
 func (m *Msg) String() string {
-	return m.Render(nil)
+	return m.body
 }
 
 func (m *Msg) Command() string {
@@ -94,11 +94,15 @@ func (m *PublicMsg) ParseCommand() (*CommandMsg, bool) {
 }
 
 func (m *PublicMsg) Render(t *Theme) string {
-	return fmt.Sprintf("%s: %s", m.from.Name(), m.body)
+	if t == nil {
+		return m.String()
+	}
+
+	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
 }
 
 func (m *PublicMsg) String() string {
-	return m.Render(nil)
+	return fmt.Sprintf("%s: %s", m.from.Name(), m.body)
 }
 
 // EmoteMsg is a /me message sent to the channel. It specifically does not

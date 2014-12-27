@@ -35,7 +35,7 @@ type Color interface {
 }
 
 // 256 color type, for terminals who support it
-type Color256 int8
+type Color256 uint8
 
 // String version of this color
 func (c Color256) String() string {
@@ -68,7 +68,19 @@ type Palette struct {
 
 // Get a color by index, overflows are looped around.
 func (p Palette) Get(i int) Color {
-	return p.colors[i%p.size]
+	return p.colors[i%(p.size-1)]
+}
+
+func (p Palette) Len() int {
+	return p.size
+}
+
+func (p Palette) String() string {
+	r := ""
+	for _, c := range p.colors {
+		r += c.Format("X")
+	}
+	return r
 }
 
 // Collection of settings for chat
@@ -79,13 +91,17 @@ type Theme struct {
 	names *Palette
 }
 
+func (t Theme) Id() string {
+	return t.id
+}
+
 // Colorize name string given some index
-func (t Theme) ColorName(s string, i int) string {
+func (t Theme) ColorName(u *User) string {
 	if t.names == nil {
-		return s
+		return u.name
 	}
 
-	return t.names.Get(i).Format(s)
+	return t.names.Get(u.colorIdx).Format(u.name)
 }
 
 // Colorize the PM string
@@ -113,16 +129,19 @@ var Themes []Theme
 var DefaultTheme *Theme
 
 func readableColors256() *Palette {
+	size := 247
 	p := Palette{
-		colors: make([]Color, 246),
-		size:   246,
+		colors: make([]Color, size),
+		size:   size,
 	}
+	j := 0
 	for i := 0; i < 256; i++ {
 		if (16 <= i && i <= 18) || (232 <= i && i <= 237) {
 			// Remove the ones near black, this is kinda sadpanda.
 			continue
 		}
-		p.colors = append(p.colors, Color256(i))
+		p.colors[j] = Color256(i)
+		j++
 	}
 	return &p
 }
@@ -134,6 +153,8 @@ func init() {
 		Theme{
 			id:    "colors",
 			names: palette,
+			sys:   palette.Get(8), // Grey
+			pm:    palette.Get(7), // White
 		},
 		Theme{
 			id: "mono",

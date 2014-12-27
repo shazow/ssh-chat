@@ -134,5 +134,30 @@ func init() {
 	})
 	c.Alias("/names", "/list")
 
+	c.Add("/theme", "[mono|colors] - Set your color theme.", func(channel *Channel, msg CommandMsg) error {
+		user := msg.From()
+		args := msg.Args()
+		if len(args) == 0 {
+			theme := "plain"
+			if user.Config.Theme != nil {
+				theme = user.Config.Theme.Id()
+			}
+			body := fmt.Sprintf("Current theme: %s", theme)
+			channel.Send(NewSystemMsg(body, user))
+			return nil
+		}
+
+		id := args[0]
+		for _, t := range Themes {
+			if t.Id() == id {
+				user.Config.Theme = &t
+				body := fmt.Sprintf("Set theme: %s", id)
+				channel.Send(NewSystemMsg(body, user))
+				return nil
+			}
+		}
+		return errors.New("theme not found")
+	})
+
 	defaultCmdHandlers = c
 }

@@ -48,7 +48,6 @@ func (ch *Channel) Close() {
 
 // Handle a message, will block until done.
 func (ch *Channel) HandleMsg(m Message) {
-	logger.Printf("ch.HandleMsg(%v)", m)
 	switch m := m.(type) {
 	case *CommandMsg:
 		cmd := *m
