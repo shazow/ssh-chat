@@ -6,35 +6,35 @@ import (
 	"sync"
 )
 
-var ErrIdTaken error = errors.New("id already taken")
-var ErrItemMissing error = errors.New("item does not exist")
+// The error returned when an added id already exists in the set.
+var ErrIdTaken = errors.New("id already taken")
 
-// Unique identifier for an item
+// The error returned when a requested item does not exist in the set.
+var ErrItemMissing = errors.New("item does not exist")
+
+// Id is a unique identifier for an item.
 type Id string
 
-// A prefix for a unique identifier
-type IdPrefix Id
-
-// An interface for items to store-able in the set
+// Item is an interface for items to store-able in the set
 type Item interface {
 	Id() Id
 }
 
-// Set with string lookup
+// Set with string lookup.
 // TODO: Add trie for efficient prefix lookup?
 type Set struct {
 	lookup map[Id]Item
 	sync.RWMutex
 }
 
-// Create a new set
+// NewSet creates a new set.
 func NewSet() *Set {
 	return &Set{
 		lookup: map[Id]Item{},
 	}
 }
 
-// Remove all items and return the number removed
+// Clear removes all items and returns the number removed.
 func (s *Set) Clear() int {
 	s.Lock()
 	n := len(s.lookup)
@@ -43,12 +43,12 @@ func (s *Set) Clear() int {
 	return n
 }
 
-// Size of the set right now
+// Len returns the size of the set right now.
 func (s *Set) Len() int {
 	return len(s.lookup)
 }
 
-// Check if user belongs in this set
+// In checks if an item exists in this set.
 func (s *Set) In(item Item) bool {
 	s.RLock()
 	_, ok := s.lookup[item.Id()]
@@ -56,7 +56,7 @@ func (s *Set) In(item Item) bool {
 	return ok
 }
 
-// Get user by name
+// Get returns an item with the given Id.
 func (s *Set) Get(id Id) (Item, error) {
 	s.RLock()
 	item, ok := s.lookup[id]
@@ -69,7 +69,7 @@ func (s *Set) Get(id Id) (Item, error) {
 	return item, nil
 }
 
-// Add user to set if user does not exist already
+// Add item to this set if it does not exist already.
 func (s *Set) Add(item Item) error {
 	s.Lock()
 	defer s.Unlock()
@@ -83,7 +83,7 @@ func (s *Set) Add(item Item) error {
 	return nil
 }
 
-// Remove user from set
+// Remove item from this set.
 func (s *Set) Remove(item Item) error {
 	s.Lock()
 	defer s.Unlock()
@@ -96,7 +96,8 @@ func (s *Set) Remove(item Item) error {
 	return nil
 }
 
-// Loop over every item while holding a read lock and apply fn
+// Each loops over every item while holding a read lock and applies fn to each
+// element.
 func (s *Set) Each(fn func(item Item)) {
 	s.RLock()
 	for _, item := range s.lookup {
@@ -105,7 +106,7 @@ func (s *Set) Each(fn func(item Item)) {
 	s.RUnlock()
 }
 
-// List users by prefix, case insensitive
+// ListPrefix returns a list of items with a prefix, case insensitive.
 func (s *Set) ListPrefix(prefix string) []Item {
 	r := []Item{}
 	prefix = strings.ToLower(prefix)

@@ -122,7 +122,7 @@ func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine str
 	return
 }
 
-// RefreshPrompt will update the terminal prompt with the latest user name.
+// GetPrompt will render the terminal prompt string based on the user.
 func GetPrompt(user *chat.User) string {
 	name := user.Name()
 	if user.Config.Theme != nil {

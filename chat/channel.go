@@ -9,6 +9,8 @@ import (
 const historyLen = 20
 const channelBuffer = 10
 
+// The error returned when a message is sent to a channel that is already
+// closed.
 var ErrChannelClosed = errors.New("channel closed")
 
 // Channel definition, also a Set of User Items
@@ -22,7 +24,7 @@ type Channel struct {
 	closeOnce sync.Once
 }
 
-// Create new channel and start broadcasting goroutine.
+// NewChannel creates a new channel.
 func NewChannel() *Channel {
 	broadcast := make(chan Message, channelBuffer)
 
@@ -46,7 +48,7 @@ func (ch *Channel) Close() {
 	})
 }
 
-// Handle a message, will block until done.
+// HandleMsg reacts to a message, will block until done.
 func (ch *Channel) HandleMsg(m Message) {
 	switch m := m.(type) {
 	case *CommandMsg:

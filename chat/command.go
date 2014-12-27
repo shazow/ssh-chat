@@ -8,18 +8,27 @@ import (
 	"sync"
 )
 
+// The error returned when an invalid command is issued.
 var ErrInvalidCommand = errors.New("invalid command")
+
+// The error returned when a command is given without an owner.
 var ErrNoOwner = errors.New("command without owner")
+
+// The error returned when a command is performed without the necessary number
+// of arguments.
 var ErrMissingArg = errors.New("missing argument")
 
+// CommandHandler is the function signature for command handlers..
 type CommandHandler func(*Channel, CommandMsg) error
 
+// Commands is a registry of available commands.
 type Commands struct {
 	handlers map[string]CommandHandler
 	help     map[string]string
 	sync.RWMutex
 }
 
+// NewCommands returns a new Commands registry.
 func NewCommands() *Commands {
 	return &Commands{
 		handlers: map[string]CommandHandler{},
@@ -27,7 +36,8 @@ func NewCommands() *Commands {
 	}
 }
 
-// Register command. If help string is empty, it will be hidden from Help().
+// Add will register a command. If help string is empty, it will be hidden from
+// Help().
 func (c Commands) Add(command string, help string, handler CommandHandler) {
 	c.Lock()
 	defer c.Unlock()
@@ -52,9 +62,9 @@ func (c Commands) Alias(command string, alias string) error {
 	return nil
 }
 
-// Execute command message, assumes IsCommand was checked.
+// Run executes a command message.
 func (c Commands) Run(channel *Channel, msg CommandMsg) error {
-	if msg.from == nil {
+	if msg.From == nil {
 		return ErrNoOwner
 	}
 
