@@ -74,7 +74,7 @@ func (c Commands) Help() string {
 	c.RLock()
 	defer c.RUnlock()
 
-	r := make([]string, len(c.help))
+	r := []string{}
 	for cmd, line := range c.help {
 		r = append(r, fmt.Sprintf("%s %s", cmd, line))
 	}
@@ -88,6 +88,11 @@ var defaultCmdHandlers *Commands
 func init() {
 	c := NewCommands()
 
+	c.Add("/help", "", func(channel *Channel, msg CommandMsg) error {
+		channel.Send(NewSystemMsg("Available commands:"+Newline+c.Help(), msg.From()))
+		return nil
+	})
+
 	c.Add("/me", "", func(channel *Channel, msg CommandMsg) error {
 		me := strings.TrimLeft(msg.body, "/me")
 		if me == "" {
@@ -100,13 +105,13 @@ func init() {
 		return nil
 	})
 
-	c.Add("/exit", "Exit the chat.", func(channel *Channel, msg CommandMsg) error {
+	c.Add("/exit", "- Exit the chat.", func(channel *Channel, msg CommandMsg) error {
 		msg.From().Close()
 		return nil
 	})
 	c.Alias("/exit", "/quit")
 
-	c.Add("/nick", "NAME\tRename yourself.", func(channel *Channel, msg CommandMsg) error {
+	c.Add("/nick", "NAME - Rename yourself.", func(channel *Channel, msg CommandMsg) error {
 		args := msg.Args()
 		if len(args) != 1 {
 			return ErrMissingArg
@@ -115,9 +120,19 @@ func init() {
 		oldName := u.Name()
 		u.SetName(args[0])
 
-		channel.Send(NewAnnounceMsg(fmt.Sprintf("%s is now known as %s.", oldName, u.Name())))
+		body := fmt.Sprintf("%s is now known as %s.", oldName, u.Name())
+		channel.Send(NewAnnounceMsg(body))
 		return nil
 	})
+
+	c.Add("/names", "- List users who are connected.", func(channel *Channel, msg CommandMsg) error {
+		// TODO: colorize
+		names := channel.NamesPrefix("")
+		body := fmt.Sprintf("%d connected: %s", len(names), strings.Join(names, ", "))
+		channel.Send(NewSystemMsg(body, msg.From()))
+		return nil
+	})
+	c.Alias("/names", "/list")
 
 	defaultCmdHandlers = c
 }
