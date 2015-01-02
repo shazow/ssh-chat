@@ -14,9 +14,12 @@ import (
 type Host struct {
 	listener *sshd.SSHListener
 	channel  *chat.Channel
+
+	motd string
+	auth *Auth
 }
 
-// NewHost creates a Host on top of an existing listener
+// NewHost creates a Host on top of an existing listener.
 func NewHost(listener *sshd.SSHListener) *Host {
 	ch := chat.NewChannel()
 	h := Host{
@@ -27,7 +30,12 @@ func NewHost(listener *sshd.SSHListener) *Host {
 	return &h
 }
 
-// Connect a specific Terminal to this host and its channel
+// SetMotd sets the host's message of the day.
+func (h *Host) SetMotd(motd string) {
+	h.motd = motd
+}
+
+// Connect a specific Terminal to this host and its channel.
 func (h *Host) Connect(term *sshd.Terminal) {
 	name := term.Conn.User()
 	term.AutoCompleteCallback = h.AutoCompleteFunction

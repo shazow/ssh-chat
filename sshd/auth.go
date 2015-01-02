@@ -9,13 +9,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var errBanned = errors.New("banned")
-var errNotWhitelisted = errors.New("not whitelisted")
-var errNoInteractive = errors.New("public key authentication required")
-
 type Auth interface {
-	IsBanned(ssh.PublicKey) bool
-	IsWhitelisted(ssh.PublicKey) bool
+	AllowAnonymous() bool
+	Check(string) (bool, error)
 }
 
 func MakeAuth(auth Auth) *ssh.ServerConfig {
@@ -23,21 +19,17 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 		NoClientAuth: false,
 		// Auth-related things should be constant-time to avoid timing attacks.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			if auth.IsBanned(key) {
-				return nil, errBanned
+			fingerprint := Fingerprint(key)
+			ok, err := auth.Check(fingerprint)
+			if !ok {
+				return nil, err
 			}
-			if !auth.IsWhitelisted(key) {
-				return nil, errNotWhitelisted
-			}
-			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": Fingerprint(key)}}
+			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": fingerprint}}
 			return perm, nil
 		},
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
-			if auth.IsBanned(nil) {
-				return nil, errNoInteractive
-			}
-			if !auth.IsWhitelisted(nil) {
-				return nil, errNotWhitelisted
+			if !auth.AllowAnonymous() {
+				return nil, errors.New("public key authentication required")
 			}
 			return nil, nil
 		},
@@ -51,7 +43,8 @@ func MakeNoAuth() *ssh.ServerConfig {
 		NoClientAuth: false,
 		// Auth-related things should be constant-time to avoid timing attacks.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			return nil, nil
+			perm := &ssh.Permissions{Extensions: map[string]string{"fingerprint": Fingerprint(key)}}
+			return perm, nil
 		},
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
 			return nil, nil

@@ -98,9 +98,8 @@ func init() {
 	c.Add(Command{
 		Prefix: "/help",
 		Handler: func(channel *Channel, msg CommandMsg) error {
-			user := msg.From()
-			op := channel.ops.In(user)
-			channel.Send(NewSystemMsg(channel.commands.Help(op), user))
+			op := channel.IsOp(msg.From())
+			channel.Send(NewSystemMsg(channel.commands.Help(op), msg.From()))
 			return nil
 		},
 	})
@@ -193,11 +192,12 @@ func init() {
 	})
 
 	c.Add(Command{
+		Op:         true,
 		Prefix:     "/op",
 		PrefixHelp: "USER",
 		Help:       "Mark user as admin.",
 		Handler: func(channel *Channel, msg CommandMsg) error {
-			if !channel.ops.In(msg.From()) {
+			if !channel.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
 
@@ -206,13 +206,14 @@ func init() {
 				return errors.New("must specify user")
 			}
 
-			// TODO: Add support for fingerprint-based op'ing.
-			user, err := channel.users.Get(Id(args[0]))
+			// TODO: Add support for fingerprint-based op'ing. This will
+			// probably need to live in host land.
+			member, err := channel.members.Get(Id(args[0]))
 			if err != nil {
 				return errors.New("user not found")
 			}
 
-			channel.ops.Add(user)
+			member.(*Member).Op = true
 			return nil
 		},
 	})

@@ -13,12 +13,17 @@ const channelBuffer = 10
 // closed.
 var ErrChannelClosed = errors.New("channel closed")
 
+// Member is a User with per-Channel metadata attached to it.
+type Member struct {
+	*User
+	Op bool
+}
+
 // Channel definition, also a Set of User Items
 type Channel struct {
 	topic     string
 	history   *History
-	users     *Set
-	ops       *Set
+	members   *Set
 	broadcast chan Message
 	commands  Commands
 	closed    bool
@@ -32,8 +37,7 @@ func NewChannel() *Channel {
 	return &Channel{
 		broadcast: broadcast,
 		history:   NewHistory(historyLen),
-		users:     NewSet(),
-		ops:       NewSet(),
+		members:   NewSet(),
 		commands:  *defaultCommands,
 	}
 }
@@ -47,10 +51,10 @@ func (ch *Channel) SetCommands(commands Commands) {
 func (ch *Channel) Close() {
 	ch.closeOnce.Do(func() {
 		ch.closed = true
-		ch.users.Each(func(u Item) {
+		ch.members.Each(func(u Item) {
 			u.(*User).Close()
 		})
-		ch.users.Clear()
+		ch.members.Clear()
 		close(ch.broadcast)
 	})
 }
@@ -75,8 +79,8 @@ func (ch *Channel) HandleMsg(m Message) {
 			skipUser = fromMsg.From()
 		}
 
-		ch.users.Each(func(u Item) {
-			user := u.(*User)
+		ch.members.Each(func(u Item) {
+			user := u.(*Member).User
 			if skip && skipUser == user {
 				// Skip
 				return
@@ -108,24 +112,44 @@ func (ch *Channel) Join(u *User) error {
 	if ch.closed {
 		return ErrChannelClosed
 	}
-	err := ch.users.Add(u)
+	err := ch.members.Add(&Member{u, false})
 	if err != nil {
 		return err
 	}
-	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), ch.users.Len())
+	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), ch.members.Len())
 	ch.Send(NewAnnounceMsg(s))
 	return nil
 }
 
-// Leave the channel as a user, will announce.
+// Leave the channel as a user, will announce. Mostly used during setup.
 func (ch *Channel) Leave(u *User) error {
-	err := ch.users.Remove(u)
+	err := ch.members.Remove(u)
 	if err != nil {
 		return err
 	}
 	s := fmt.Sprintf("%s left.", u.Name())
 	ch.Send(NewAnnounceMsg(s))
 	return nil
+}
+
+// Member returns a corresponding Member object to a User if the Member is
+// present in this channel.
+func (ch *Channel) Member(u *User) (*Member, bool) {
+	m, err := ch.members.Get(u.Id())
+	if err != nil {
+		return nil, false
+	}
+	// Check that it's the same user
+	if m.(*Member).User != u {
+		return nil, false
+	}
+	return m.(*Member), true
+}
+
+// IsOp returns whether a user is an operator in this channel.
+func (ch *Channel) IsOp(u *User) bool {
+	m, ok := ch.Member(u)
+	return ok && m.Op
 }
 
 // Topic of the channel.
@@ -141,9 +165,9 @@ func (ch *Channel) SetTopic(s string) {
 // NamesPrefix lists all members' names with a given prefix, used to query
 // for autocompletion purposes.
 func (ch *Channel) NamesPrefix(prefix string) []string {
-	users := ch.users.ListPrefix(prefix)
-	names := make([]string, len(users))
-	for i, u := range users {
+	members := ch.members.ListPrefix(prefix)
+	names := make([]string, len(members))
+	for i, u := range members {
 		names[i] = u.(*User).Name()
 	}
 	return names

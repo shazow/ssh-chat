@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -93,8 +94,8 @@ func main() {
 		return
 	}
 
-	// TODO: MakeAuth
-	config := sshd.MakeNoAuth()
+	auth := Auth{}
+	config := sshd.MakeAuth(auth)
 	config.AddHostKey(signer)
 
 	s, err := sshd.ListenSSH(options.Bind, config)
@@ -106,11 +107,10 @@ func main() {
 	defer s.Close()
 
 	host := NewHost(s)
-	go host.Serve()
+	host.auth = &auth
 
-	/* TODO:
 	for _, fingerprint := range options.Admin {
-		server.Op(fingerprint)
+		auth.Op(fingerprint)
 	}
 
 	if options.Whitelist != "" {
@@ -123,7 +123,7 @@ func main() {
 
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			server.Whitelist(scanner.Text())
+			auth.Whitelist(scanner.Text())
 		}
 	}
 
@@ -137,9 +137,10 @@ func main() {
 		// hack to normalize line endings into \r\n
 		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
 		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
-		server.SetMotd(motdString)
+		host.SetMotd(motdString)
 	}
-	*/
+
+	go host.Serve()
 
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
