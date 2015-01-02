@@ -16,7 +16,6 @@ var ErrUserClosed = errors.New("user closed")
 type User struct {
 	Config    UserConfig
 	name      string
-	op        bool
 	colorIdx  int
 	joined    time.Time
 	msg       chan Message
@@ -64,16 +63,6 @@ func (u *User) SetName(name string) {
 // testing.
 func (u *User) SetColorIdx(idx int) {
 	u.colorIdx = idx
-}
-
-// Return whether user is an admin
-func (u *User) Op() bool {
-	return u.op
-}
-
-// Set whether user is an admin
-func (u *User) SetOp(op bool) {
-	u.op = op
 }
 
 // Block until user is closed

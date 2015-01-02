@@ -17,12 +17,12 @@ type help struct {
 }
 
 // NewCommandsHelp creates a help container from a commands container.
-func NewCommandsHelp(c *Commands) *help {
+func NewCommandsHelp(c []*Command) *help {
 	lookup := map[string]struct{}{}
 	h := help{
 		items: []helpItem{},
 	}
-	for _, cmd := range c.commands {
+	for _, cmd := range c {
 		if cmd.Help == "" {
 			// Skip hidden commands.
 			continue

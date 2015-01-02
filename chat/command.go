@@ -1,10 +1,10 @@
+// FIXME: Would be sweet if we could piggyback on a cli parser or something.
 package chat
 
 import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 )
 
 // The error returned when an invalid command is issued.
@@ -29,58 +29,41 @@ type Command struct {
 	// If omitted, command is hidden from /help
 	Help    string
 	Handler func(*Channel, CommandMsg) error
+	// Command requires Op permissions
+	Op bool
 }
 
 // Commands is a registry of available commands.
-type Commands struct {
-	commands map[string]*Command
-	sync.RWMutex
-}
-
-// NewCommands returns a new Commands registry.
-func NewCommands() *Commands {
-	return &Commands{
-		commands: map[string]*Command{},
-	}
-}
+type Commands map[string]*Command
 
 // Add will register a command. If help string is empty, it will be hidden from
 // Help().
-func (c *Commands) Add(cmd Command) error {
-	c.Lock()
-	defer c.Unlock()
-
+func (c Commands) Add(cmd Command) error {
 	if cmd.Prefix == "" {
 		return ErrMissingPrefix
 	}
 
-	c.commands[cmd.Prefix] = &cmd
+	c[cmd.Prefix] = &cmd
 	return nil
 }
 
 // Alias will add another command for the same handler, won't get added to help.
-func (c *Commands) Alias(command string, alias string) error {
-	c.Lock()
-	defer c.Unlock()
-
-	cmd, ok := c.commands[command]
+func (c Commands) Alias(command string, alias string) error {
+	cmd, ok := c[command]
 	if !ok {
 		return ErrInvalidCommand
 	}
-	c.commands[alias] = cmd
+	c[alias] = cmd
 	return nil
 }
 
 // Run executes a command message.
-func (c *Commands) Run(channel *Channel, msg CommandMsg) error {
+func (c Commands) Run(channel *Channel, msg CommandMsg) error {
 	if msg.From == nil {
 		return ErrNoOwner
 	}
 
-	c.RLock()
-	defer c.RUnlock()
-
-	cmd, ok := c.commands[msg.Command()]
+	cmd, ok := c[msg.Command()]
 	if !ok {
 		return ErrInvalidCommand
 	}
@@ -89,24 +72,35 @@ func (c *Commands) Run(channel *Channel, msg CommandMsg) error {
 }
 
 // Help will return collated help text as one string.
-func (c *Commands) Help() string {
-	c.RLock()
-	defer c.RUnlock()
-
-	// TODO: Could cache this...
-	help := NewCommandsHelp(c)
-	return help.String()
+func (c Commands) Help(showOp bool) string {
+	// Filter by op
+	op := []*Command{}
+	normal := []*Command{}
+	for _, cmd := range c {
+		if cmd.Op {
+			op = append(op, cmd)
+		} else {
+			normal = append(normal, cmd)
+		}
+	}
+	help := "Available commands:" + Newline + NewCommandsHelp(normal).String()
+	if showOp {
+		help += Newline + "Operator commands:" + Newline + NewCommandsHelp(op).String()
+	}
+	return help
 }
 
-var defaultCmdHandlers *Commands
+var defaultCommands *Commands
 
 func init() {
-	c := NewCommands()
+	c := Commands{}
 
 	c.Add(Command{
 		Prefix: "/help",
 		Handler: func(channel *Channel, msg CommandMsg) error {
-			channel.Send(NewSystemMsg("Available commands:"+Newline+c.Help(), msg.From()))
+			user := msg.From()
+			op := channel.ops.In(user)
+			channel.Send(NewSystemMsg(channel.commands.Help(op), user))
 			return nil
 		},
 	})
@@ -198,5 +192,30 @@ func init() {
 		},
 	})
 
-	defaultCmdHandlers = c
+	c.Add(Command{
+		Prefix:     "/op",
+		PrefixHelp: "USER",
+		Help:       "Mark user as admin.",
+		Handler: func(channel *Channel, msg CommandMsg) error {
+			if !channel.ops.In(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) != 1 {
+				return errors.New("must specify user")
+			}
+
+			// TODO: Add support for fingerprint-based op'ing.
+			user, err := channel.users.Get(Id(args[0]))
+			if err != nil {
+				return errors.New("user not found")
+			}
+
+			channel.ops.Add(user)
+			return nil
+		},
+	})
+
+	defaultCommands = &c
 }

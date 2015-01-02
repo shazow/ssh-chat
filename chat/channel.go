@@ -18,6 +18,7 @@ type Channel struct {
 	topic     string
 	history   *History
 	users     *Set
+	ops       *Set
 	broadcast chan Message
 	commands  Commands
 	closed    bool
@@ -32,8 +33,14 @@ func NewChannel() *Channel {
 		broadcast: broadcast,
 		history:   NewHistory(historyLen),
 		users:     NewSet(),
-		commands:  *defaultCmdHandlers,
+		ops:       NewSet(),
+		commands:  *defaultCommands,
 	}
+}
+
+// SetCommands sets the channel's command handlers.
+func (ch *Channel) SetCommands(commands Commands) {
+	ch.commands = commands
 }
 
 // Close the channel and all the users it contains.
