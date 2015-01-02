@@ -17,7 +17,7 @@ type help struct {
 }
 
 // NewCommandsHelp creates a help container from a commands container.
-func NewCommandsHelp(c []*Command) *help {
+func NewCommandsHelp(c []*Command) fmt.Stringer {
 	lookup := map[string]struct{}{}
 	h := help{
 		items: []helpItem{},

@@ -14,6 +14,7 @@ import (
 type Host struct {
 	listener *sshd.SSHListener
 	channel  *chat.Channel
+	commands *chat.Commands
 
 	motd string
 	auth *Auth
@@ -26,6 +27,12 @@ func NewHost(listener *sshd.SSHListener) *Host {
 		listener: listener,
 		channel:  ch,
 	}
+
+	// Make our own commands registry instance.
+	commands := chat.Commands{}
+	chat.InitCommands(&commands)
+	ch.SetCommands(commands)
+
 	go ch.Serve()
 	return &h
 }

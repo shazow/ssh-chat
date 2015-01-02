@@ -51,8 +51,8 @@ func (ch *Channel) SetCommands(commands Commands) {
 func (ch *Channel) Close() {
 	ch.closeOnce.Do(func() {
 		ch.closed = true
-		ch.members.Each(func(u Item) {
-			u.(*User).Close()
+		ch.members.Each(func(m Item) {
+			m.(*Member).Close()
 		})
 		ch.members.Clear()
 		close(ch.broadcast)

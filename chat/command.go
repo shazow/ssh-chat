@@ -1,5 +1,6 @@
-// FIXME: Would be sweet if we could piggyback on a cli parser or something.
 package chat
+
+// FIXME: Would be sweet if we could piggyback on a cli parser or something.
 
 import (
 	"errors"
@@ -93,8 +94,12 @@ func (c Commands) Help(showOp bool) string {
 var defaultCommands *Commands
 
 func init() {
-	c := Commands{}
+	defaultCommands = &Commands{}
+	InitCommands(defaultCommands)
+}
 
+// InitCommands injects default commands into a Commands registry.
+func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/help",
 		Handler: func(channel *Channel, msg CommandMsg) error {
@@ -217,6 +222,4 @@ func init() {
 			return nil
 		},
 	})
-
-	defaultCommands = &c
 }
