@@ -3,7 +3,6 @@ package chat
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -23,22 +22,25 @@ var ErrMissingPrefix = errors.New("command missing prefix")
 
 // Command is a definition of a handler for a command.
 type Command struct {
-	Prefix     string
+	// The command's key, such as /foo
+	Prefix string
+	// Extra help regarding arguments
 	PrefixHelp string
-	Help       string
-	Handler    func(*Channel, CommandMsg) error
+	// If omitted, command is hidden from /help
+	Help    string
+	Handler func(*Channel, CommandMsg) error
 }
 
 // Commands is a registry of available commands.
 type Commands struct {
-	commands map[string]Command
+	commands map[string]*Command
 	sync.RWMutex
 }
 
 // NewCommands returns a new Commands registry.
 func NewCommands() *Commands {
 	return &Commands{
-		commands: map[string]Command{},
+		commands: map[string]*Command{},
 	}
 }
 
@@ -52,7 +54,7 @@ func (c *Commands) Add(cmd Command) error {
 		return ErrMissingPrefix
 	}
 
-	c.commands[cmd.Prefix] = cmd
+	c.commands[cmd.Prefix] = &cmd
 	return nil
 }
 
@@ -91,13 +93,9 @@ func (c *Commands) Help() string {
 	c.RLock()
 	defer c.RUnlock()
 
-	r := []string{}
-	for _, cmd := range c.commands {
-		r = append(r, fmt.Sprintf("%s %s - %s", cmd.Prefix, cmd.PrefixHelp, cmd.Help))
-	}
-	sort.Strings(r)
-
-	return strings.Join(r, Newline)
+	// TODO: Could cache this...
+	help := NewCommandsHelp(c)
+	return help.String()
 }
 
 var defaultCmdHandlers *Commands
