@@ -85,6 +85,12 @@ func (ch *Channel) HandleMsg(m Message) {
 				// Skip
 				return
 			}
+			if _, ok := m.(*AnnounceMsg); ok {
+				if user.Config.Quiet {
+					// Skip
+					return
+				}
+			}
 			err := user.Send(m)
 			if err != nil {
 				ch.Leave(user)
