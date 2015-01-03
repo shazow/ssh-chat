@@ -17,6 +17,15 @@ type Auth struct {
 	sync.RWMutex
 }
 
+// NewAuth creates a new default Auth.
+func NewAuth() Auth {
+	return Auth{
+		whitelist: make(map[string]struct{}),
+		banned:    make(map[string]struct{}),
+		ops:       make(map[string]struct{}),
+	}
+}
+
 // AllowAnonymous determines if anonymous users are permitted.
 func (a Auth) AllowAnonymous() bool {
 	a.RLock()
