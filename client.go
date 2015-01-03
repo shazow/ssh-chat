@@ -29,7 +29,8 @@ const (
    /whois $NAME         - Display information about another connected user.
    /msg $NAME $MESSAGE  - Sends a private message to a user.
    /motd                - Prints the Message of the Day.
-   /theme [color|mono]  - Set client theme.`
+   /theme [color|mono]  - Set client theme.
+   /quiet               - Toggles "quiet" mode. Hide join/quit messages.`
 
 	// OpHelpText is the additional text returned by /help if the client is an Op
 	OpHelpText string = `Available operator commands:
@@ -72,6 +73,7 @@ type Client struct {
 	lastTX        time.Time
 	beepMe        bool
 	colorMe       bool
+	quietMode     bool
 	closed        bool
 	sync.RWMutex
 }
@@ -79,14 +81,15 @@ type Client struct {
 // NewClient constructs a new client
 func NewClient(server *Server, conn *ssh.ServerConn) *Client {
 	return &Client{
-		Server:  server,
-		Conn:    conn,
-		Name:    conn.User(),
-		Color:   RandomColor256(),
-		Msg:     make(chan string, MsgBuffer),
-		ready:   make(chan struct{}, 1),
-		lastTX:  time.Now(),
-		colorMe: true,
+		Server:    server,
+		Conn:      conn,
+		Name:      conn.User(),
+		Color:     RandomColor256(),
+		Msg:       make(chan string, MsgBuffer),
+		ready:     make(chan struct{}, 1),
+		lastTX:    time.Now(),
+		colorMe:   true,
+		quietMode: false,
 	}
 }
 
@@ -169,6 +172,11 @@ func (c *Client) Rename(name string) {
 	}
 
 	c.term.SetPrompt(fmt.Sprintf("[%s] ", prompt))
+}
+
+// ToggleQuietMode toggles whether or not a client is in quiet mode
+func (c *Client) ToggleQuietMode() {
+	c.quietMode = !c.quietMode
 }
 
 // Fingerprint returns the fingerprint
@@ -414,7 +422,13 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					// Rename to reset prompt
 					c.Rename(c.Name)
 				}
-
+			case "/quiet":
+				c.ToggleQuietMode()
+				if c.quietMode {
+					c.SysMsg("Quiet mode toggled ON")
+				} else {
+					c.SysMsg("Quiet mode toggled OFF")
+				}
 			case "/whitelist": /* whitelist a fingerprint */
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")

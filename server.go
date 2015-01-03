@@ -128,6 +128,10 @@ func (s *Server) Broadcast(msg string, except *Client) {
 			}
 			client.Send(personalMsg)
 		} else {
+			if client.quietMode && strings.HasPrefix(msg, systemMessageFormat) {
+				continue
+			}
+
 			client.Send(msg)
 		}
 	}
