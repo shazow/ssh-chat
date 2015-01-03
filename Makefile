@@ -8,7 +8,7 @@ all: $(BINARY)
 	go build ./...
 
 $(BINARY): **/*.go *.go
-	go build -ldflags "-X main.buildCommit `git rev-parse --short HEAD`" .
+	go build -ldflags "-X main.buildCommit `git describe --long --tags --dirty --always`" .
 
 deps:
 	go get .
