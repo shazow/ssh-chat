@@ -242,7 +242,7 @@ func (s *Server) Rename(client *Client, newName string) {
 		s.clients[strings.ToLower(client.Name)] = client
 		s.Unlock()
 	}
-	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, newName))
+	s.SysMsg("%s is now known as %s.", ColorString(client.Color, oldName), ColorString(client.Color, client.Name))
 }
 
 // List lists the clients with the given prefix
