@@ -168,7 +168,7 @@ func (ch *Channel) NamesPrefix(prefix string) []string {
 	members := ch.members.ListPrefix(prefix)
 	names := make([]string, len(members))
 	for i, u := range members {
-		names[i] = u.(*User).Name()
+		names[i] = u.(*Member).User.Name()
 	}
 	return names
 }

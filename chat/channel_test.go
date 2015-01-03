@@ -56,3 +56,29 @@ func TestChannelJoin(t *testing.T) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 }
+
+func TestChannelNames(t *testing.T) {
+	var expected, actual []byte
+
+	s := &MockScreen{}
+	u := NewUser("foo")
+
+	ch := NewChannel()
+	go ch.Serve()
+	defer ch.Close()
+
+	err := ch.Join(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-ch.broadcast
+
+	ch.Send(ParseInput("/names", u))
+	u.ConsumeOne(s)
+	expected = []byte("-> 1 connected: foo" + Newline)
+	s.Read(&actual)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
+}
