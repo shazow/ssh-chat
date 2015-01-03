@@ -12,10 +12,13 @@ import (
 
 const (
 	// MsgBuffer is the length of the message buffer
-	MsgBuffer int = 50
+	MsgBuffer int = 20
 
 	// MaxMsgLength is the maximum length of a message
 	MaxMsgLength int = 1024
+
+	// MaxNamesList is the max number of items to return in a /names command
+	MaxNamesList int = 3
 
 	// HelpText is the text returned by /help
 	HelpText string = `Available commands:
@@ -277,15 +280,18 @@ func (c *Client) handleShell(channel ssh.Channel) {
 					c.SysMsg("Missing $NAME from: /whois $NAME")
 				}
 			case "/names", "/list":
-				names := ""
-				nameList := c.Server.List(nil)
-				for _, name := range nameList {
-					names += c.Server.Who(name).ColoredName() + systemMessageFormat + ", "
+				coloredNames := []string{}
+				for _, name := range c.Server.List(nil) {
+					coloredNames = append(coloredNames, c.Server.Who(name).ColoredName())
 				}
-				if len(names) > 2 {
-					names = names[:len(names)-2]
+				num := len(coloredNames)
+				if len(coloredNames) > MaxNamesList {
+					others := fmt.Sprintf("and %d others.", len(coloredNames)-MaxNamesList)
+					coloredNames = coloredNames[:MaxNamesList]
+					coloredNames = append(coloredNames, others)
 				}
-				c.SysMsg("%d connected: %s", len(nameList), names)
+
+				c.SysMsg("%d connected: %s", num, strings.Join(coloredNames, systemMessageFormat+", "))
 			case "/ban":
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
