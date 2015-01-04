@@ -330,7 +330,7 @@ func (c *Client) handleShell(channel ssh.Channel) {
 				} else if len(parts) != 1 {
 					c.SysMsg("Too many arguments for /banned")
 				} else {
-					for fingerprint, _ := range c.Server.bannedPK {
+					for fingerprint := range c.Server.bannedPK {
 						c.SysMsg("Banned fingerprint: %s", fingerprint)
 					}
 				}
