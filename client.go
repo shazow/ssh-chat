@@ -18,7 +18,7 @@ const (
 	MaxMsgLength int = 1024
 
 	// MaxNamesList is the max number of items to return in a /names command
-	MaxNamesList int = 30
+	MaxNamesList int = 20
 
 	// HelpText is the text returned by /help
 	HelpText string = `Available commands:
