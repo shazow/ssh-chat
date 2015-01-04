@@ -37,6 +37,8 @@ const (
 	// OpHelpText is the additional text returned by /help if the client is an Op
 	OpHelpText string = `Available operator commands:
    /ban $NAME                   - Banish a user from the chat
+   /unban $FINGERPRINT          - Unban a fingerprint
+   /banned                      - List all banned fingerprints
    /kick $NAME                  - Kick em' out.
    /op $NAME                    - Promote a user to server operator.
    /silence $NAME               - Revoke a user's ability to speak.
