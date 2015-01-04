@@ -127,7 +127,7 @@ func (c *Client) Send(msg string) {
 	case c.Msg <- msg:
 	default:
 		logger.Errorf("Msg buffer full, dropping: %s (%s)", c.Name, c.Conn.RemoteAddr())
-		c.Conn.Close()
+		c.Conn.Conn.Close()
 	}
 }
 
