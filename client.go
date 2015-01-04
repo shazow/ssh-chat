@@ -37,6 +37,8 @@ const (
 	// OpHelpText is the additional text returned by /help if the client is an Op
 	OpHelpText string = `Available operator commands:
    /ban $NAME                   - Banish a user from the chat
+   /unban $FINGERPRINT          - Unban a fingerprint
+   /banned                      - List all banned fingerprints
    /kick $NAME                  - Kick em' out.
    /op $NAME                    - Promote a user to server operator.
    /silence $NAME               - Revoke a user's ability to speak.
@@ -307,6 +309,31 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Server.Ban(fingerprint, nil)
 						client.Conn.Close()
 						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
+					}
+				}
+			case "/unban":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 2 {
+					c.SysMsg("Missing $FINGERPRINT from: /unban $FINGERPRINT")
+				} else {
+					fingerprint := parts[1]
+					isBanned := c.Server.IsBanned(fingerprint)
+					if !isBanned {
+						c.SysMsg("No such banned fingerprint: %s", fingerprint)
+					} else {
+						c.Server.Unban(fingerprint)
+						c.Server.Broadcast(fmt.Sprintf("* %s was unbanned by %s", fingerprint, c.ColoredName()), nil)
+					}
+				}
+			case "/banned":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 1 {
+					c.SysMsg("Too many arguments for /banned")
+				} else {
+					for fingerprint := range c.Server.bannedPK {
+						c.SysMsg("Banned fingerprint: %s", fingerprint)
 					}
 				}
 			case "/op":
