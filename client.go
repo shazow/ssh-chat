@@ -309,6 +309,21 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Server.Broadcast(fmt.Sprintf("* %s was banned by %s", parts[1], c.ColoredName()), nil)
 					}
 				}
+			case "/unban":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 2 {
+					c.SysMsg("Missing $FINGERPRINT from: /unban $FINGERPRINT")
+				} else {
+					fingerprint := parts[1]
+					isBanned := c.Server.IsBanned(fingerprint)
+					if !isBanned {
+						c.SysMsg("No such banned fingerprint: %s", fingerprint)
+					} else {
+						c.Server.Unban(fingerprint)
+						c.Server.Broadcast(fmt.Sprintf("* %s was unbanned by %s", fingerprint, c.ColoredName()), nil)
+					}
+				}
 			case "/op":
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
