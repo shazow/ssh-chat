@@ -324,6 +324,16 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.Server.Broadcast(fmt.Sprintf("* %s was unbanned by %s", fingerprint, c.ColoredName()), nil)
 					}
 				}
+			case "/banned":
+				if !c.Server.IsOp(c) {
+					c.SysMsg("You're not an admin.")
+				} else if len(parts) != 1 {
+					c.SysMsg("Too many arguments for /banned")
+				} else {
+					for fingerprint, _ := range c.Server.bannedPK {
+						c.SysMsg("Banned fingerprint: %s", fingerprint)
+					}
+				}
 			case "/op":
 				if !c.Server.IsOp(c) {
 					c.SysMsg("You're not an admin.")
