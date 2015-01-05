@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/shazow/ssh-chat.svg?branch=master)](https://travis-ci.org/shazow/ssh-chat)
-[![Bountysource](https://www.bountysource.com/badge/team?team_id=52292&style=raised)](https://www.bountysource.com/teams/ssh-chat?utm_source=ssh-chat&utm_medium=shield&utm_campaign=raised)
+[![Bountysource](https://www.bountysource.com/badge/team?team_id=52292&style=bounties_received)](https://www.bountysource.com/teams/ssh-chat/issues?utm_source=ssh-chat&utm_medium=shield&utm_campaign=bounties_received)
 
 # ssh-chat
 
