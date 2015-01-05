@@ -27,7 +27,7 @@ import _ "net/http/pprof"
 type Options struct {
 	Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
 	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:22"`
+	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
 	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
 	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints who are allowed to connect."`
 	Motd      string   `long:"motd" description:"Optional Message of the Day file."`
@@ -105,6 +105,8 @@ func main() {
 		os.Exit(4)
 	}
 	defer s.Close()
+
+	fmt.Printf("Listening for connections on %v\n", options.Bind)
 
 	host := NewHost(s)
 	host.auth = &auth
