@@ -106,7 +106,7 @@ func main() {
 	}
 	defer s.Close()
 
-	fmt.Printf("Listening for connections on %v\n", options.Bind)
+	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
 	host := NewHost(s)
 	host.auth = &auth
