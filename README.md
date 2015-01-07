@@ -19,6 +19,8 @@ The server's RSA key fingerprint is `e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6
 
 ## Compiling / Developing
 
+**If you're going to be diving into the code, please use the [refactor branch](https://github.com/shazow/ssh-chat/tree/refactor) or see [issue #87](https://github.com/shazow/ssh-chat/pull/87).** It's not quite at feature parity yet, but the code is way nicer. The master branch is what's running on chat.shazow.net, but that will change soon.
+
 You can compile ssh-chat by using `make build`. The resulting binary is portable and
 can be run on any system with a similar OS and CPU arch. Go 1.3 or higher is required to compile.
 
