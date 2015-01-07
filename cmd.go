@@ -108,6 +108,7 @@ func main() {
 
 	host := NewHost(s)
 	host.auth = &auth
+	host.theme = &chat.Themes[0]
 
 	for _, fingerprint := range options.Admin {
 		auth.Op(fingerprint)

@@ -2,65 +2,11 @@ package sshd
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
 	"io"
 	"testing"
-
-	"golang.org/x/crypto/ssh"
 )
 
 // TODO: Move some of these into their own package?
-
-func MakeKey(bits int) (ssh.Signer, error) {
-	key, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		return nil, err
-	}
-	return ssh.NewSignerFromKey(key)
-}
-
-func NewClientSession(host string, name string, handler func(r io.Reader, w io.WriteCloser)) error {
-	config := &ssh.ClientConfig{
-		User: name,
-		Auth: []ssh.AuthMethod{
-			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) (answers []string, err error) {
-				return
-			}),
-		},
-	}
-
-	conn, err := ssh.Dial("tcp", host, config)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	session, err := conn.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	in, err := session.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	out, err := session.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	err = session.Shell()
-	if err != nil {
-		return err
-	}
-
-	handler(out, in)
-
-	return nil
-}
 
 func TestServerInit(t *testing.T) {
 	config := MakeNoAuth()
@@ -81,7 +27,7 @@ func TestServerInit(t *testing.T) {
 }
 
 func TestServeTerminals(t *testing.T) {
-	signer, err := MakeKey(512)
+	signer, err := NewRandomKey(512)
 	config := MakeNoAuth()
 	config.AddHostKey(signer)
 

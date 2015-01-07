@@ -16,8 +16,12 @@ type Host struct {
 	channel  *chat.Channel
 	commands *chat.Commands
 
-	motd string
-	auth *Auth
+	motd  string
+	auth  *Auth
+	count int
+
+	// Default theme
+	theme *chat.Theme
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -48,7 +52,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.AutoCompleteCallback = h.AutoCompleteFunction
 
 	user := chat.NewUserScreen(name, term)
-	user.Config.Theme = &chat.Themes[0]
+	user.Config.Theme = h.theme
 	go func() {
 		// Close term once user is closed.
 		user.Wait()
@@ -56,13 +60,20 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}()
 	defer user.Close()
 
-	term.SetPrompt(GetPrompt(user))
-
 	err := h.channel.Join(user)
+	if err == chat.ErrIdTaken {
+		// Try again...
+		user.SetName(fmt.Sprintf("Guest%d", h.count))
+		err = h.channel.Join(user)
+	}
 	if err != nil {
 		logger.Errorf("Failed to join: %s", err)
 		return
 	}
+
+	// Successfully joined.
+	term.SetPrompt(GetPrompt(user))
+	h.count++
 
 	for {
 		line, err := term.ReadLine()
