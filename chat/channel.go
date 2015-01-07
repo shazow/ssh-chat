@@ -85,6 +85,12 @@ func (ch *Channel) HandleMsg(m Message) {
 				// Skip
 				return
 			}
+			if _, ok := m.(*AnnounceMsg); ok {
+				if user.Config.Quiet {
+					// Skip
+					return
+				}
+			}
 			err := user.Send(m)
 			if err != nil {
 				ch.Leave(user)
@@ -168,7 +174,7 @@ func (ch *Channel) NamesPrefix(prefix string) []string {
 	members := ch.members.ListPrefix(prefix)
 	names := make([]string, len(members))
 	for i, u := range members {
-		names[i] = u.(*User).Name()
+		names[i] = u.(*Member).User.Name()
 	}
 	return names
 }

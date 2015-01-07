@@ -7,7 +7,7 @@ package sshd
 	config := MakeNoAuth()
 	config.AddHostKey(signer)
 
-	s, err := ListenSSH("0.0.0.0:22", config)
+	s, err := ListenSSH("0.0.0.0:2022", config)
 	if err != nil {
 		// Handle opening socket error
 	}

@@ -197,6 +197,24 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix: "/quiet",
+		Help:   "Silence announcement-type messages (join, part, rename, etc).",
+		Handler: func(channel *Channel, msg CommandMsg) error {
+			u := msg.From()
+			u.ToggleQuietMode()
+
+			var body string
+			if u.Config.Quiet {
+				body = "Quiet mode is toggled ON"
+			} else {
+				body = "Quiet mode is toggled OFF"
+			}
+			channel.Send(NewSystemMsg(body, u))
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Op:         true,
 		Prefix:     "/op",
 		PrefixHelp: "USER",

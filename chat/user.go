@@ -59,6 +59,11 @@ func (u *User) SetName(name string) {
 	u.SetColorIdx(rand.Int())
 }
 
+// ToggleQuietMode will toggle whether or not quiet mode is enabled
+func (u *User) ToggleQuietMode() {
+	u.Config.Quiet = !u.Config.Quiet
+}
+
 // SetColorIdx will set the colorIdx to a specific value, primarily used for
 // testing.
 func (u *User) SetColorIdx(idx int) {
@@ -122,6 +127,7 @@ func (u *User) Send(m Message) error {
 type UserConfig struct {
 	Highlight bool
 	Bell      bool
+	Quiet     bool
 	Theme     *Theme
 }
 
@@ -132,6 +138,7 @@ func init() {
 	DefaultUserConfig = &UserConfig{
 		Highlight: true,
 		Bell:      false,
+		Quiet:     false,
 	}
 
 	// TODO: Seed random?
