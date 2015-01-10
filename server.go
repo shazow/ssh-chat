@@ -363,6 +363,10 @@ func (s *Server) Uptime() string {
 
 // IsOp checks if the given client is Op
 func (s *Server) IsOp(client *Client) bool {
+	fingerprint := client.Fingerprint()
+	if fingerprint == "" {
+		return false
+	}
 	_, r := s.admins[client.Fingerprint()]
 	return r
 }

@@ -347,8 +347,12 @@ func (c *Client) handleShell(channel ssh.Channel) {
 						c.SysMsg("No such name: %s", parts[1])
 					} else {
 						fingerprint := client.Fingerprint()
-						client.SysMsg("Made op by %s.", c.ColoredName())
-						c.Server.Op(fingerprint)
+						if fingerprint == "" {
+							c.SysMsg("Cannot op user without fingerprint.")
+						} else {
+							client.SysMsg("Made op by %s.", c.ColoredName())
+							c.Server.Op(fingerprint)
+						}
 					}
 				}
 			case "/kick":
