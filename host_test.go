@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"crypto/rsa"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
+	"golang.org/x/crypto/ssh"
 )
 
 func stripPrompt(s string) string {
@@ -39,7 +42,7 @@ func TestHostGetPrompt(t *testing.T) {
 }
 
 func TestHostNameCollision(t *testing.T) {
-	key, err := sshd.NewRandomKey(512)
+	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +53,7 @@ func TestHostNameCollision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer s.Close()
 	host := NewHost(s)
 	go host.Serve()
 
@@ -110,5 +114,44 @@ func TestHostNameCollision(t *testing.T) {
 	}
 
 	<-done
-	s.Close()
+}
+
+func TestHostWhitelist(t *testing.T) {
+	key, err := sshd.NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auth := NewAuth()
+	config := sshd.MakeAuth(auth)
+	config.AddHostKey(key)
+
+	s, err := sshd.ListenSSH(":0", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	host := NewHost(s)
+	host.auth = auth
+	go host.Serve()
+
+	target := s.Addr().String()
+
+	err = sshd.NewClientSession(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	if err != nil {
+		t.Error(err)
+	}
+
+	clientkey, err := rsa.GenerateKey(rand.Reader, 512)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
+	auth.Whitelist(clientpubkey)
+
+	err = sshd.NewClientSession(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	if err == nil {
+		t.Error("Failed to block unwhitelisted connection.")
+	}
 }

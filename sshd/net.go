@@ -29,6 +29,7 @@ func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
 		return nil, err
 	}
 
+	// FIXME: Disconnect if too many faulty requests? (Avoid DoS.)
 	go ssh.DiscardRequests(requests)
 	return NewSession(sshConn, channels)
 }

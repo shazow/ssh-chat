@@ -2,8 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +14,6 @@ import (
 	"github.com/alexcesaro/log/golog"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
@@ -25,13 +22,13 @@ import _ "net/http/pprof"
 
 // Options contains the flag options
 type Options struct {
-	Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
-	Identity  string   `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind      string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
-	Admin     []string `long:"admin" description:"Fingerprint of pubkey to mark as admin."`
-	Whitelist string   `long:"whitelist" description:"Optional file of pubkey fingerprints who are allowed to connect."`
-	Motd      string   `long:"motd" description:"Optional Message of the Day file."`
-	Pprof     int      `long:"pprof" description:"Enable pprof http server for profiling."`
+	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose logging."`
+	Identity  string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Bind      string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
+	Admin     string `long:"admin" description:"File of public keys who are admins."`
+	Whitelist string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
+	Motd      string `long:"motd" description:"Optional Message of the Day file."`
+	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
 }
 
 var logLevels = []log.Level{
@@ -83,7 +80,7 @@ func main() {
 		}
 	}
 
-	privateKey, err := readPrivateKey(privateKeyPath)
+	privateKey, err := ReadPrivateKey(privateKeyPath)
 	if err != nil {
 		logger.Errorf("Couldn't read private key: %v", err)
 		os.Exit(2)
@@ -109,25 +106,35 @@ func main() {
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
 	host := NewHost(s)
-	host.auth = &auth
+	host.auth = auth
 	host.theme = &chat.Themes[0]
 
-	for _, fingerprint := range options.Admin {
-		auth.Op(fingerprint)
+	err = fromFile(options.Admin, func(line []byte) error {
+		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
+		if err != nil {
+			return err
+		}
+		auth.Op(key)
+		logger.Debugf("Added admin: %s", line)
+		return nil
+	})
+	if err != nil {
+		logger.Errorf("Failed to load admins: %v", err)
+		os.Exit(5)
 	}
 
-	if options.Whitelist != "" {
-		file, err := os.Open(options.Whitelist)
+	err = fromFile(options.Whitelist, func(line []byte) error {
+		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
 		if err != nil {
-			logger.Errorf("Could not open whitelist file")
-			return
+			return err
 		}
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			auth.Whitelist(scanner.Text())
-		}
+		auth.Whitelist(key)
+		logger.Debugf("Whitelisted: %s", line)
+		return nil
+	})
+	if err != nil {
+		logger.Errorf("Failed to load whitelist: %v", err)
+		os.Exit(5)
 	}
 
 	if options.Motd != "" {
@@ -154,42 +161,24 @@ func main() {
 	os.Exit(0)
 }
 
-// readPrivateKey attempts to read your private key and possibly decrypt it if it
-// requires a passphrase.
-// This function will prompt for a passphrase on STDIN if the environment variable (`IDENTITY_PASSPHRASE`),
-// is not set.
-func readPrivateKey(privateKeyPath string) ([]byte, error) {
-	privateKey, err := ioutil.ReadFile(privateKeyPath)
+func fromFile(path string, handler func(line []byte) error) error {
+	if path == "" {
+		// Skip
+		return nil
+	}
+
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load identity: %v", err)
+		return err
 	}
+	defer file.Close()
 
-	block, rest := pem.Decode(privateKey)
-	if len(rest) > 0 {
-		return nil, fmt.Errorf("extra data when decoding private key")
-	}
-	if !x509.IsEncryptedPEMBlock(block) {
-		return privateKey, nil
-	}
-
-	passphrase := []byte(os.Getenv("IDENTITY_PASSPHRASE"))
-	if len(passphrase) == 0 {
-		fmt.Printf("Enter passphrase: ")
-		passphrase, err = terminal.ReadPassword(int(os.Stdin.Fd()))
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		err := handler(scanner.Bytes())
 		if err != nil {
-			return nil, fmt.Errorf("couldn't read passphrase: %v", err)
+			return err
 		}
-		fmt.Println()
 	}
-	der, err := x509.DecryptPEMBlock(block, passphrase)
-	if err != nil {
-		return nil, fmt.Errorf("decrypt failed: %v", err)
-	}
-
-	privateKey = pem.EncodeToMemory(&pem.Block{
-		Type:  block.Type,
-		Bytes: der,
-	})
-
-	return privateKey, nil
+	return nil
 }

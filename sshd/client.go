@@ -8,8 +8,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// NewRandomKey generates a random key of a desired bit length.
-func NewRandomKey(bits int) (ssh.Signer, error) {
+// NewRandomSigner generates a random key of a desired bit length.
+func NewRandomSigner(bits int) (ssh.Signer, error) {
 	key, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
 		return nil, err

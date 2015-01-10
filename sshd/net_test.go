@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TODO: Move some of these into their own package?
-
 func TestServerInit(t *testing.T) {
 	config := MakeNoAuth()
 	s, err := ListenSSH(":badport", config)
@@ -27,7 +25,7 @@ func TestServerInit(t *testing.T) {
 }
 
 func TestServeTerminals(t *testing.T) {
-	signer, err := NewRandomKey(512)
+	signer, err := NewRandomSigner(512)
 	config := MakeNoAuth()
 	config.AddHostKey(signer)
 
