@@ -8,10 +8,43 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+// Connection is an interface with fields necessary to operate an sshd host.
+type Connection interface {
+	PublicKey() (ssh.PublicKey, bool)
+	Name() string
+	Close() error
+}
+
+type sshConn struct {
+	*ssh.ServerConn
+}
+
+func (c sshConn) PublicKey() (ssh.PublicKey, bool) {
+	if c.Permissions == nil {
+		return nil, false
+	}
+
+	s, ok := c.Permissions.Extensions["pubkey"]
+	if !ok {
+		return nil, false
+	}
+
+	key, err := ssh.ParsePublicKey([]byte(s))
+	if err != nil {
+		return nil, false
+	}
+
+	return key, true
+}
+
+func (c sshConn) Name() string {
+	return c.User()
+}
+
 // Extending ssh/terminal to include a closer interface
 type Terminal struct {
 	terminal.Terminal
-	Conn    *ssh.ServerConn
+	Conn    Connection
 	Channel ssh.Channel
 }
 
@@ -26,7 +59,7 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 	}
 	term := Terminal{
 		*terminal.NewTerminal(channel, "Connecting..."),
-		conn,
+		sshConn{conn},
 		channel,
 	}
 

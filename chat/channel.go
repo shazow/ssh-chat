@@ -114,17 +114,18 @@ func (ch *Channel) Send(m Message) {
 }
 
 // Join the channel as a user, will announce.
-func (ch *Channel) Join(u *User) error {
+func (ch *Channel) Join(u *User) (*Member, error) {
 	if ch.closed {
-		return ErrChannelClosed
+		return nil, ErrChannelClosed
 	}
-	err := ch.members.Add(&Member{u, false})
+	member := Member{u, false}
+	err := ch.members.Add(&member)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), ch.members.Len())
 	ch.Send(NewAnnounceMsg(s))
-	return nil
+	return &member, nil
 }
 
 // Leave the channel as a user, will announce. Mostly used during setup.

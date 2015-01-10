@@ -81,12 +81,30 @@ func (a *Auth) Op(key ssh.PublicKey) {
 	a.Unlock()
 }
 
-// Whitelist will set a fingerprint as a whitelisted user.
+// IsOp checks if a public key is an op.
+func (a Auth) IsOp(key ssh.PublicKey) bool {
+	authkey := NewAuthKey(key)
+	a.RLock()
+	_, ok := a.ops[authkey]
+	a.RUnlock()
+	return ok
+}
+
+// Whitelist will set a public key as a whitelisted user.
 func (a *Auth) Whitelist(key ssh.PublicKey) {
 	authkey := NewAuthKey(key)
 	a.Lock()
 	a.whitelist[authkey] = struct{}{}
 	a.Unlock()
+}
+
+// IsWhitelisted checks if a public key is whitelisted.
+func (a Auth) IsWhitelisted(key ssh.PublicKey) bool {
+	authkey := NewAuthKey(key)
+	a.RLock()
+	_, ok := a.whitelist[authkey]
+	a.RUnlock()
+	return ok
 }
 
 // Ban will set a fingerprint as banned.
@@ -95,4 +113,13 @@ func (a *Auth) Ban(key ssh.PublicKey) {
 	a.Lock()
 	a.banned[authkey] = struct{}{}
 	a.Unlock()
+}
+
+// IsBanned will set a fingerprint as banned.
+func (a Auth) IsBanned(key ssh.PublicKey) bool {
+	authkey := NewAuthKey(key)
+	a.RLock()
+	_, ok := a.whitelist[authkey]
+	a.RUnlock()
+	return ok
 }

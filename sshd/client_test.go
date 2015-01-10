@@ -19,7 +19,8 @@ func (a RejectAuth) Check(ssh.PublicKey) (bool, error) {
 }
 
 func consume(ch <-chan *Terminal) {
-	for range ch {}
+	for _ = range ch {
+	}
 }
 
 func TestClientReject(t *testing.T) {

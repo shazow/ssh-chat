@@ -46,9 +46,17 @@ func (h *Host) SetMotd(motd string) {
 	h.motd = motd
 }
 
+func (h Host) isOp(conn sshd.Connection) bool {
+	key, ok := conn.PublicKey()
+	if !ok {
+		return false
+	}
+	return h.auth.IsOp(key)
+}
+
 // Connect a specific Terminal to this host and its channel.
 func (h *Host) Connect(term *sshd.Terminal) {
-	name := term.Conn.User()
+	name := term.Conn.Name()
 	term.AutoCompleteCallback = h.AutoCompleteFunction
 
 	user := chat.NewUserScreen(name, term)
@@ -60,11 +68,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}()
 	defer user.Close()
 
-	err := h.channel.Join(user)
+	member, err := h.channel.Join(user)
 	if err == chat.ErrIdTaken {
 		// Try again...
 		user.SetName(fmt.Sprintf("Guest%d", h.count))
-		err = h.channel.Join(user)
+		member, err = h.channel.Join(user)
 	}
 	if err != nil {
 		logger.Errorf("Failed to join: %s", err)
@@ -74,6 +82,9 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	// Successfully joined.
 	term.SetPrompt(GetPrompt(user))
 	h.count++
+
+	// Should the user be op'd?
+	member.Op = h.isOp(term.Conn)
 
 	for {
 		line, err := term.ReadLine()

@@ -28,7 +28,7 @@ func TestChannelJoin(t *testing.T) {
 	go ch.Serve()
 	defer ch.Close()
 
-	err := ch.Join(u)
+	_, err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestChannelDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 	ch := NewChannel()
 	defer ch.Close()
 
-	err := ch.Join(u)
+	_, err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestChannelQuietToggleBroadcasts(t *testing.T) {
 	ch := NewChannel()
 	defer ch.Close()
 
-	err := ch.Join(u)
+	_, err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	go ch.Serve()
 	defer ch.Close()
 
-	err := ch.Join(u)
+	_, err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestChannelNames(t *testing.T) {
 	go ch.Serve()
 	defer ch.Close()
 
-	err := ch.Join(u)
+	_, err := ch.Join(u)
 	if err != nil {
 		t.Fatal(err)
 	}

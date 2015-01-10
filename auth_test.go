@@ -35,16 +35,16 @@ func TestAuthWhitelist(t *testing.T) {
 
 	auth.Whitelist(key)
 
-	key_clone, err := ClonePublicKey(key)
+	keyClone, err := ClonePublicKey(key)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if string(key_clone.Marshal()) != string(key.Marshal()) {
+	if string(keyClone.Marshal()) != string(key.Marshal()) {
 		t.Error("Clone key does not match.")
 	}
 
-	ok, err = auth.Check(key_clone)
+	ok, err = auth.Check(keyClone)
 	if !ok || err != nil {
 		t.Error("Failed to permit whitelisted:", err)
 	}
