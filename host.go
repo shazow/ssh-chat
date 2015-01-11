@@ -170,6 +170,7 @@ func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine str
 	return
 }
 
+// GetUser returns a chat.User based on a name.
 func (h *Host) GetUser(name string) (*chat.User, bool) {
 	m, ok := h.channel.MemberById(chat.Id(name))
 	if !ok {

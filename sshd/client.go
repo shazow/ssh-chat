@@ -29,8 +29,8 @@ func NewClientConfig(name string) *ssh.ClientConfig {
 	}
 }
 
-// NewClientSession makes a barebones SSH client session, used for testing.
-func NewClientSession(host string, name string, handler func(r io.Reader, w io.WriteCloser)) error {
+// ConnectShell makes a barebones SSH client session, used for testing.
+func ConnectShell(host string, name string, handler func(r io.Reader, w io.WriteCloser)) error {
 	config := NewClientConfig(name)
 	conn, err := ssh.Dial("tcp", host, config)
 	if err != nil {
@@ -53,6 +53,13 @@ func NewClientSession(host string, name string, handler func(r io.Reader, w io.W
 	if err != nil {
 		return err
 	}
+
+	/* FIXME: Do we want to request a PTY?
+	err = session.RequestPty("xterm", 80, 40, ssh.TerminalModes{})
+	if err != nil {
+		return err
+	}
+	*/
 
 	err = session.Shell()
 	if err != nil {

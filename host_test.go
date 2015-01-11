@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"io"
+	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
@@ -61,7 +63,7 @@ func TestHostNameCollision(t *testing.T) {
 
 	// First client
 	go func() {
-		err = sshd.NewClientSession(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
+		err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -99,7 +101,7 @@ func TestHostNameCollision(t *testing.T) {
 	<-done
 
 	// Second client
-	err = sshd.NewClientSession(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
+	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
 		scanner := bufio.NewScanner(r)
 
 		// Consume the initial buffer
@@ -137,7 +139,7 @@ func TestHostWhitelist(t *testing.T) {
 
 	target := s.Addr().String()
 
-	err = sshd.NewClientSession(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) {})
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,8 +152,67 @@ func TestHostWhitelist(t *testing.T) {
 	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
 	auth.Whitelist(clientpubkey)
 
-	err = sshd.NewClientSession(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) {})
 	if err == nil {
 		t.Error("Failed to block unwhitelisted connection.")
+	}
+}
+
+func TestHostKick(t *testing.T) {
+	key, err := sshd.NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auth := NewAuth()
+	config := sshd.MakeAuth(auth)
+	config.AddHostKey(key)
+
+	s, err := sshd.ListenSSH(":0", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	addr := s.Addr().String()
+	host := NewHost(s)
+	go host.Serve()
+
+	connected := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		// First client
+		err = sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) {
+			// Make op
+			member, _ := host.channel.MemberById("foo")
+			member.Op = true
+
+			// Block until second client is here
+			connected <- struct{}{}
+			w.Write([]byte("/kick bar\r\n"))
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	go func() {
+		// Second client
+		err = sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) {
+			<-connected
+
+			// Consume while we're connected. Should break when kicked.
+			ioutil.ReadAll(r)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second * 1):
+		t.Fatal("Timeout.")
 	}
 }

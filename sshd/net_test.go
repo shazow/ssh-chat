@@ -56,7 +56,7 @@ func TestServeTerminals(t *testing.T) {
 	host := s.Addr().String()
 	name := "foo"
 
-	err = NewClientSession(host, name, func(r io.Reader, w io.WriteCloser) {
+	err = ConnectShell(host, name, func(r io.Reader, w io.WriteCloser) {
 		// Consume if there is anything
 		buf := new(bytes.Buffer)
 		w.Write([]byte("hello\r\n"))
@@ -70,7 +70,7 @@ func TestServeTerminals(t *testing.T) {
 		expected := "> hello\r\necho: hello\r\n"
 		actual := buf.String()
 		if actual != expected {
-			t.Errorf("Got `%s`; expected `%s`", actual, expected)
+			t.Errorf("Got %q; expected %q", actual, expected)
 		}
 		s.Close()
 	})
