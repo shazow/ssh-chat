@@ -86,7 +86,7 @@ func (c Commands) Help(showOp bool) string {
 	}
 	help := "Available commands:" + Newline + NewCommandsHelp(normal).String()
 	if showOp {
-		help += Newline + "Operator commands:" + Newline + NewCommandsHelp(op).String()
+		help += Newline + "-> Operator commands:" + Newline + NewCommandsHelp(op).String()
 	}
 	return help
 }
@@ -231,12 +231,12 @@ func InitCommands(c *Commands) {
 
 			// TODO: Add support for fingerprint-based op'ing. This will
 			// probably need to live in host land.
-			member, err := channel.members.Get(Id(args[0]))
-			if err != nil {
+			member, ok := channel.MemberById(Id(args[0]))
+			if !ok {
 				return errors.New("user not found")
 			}
 
-			member.(*Member).Op = true
+			member.Op = true
 			return nil
 		},
 	})

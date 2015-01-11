@@ -142,12 +142,20 @@ func (ch *Channel) Leave(u *User) error {
 // Member returns a corresponding Member object to a User if the Member is
 // present in this channel.
 func (ch *Channel) Member(u *User) (*Member, bool) {
-	m, err := ch.members.Get(u.Id())
-	if err != nil {
+	m, ok := ch.MemberById(u.Id())
+	if !ok {
 		return nil, false
 	}
 	// Check that it's the same user
-	if m.(*Member).User != u {
+	if m.User != u {
+		return nil, false
+	}
+	return m, true
+}
+
+func (ch *Channel) MemberById(id Id) (*Member, bool) {
+	m, err := ch.members.Get(id)
+	if err != nil {
 		return nil, false
 	}
 	return m.(*Member), true

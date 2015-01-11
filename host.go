@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -8,6 +9,15 @@ import (
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
 )
+
+// GetPrompt will render the terminal prompt string based on the user.
+func GetPrompt(user *chat.User) string {
+	name := user.Name()
+	if user.Config.Theme != nil {
+		name = user.Config.Theme.ColorName(user)
+	}
+	return fmt.Sprintf("[%s] ", name)
+}
 
 // Host is the bridge between sshd and chat modules
 // TODO: Should be easy to add support for multiple channels, if we want.
@@ -35,6 +45,7 @@ func NewHost(listener *sshd.SSHListener) *Host {
 	// Make our own commands registry instance.
 	commands := chat.Commands{}
 	chat.InitCommands(&commands)
+	h.InitCommands(&commands)
 	ch.SetCommands(commands)
 
 	go ch.Serve()
@@ -159,11 +170,58 @@ func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine str
 	return
 }
 
-// GetPrompt will render the terminal prompt string based on the user.
-func GetPrompt(user *chat.User) string {
-	name := user.Name()
-	if user.Config.Theme != nil {
-		name = user.Config.Theme.ColorName(user)
-	}
-	return fmt.Sprintf("[%s] ", name)
+// InitCommands adds host-specific commands to a Commands container. These will
+// override any existing commands.
+func (h *Host) InitCommands(c *chat.Commands) {
+	c.Add(chat.Command{
+		Prefix:     "/msg",
+		PrefixHelp: "USER MESSAGE",
+		Help:       "Send MESSAGE to USER.",
+		Handler: func(channel *chat.Channel, msg chat.CommandMsg) error {
+			args := msg.Args()
+			switch len(args) {
+			case 0:
+				return errors.New("must specify user")
+			case 1:
+				return errors.New("must specify message")
+			}
+
+			member, ok := channel.MemberById(chat.Id(args[0]))
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			m := chat.NewPrivateMsg(strings.Join(args[2:], " "), msg.From(), member.User)
+			channel.Send(m)
+			return nil
+		},
+	})
+
+	// Op commands
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/kick",
+		PrefixHelp: "USER",
+		Help:       "Kick USER from the server.",
+		Handler: func(channel *chat.Channel, msg chat.CommandMsg) error {
+			if !channel.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			member, ok := channel.MemberById(chat.Id(args[0]))
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			body := fmt.Sprintf("%s was kicked by %s.", member.Name(), msg.From().Name())
+			channel.Send(chat.NewAnnounceMsg(body))
+			member.User.Close()
+			return nil
+		},
+	})
 }

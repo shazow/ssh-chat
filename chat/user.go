@@ -20,6 +20,7 @@ type User struct {
 	joined    time.Time
 	msg       chan Message
 	done      chan struct{}
+	replyTo   *User // Set when user gets a /msg, for replying.
 	closed    bool
 	closeOnce sync.Once
 }
