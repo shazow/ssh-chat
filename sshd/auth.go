@@ -27,7 +27,7 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 				return nil, err
 			}
 			perm := &ssh.Permissions{Extensions: map[string]string{
-				"pubkey": string(ssh.MarshalAuthorizedKey(key)),
+				"pubkey": string(key.Marshal()),
 			}}
 			return perm, nil
 		},
@@ -50,7 +50,7 @@ func MakeNoAuth() *ssh.ServerConfig {
 		// Auth-related things should be constant-time to avoid timing attacks.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			perm := &ssh.Permissions{Extensions: map[string]string{
-				"pubkey": string(ssh.MarshalAuthorizedKey(key)),
+				"pubkey": string(key.Marshal()),
 			}}
 			return perm, nil
 		},
