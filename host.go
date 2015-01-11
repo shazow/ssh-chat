@@ -94,7 +94,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.SetPrompt(GetPrompt(user))
 	h.count++
 
-	// Should the user be op'd?
+	// Should the user be op'd on join?
 	member.Op = h.isOp(term.Conn)
 
 	for {
@@ -191,7 +191,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			m := chat.NewPrivateMsg(strings.Join(args[2:], " "), msg.From(), member.User)
+			m := chat.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), member.User)
 			channel.Send(m)
 			return nil
 		},
@@ -220,7 +220,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			body := fmt.Sprintf("%s was kicked by %s.", member.Name(), msg.From().Name())
 			channel.Send(chat.NewAnnounceMsg(body))
-			member.User.Close()
+			member.Close()
 			return nil
 		},
 	})
