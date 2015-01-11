@@ -93,7 +93,6 @@ func (ch *Channel) HandleMsg(m Message) {
 			}
 			err := user.Send(m)
 			if err != nil {
-				ch.Leave(user)
 				user.Close()
 			}
 		})
