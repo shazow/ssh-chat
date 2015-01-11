@@ -170,6 +170,14 @@ func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine str
 	return
 }
 
+func (h *Host) GetUser(name string) (*chat.User, bool) {
+	m, ok := h.channel.MemberById(chat.Id(name))
+	if !ok {
+		return nil, false
+	}
+	return m.User, true
+}
+
 // InitCommands adds host-specific commands to a Commands container. These will
 // override any existing commands.
 func (h *Host) InitCommands(c *chat.Commands) {
@@ -186,12 +194,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify message")
 			}
 
-			member, ok := channel.MemberById(chat.Id(args[0]))
+			target, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
 
-			m := chat.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), member.User)
+			m := chat.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
 			channel.Send(m)
 			return nil
 		},
@@ -213,14 +221,45 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify user")
 			}
 
-			member, ok := channel.MemberById(chat.Id(args[0]))
+			target, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
 
-			body := fmt.Sprintf("%s was kicked by %s.", member.Name(), msg.From().Name())
+			body := fmt.Sprintf("%s was kicked by %s.", target.Name(), msg.From().Name())
 			channel.Send(chat.NewAnnounceMsg(body))
-			member.Close()
+			target.Close()
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/ban",
+		PrefixHelp: "USER",
+		Help:       "Ban USER from the server.",
+		Handler: func(channel *chat.Channel, msg chat.CommandMsg) error {
+			// TODO: This only bans their pubkey if they have one. Would be
+			// nice to IP-ban too while we're at it.
+			if !channel.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			target, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			// XXX: Figure out how to link a public key to a target.
+			//h.auth.Ban(target.Conn.PublicKey())
+			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
+			channel.Send(chat.NewAnnounceMsg(body))
+			target.Close()
 			return nil
 		},
 	})
