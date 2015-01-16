@@ -11,7 +11,8 @@ import (
 // Container for the connection and ssh-related configuration
 type SSHListener struct {
 	net.Listener
-	config *ssh.ServerConfig
+	config    *ssh.ServerConfig
+	RateLimit bool
 }
 
 // Make an SSH listener socket
@@ -20,13 +21,17 @@ func ListenSSH(laddr string, config *ssh.ServerConfig) (*SSHListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	l := SSHListener{socket, config}
+	l := SSHListener{Listener: socket, config: config}
 	return &l, nil
 }
 
 func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
+	if l.RateLimit {
+		// TODO: Configurable Limiter?
+		conn = ReadLimitConn(conn, rateio.NewGracefulLimiter(1000, time.Minute*2, time.Second*3))
+	}
+
 	// Upgrade TCP connection to SSH connection
-	conn = ReadLimitConn(conn, rateio.NewGracefulLimiter(1000, time.Minute*2, time.Second*3))
 	sshConn, channels, requests, err := ssh.NewServerConn(conn, l.config)
 	if err != nil {
 		return nil, err

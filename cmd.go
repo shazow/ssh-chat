@@ -102,6 +102,7 @@ func main() {
 		os.Exit(4)
 	}
 	defer s.Close()
+	s.RateLimit = true
 
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
