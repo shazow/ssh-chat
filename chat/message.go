@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -99,6 +100,15 @@ func (m *PublicMsg) Render(t *Theme) string {
 	}
 
 	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
+}
+
+func (m *PublicMsg) RenderHighlighted(t *Theme, highlight *regexp.Regexp) string {
+	if highlight == nil || t == nil {
+		return m.Render(t)
+	}
+
+	body := highlight.ReplaceAllString(m.body, t.Highlight("${1}"))
+	return fmt.Sprintf("%s: %s", t.ColorName(m.from), body)
 }
 
 func (m *PublicMsg) String() string {
@@ -212,7 +222,7 @@ type CommandMsg struct {
 	*PublicMsg
 	command string
 	args    []string
-	room *Room
+	room    *Room
 }
 
 func (m *CommandMsg) Command() string {

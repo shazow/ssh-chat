@@ -92,6 +92,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Successfully joined.
 	term.SetPrompt(GetPrompt(user))
+	user.SetHighlight(user.Name())
 	h.count++
 
 	// Should the user be op'd on join?
@@ -119,6 +120,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			// FIXME: This is hacky, how do we improve the API to allow for
 			// this? Chat module shouldn't know about terminals.
 			term.SetPrompt(GetPrompt(user))
+			user.SetHighlight(user.Name())
 		}
 	}
 

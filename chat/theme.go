@@ -28,10 +28,22 @@ const (
 	Newline = "\r\n"
 )
 
-// Interface for Colors
-type Color interface {
+// Interface for Styles
+type Style interface {
 	String() string
 	Format(string) string
+}
+
+// General hardcoded style, mostly used as a crutch until we flesh out the
+// framework to support backgrounds etc.
+type style string
+
+func (c style) String() string {
+	return string(c)
+}
+
+func (c style) Format(s string) string {
+	return c.String() + s + Reset
 }
 
 // 256 color type, for terminals who support it
@@ -62,12 +74,12 @@ func (c Color0) Format(s string) string {
 
 // Container for a collection of colors
 type Palette struct {
-	colors []Color
+	colors []Style
 	size   int
 }
 
 // Get a color by index, overflows are looped around.
-func (p Palette) Get(i int) Color {
+func (p Palette) Get(i int) Style {
 	return p.colors[i%(p.size-1)]
 }
 
@@ -85,10 +97,11 @@ func (p Palette) String() string {
 
 // Collection of settings for chat
 type Theme struct {
-	id    string
-	sys   Color
-	pm    Color
-	names *Palette
+	id        string
+	sys       Style
+	pm        Style
+	highlight Style
+	names     *Palette
 }
 
 func (t Theme) Id() string {
@@ -122,6 +135,14 @@ func (t Theme) ColorSys(s string) string {
 	return t.sys.Format(s)
 }
 
+// Highlight a matched string, usually name
+func (t Theme) Highlight(s string) string {
+	if t.highlight == nil {
+		return s
+	}
+	return t.highlight.Format(s)
+}
+
 // List of initialzied themes
 var Themes []Theme
 
@@ -131,7 +152,7 @@ var DefaultTheme *Theme
 func readableColors256() *Palette {
 	size := 247
 	p := Palette{
-		colors: make([]Color, size),
+		colors: make([]Style, size),
 		size:   size,
 	}
 	j := 0
@@ -151,10 +172,11 @@ func init() {
 
 	Themes = []Theme{
 		Theme{
-			id:    "colors",
-			names: palette,
-			sys:   palette.Get(8), // Grey
-			pm:    palette.Get(7), // White
+			id:        "colors",
+			names:     palette,
+			sys:       palette.Get(8),                             // Grey
+			pm:        palette.Get(7),                             // White
+			highlight: style(Bold + "\033[48;5;11m\033[38;5;16m"), // Yellow highlight
 		},
 		Theme{
 			id: "mono",

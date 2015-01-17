@@ -2,13 +2,16 @@ package chat
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
+	"regexp"
 	"sync"
 	"time"
 )
 
 const messageBuffer = 20
+const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
 
@@ -100,9 +103,28 @@ func (u *User) ConsumeOne(out io.Writer) {
 	u.HandleMsg(<-u.msg, out)
 }
 
+// SetHighlight sets the highlighting regular expression to match string.
+func (u *User) SetHighlight(s string) error {
+	re, err := regexp.Compile(fmt.Sprintf(reHighlight, s))
+	if err != nil {
+		return err
+	}
+	u.Config.Highlight = re
+	return nil
+}
+
+func (u User) render(m Message) string {
+	switch m := m.(type) {
+	case *PublicMsg:
+		return m.RenderHighlighted(u.Config.Theme, u.Config.Highlight) + Newline
+	default:
+		return m.Render(u.Config.Theme) + Newline
+	}
+}
+
 func (u *User) HandleMsg(m Message, out io.Writer) {
-	s := m.Render(u.Config.Theme)
-	_, err := out.Write([]byte(s + Newline))
+	r := u.render(m)
+	_, err := out.Write([]byte(r))
 	if err != nil {
 		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
 		u.Close()
@@ -127,7 +149,7 @@ func (u *User) Send(m Message) error {
 
 // Container for per-user configurations.
 type UserConfig struct {
-	Highlight bool
+	Highlight *regexp.Regexp
 	Bell      bool
 	Quiet     bool
 	Theme     *Theme
@@ -138,9 +160,8 @@ var DefaultUserConfig *UserConfig
 
 func init() {
 	DefaultUserConfig = &UserConfig{
-		Highlight: true,
-		Bell:      false,
-		Quiet:     false,
+		Bell:  true,
+		Quiet: false,
 	}
 
 	// TODO: Seed random?
