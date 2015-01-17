@@ -98,10 +98,10 @@ func (t Theme) Id() string {
 // Colorize name string given some index
 func (t Theme) ColorName(u *User) string {
 	if t.names == nil {
-		return u.name
+		return u.Name()
 	}
 
-	return t.names.Get(u.colorIdx).Format(u.name)
+	return t.names.Get(u.colorIdx).Format(u.Name())
 }
 
 // Colorize the PM string

@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
+	"net"
 	"sync"
 
-	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -17,27 +17,38 @@ var ErrBanned = errors.New("banned")
 // AuthKey is the type that our lookups are keyed against.
 type AuthKey string
 
-// NewAuthKey returns an AuthKey from an ssh.PublicKey.
-func NewAuthKey(key ssh.PublicKey) AuthKey {
+// NewAuthKey returns string from an ssh.PublicKey.
+func NewAuthKey(key ssh.PublicKey) string {
+	if key == nil {
+		return ""
+	}
 	// FIXME: Is there a way to index pubkeys without marshal'ing them into strings?
-	return AuthKey(string(key.Marshal()))
+	return string(key.Marshal())
+}
+
+// NewAuthAddr returns a string from a net.Addr
+func NewAuthAddr(addr net.Addr) string {
+	host, _, _ := net.SplitHostPort(addr.String())
+	return host
 }
 
 // Auth stores fingerprint lookups
+// TODO: Add timed auth by using a time.Time instead of struct{} for values.
 type Auth struct {
-	sshd.Auth
 	sync.RWMutex
-	whitelist map[AuthKey]struct{}
-	banned    map[AuthKey]struct{}
-	ops       map[AuthKey]struct{}
+	bannedAddr map[string]struct{}
+	banned     map[string]struct{}
+	whitelist  map[string]struct{}
+	ops        map[string]struct{}
 }
 
 // NewAuth creates a new default Auth.
 func NewAuth() *Auth {
 	return &Auth{
-		whitelist: make(map[AuthKey]struct{}),
-		banned:    make(map[AuthKey]struct{}),
-		ops:       make(map[AuthKey]struct{}),
+		bannedAddr: make(map[string]struct{}),
+		banned:     make(map[string]struct{}),
+		whitelist:  make(map[string]struct{}),
+		ops:        make(map[string]struct{}),
 	}
 }
 
@@ -50,7 +61,7 @@ func (a Auth) AllowAnonymous() bool {
 }
 
 // Check determines if a pubkey fingerprint is permitted.
-func (a Auth) Check(key ssh.PublicKey) (bool, error) {
+func (a Auth) Check(addr net.Addr, key ssh.PublicKey) (bool, error) {
 	authkey := NewAuthKey(key)
 
 	a.RLock()
@@ -63,9 +74,13 @@ func (a Auth) Check(key ssh.PublicKey) (bool, error) {
 		if !whitelisted {
 			return false, ErrNotWhitelisted
 		}
+		return true, nil
 	}
 
 	_, banned := a.banned[authkey]
+	if !banned {
+		_, banned = a.bannedAddr[NewAuthAddr(addr)]
+	}
 	if banned {
 		return false, ErrBanned
 	}
@@ -75,6 +90,10 @@ func (a Auth) Check(key ssh.PublicKey) (bool, error) {
 
 // Op will set a fingerprint as a known operator.
 func (a *Auth) Op(key ssh.PublicKey) {
+	if key == nil {
+		// Don't process empty keys.
+		return
+	}
 	authkey := NewAuthKey(key)
 	a.Lock()
 	a.ops[authkey] = struct{}{}
@@ -83,6 +102,9 @@ func (a *Auth) Op(key ssh.PublicKey) {
 
 // IsOp checks if a public key is an op.
 func (a Auth) IsOp(key ssh.PublicKey) bool {
+	if key == nil {
+		return false
+	}
 	authkey := NewAuthKey(key)
 	a.RLock()
 	_, ok := a.ops[authkey]
@@ -92,34 +114,34 @@ func (a Auth) IsOp(key ssh.PublicKey) bool {
 
 // Whitelist will set a public key as a whitelisted user.
 func (a *Auth) Whitelist(key ssh.PublicKey) {
+	if key == nil {
+		// Don't process empty keys.
+		return
+	}
 	authkey := NewAuthKey(key)
 	a.Lock()
 	a.whitelist[authkey] = struct{}{}
 	a.Unlock()
 }
 
-// IsWhitelisted checks if a public key is whitelisted.
-func (a Auth) IsWhitelisted(key ssh.PublicKey) bool {
-	authkey := NewAuthKey(key)
-	a.RLock()
-	_, ok := a.whitelist[authkey]
-	a.RUnlock()
-	return ok
-}
-
-// Ban will set a fingerprint as banned.
+// Ban will set a public key as banned.
 func (a *Auth) Ban(key ssh.PublicKey) {
+	if key == nil {
+		// Don't process empty keys.
+		return
+	}
 	authkey := NewAuthKey(key)
+
 	a.Lock()
 	a.banned[authkey] = struct{}{}
 	a.Unlock()
 }
 
-// IsBanned will set a fingerprint as banned.
-func (a Auth) IsBanned(key ssh.PublicKey) bool {
-	authkey := NewAuthKey(key)
-	a.RLock()
-	_, ok := a.whitelist[authkey]
-	a.RUnlock()
-	return ok
+// Ban will set an IP address as banned.
+func (a *Auth) BanAddr(addr net.Addr) {
+	key := NewAuthAddr(addr)
+
+	a.Lock()
+	a.bannedAddr[key] = struct{}{}
+	a.Unlock()
 }

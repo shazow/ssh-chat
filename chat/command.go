@@ -29,7 +29,7 @@ type Command struct {
 	PrefixHelp string
 	// If omitted, command is hidden from /help
 	Help    string
-	Handler func(*Channel, CommandMsg) error
+	Handler func(*Room, CommandMsg) error
 	// Command requires Op permissions
 	Op bool
 }
@@ -59,7 +59,7 @@ func (c Commands) Alias(command string, alias string) error {
 }
 
 // Run executes a command message.
-func (c Commands) Run(channel *Channel, msg CommandMsg) error {
+func (c Commands) Run(room *Room, msg CommandMsg) error {
 	if msg.From == nil {
 		return ErrNoOwner
 	}
@@ -69,7 +69,7 @@ func (c Commands) Run(channel *Channel, msg CommandMsg) error {
 		return ErrInvalidCommand
 	}
 
-	return cmd.Handler(channel, msg)
+	return cmd.Handler(room, msg)
 }
 
 // Help will return collated help text as one string.
@@ -102,16 +102,16 @@ func init() {
 func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/help",
-		Handler: func(channel *Channel, msg CommandMsg) error {
-			op := channel.IsOp(msg.From())
-			channel.Send(NewSystemMsg(channel.commands.Help(op), msg.From()))
+		Handler: func(room *Room, msg CommandMsg) error {
+			op := room.IsOp(msg.From())
+			room.Send(NewSystemMsg(room.commands.Help(op), msg.From()))
 			return nil
 		},
 	})
 
 	c.Add(Command{
 		Prefix: "/me",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			me := strings.TrimLeft(msg.body, "/me")
 			if me == "" {
 				me = " is at a loss for words."
@@ -119,7 +119,7 @@ func InitCommands(c *Commands) {
 				me = me[1:]
 			}
 
-			channel.Send(NewEmoteMsg(me, msg.From()))
+			room.Send(NewEmoteMsg(me, msg.From()))
 			return nil
 		},
 	})
@@ -127,7 +127,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/exit",
 		Help:   "Exit the chat.",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			msg.From().Close()
 			return nil
 		},
@@ -138,17 +138,20 @@ func InitCommands(c *Commands) {
 		Prefix:     "/nick",
 		PrefixHelp: "NAME",
 		Help:       "Rename yourself.",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			args := msg.Args()
 			if len(args) != 1 {
 				return ErrMissingArg
 			}
 			u := msg.From()
-			oldName := u.Name()
-			u.SetName(args[0])
+			oldId := u.Id()
+			u.SetId(Id(args[0]))
 
-			body := fmt.Sprintf("%s is now known as %s.", oldName, u.Name())
-			channel.Send(NewAnnounceMsg(body))
+			err := room.Rename(oldId, u)
+			if err != nil {
+				u.SetId(oldId)
+				return err
+			}
 			return nil
 		},
 	})
@@ -156,11 +159,11 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/names",
 		Help:   "List users who are connected.",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			// TODO: colorize
-			names := channel.NamesPrefix("")
+			names := room.NamesPrefix("")
 			body := fmt.Sprintf("%d connected: %s", len(names), strings.Join(names, ", "))
-			channel.Send(NewSystemMsg(body, msg.From()))
+			room.Send(NewSystemMsg(body, msg.From()))
 			return nil
 		},
 	})
@@ -170,7 +173,7 @@ func InitCommands(c *Commands) {
 		Prefix:     "/theme",
 		PrefixHelp: "[mono|colors]",
 		Help:       "Set your color theme.",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			user := msg.From()
 			args := msg.Args()
 			if len(args) == 0 {
@@ -179,7 +182,7 @@ func InitCommands(c *Commands) {
 					theme = user.Config.Theme.Id()
 				}
 				body := fmt.Sprintf("Current theme: %s", theme)
-				channel.Send(NewSystemMsg(body, user))
+				room.Send(NewSystemMsg(body, user))
 				return nil
 			}
 
@@ -188,7 +191,7 @@ func InitCommands(c *Commands) {
 				if t.Id() == id {
 					user.Config.Theme = &t
 					body := fmt.Sprintf("Set theme: %s", id)
-					channel.Send(NewSystemMsg(body, user))
+					room.Send(NewSystemMsg(body, user))
 					return nil
 				}
 			}
@@ -199,7 +202,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/quiet",
 		Help:   "Silence announcement-type messages (join, part, rename, etc).",
-		Handler: func(channel *Channel, msg CommandMsg) error {
+		Handler: func(room *Room, msg CommandMsg) error {
 			u := msg.From()
 			u.ToggleQuietMode()
 
@@ -209,7 +212,7 @@ func InitCommands(c *Commands) {
 			} else {
 				body = "Quiet mode is toggled OFF"
 			}
-			channel.Send(NewSystemMsg(body, u))
+			room.Send(NewSystemMsg(body, u))
 			return nil
 		},
 	})
@@ -219,8 +222,8 @@ func InitCommands(c *Commands) {
 		Prefix:     "/op",
 		PrefixHelp: "USER",
 		Help:       "Mark user as admin.",
-		Handler: func(channel *Channel, msg CommandMsg) error {
-			if !channel.IsOp(msg.From()) {
+		Handler: func(room *Room, msg CommandMsg) error {
+			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
 
@@ -231,7 +234,7 @@ func InitCommands(c *Commands) {
 
 			// TODO: Add support for fingerprint-based op'ing. This will
 			// probably need to live in host land.
-			member, ok := channel.MemberById(Id(args[0]))
+			member, ok := room.MemberById(Id(args[0]))
 			if !ok {
 				return errors.New("user not found")
 			}

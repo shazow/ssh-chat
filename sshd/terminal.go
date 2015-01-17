@@ -3,6 +3,7 @@ package sshd
 import (
 	"errors"
 	"fmt"
+	"net"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -10,7 +11,8 @@ import (
 
 // Connection is an interface with fields necessary to operate an sshd host.
 type Connection interface {
-	PublicKey() (ssh.PublicKey, bool)
+	PublicKey() ssh.PublicKey
+	RemoteAddr() net.Addr
 	Name() string
 	Close() error
 }
@@ -19,22 +21,22 @@ type sshConn struct {
 	*ssh.ServerConn
 }
 
-func (c sshConn) PublicKey() (ssh.PublicKey, bool) {
+func (c sshConn) PublicKey() ssh.PublicKey {
 	if c.Permissions == nil {
-		return nil, false
+		return nil
 	}
 
 	s, ok := c.Permissions.Extensions["pubkey"]
 	if !ok {
-		return nil, false
+		return nil
 	}
 
 	key, err := ssh.ParsePublicKey([]byte(s))
 	if err != nil {
-		return nil, false
+		return nil
 	}
 
-	return key, true
+	return key
 }
 
 func (c sshConn) Name() string {

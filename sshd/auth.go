@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"net"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -12,8 +13,8 @@ import (
 type Auth interface {
 	// Whether to allow connections without a public key.
 	AllowAnonymous() bool
-	// Given public key, return if the connection should be permitted.
-	Check(ssh.PublicKey) (bool, error)
+	// Given address and public key, return if the connection should be permitted.
+	Check(net.Addr, ssh.PublicKey) (bool, error)
 }
 
 // MakeAuth makes an ssh.ServerConfig which performs authentication against an Auth implementation.
@@ -22,7 +23,7 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 		NoClientAuth: false,
 		// Auth-related things should be constant-time to avoid timing attacks.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			ok, err := auth.Check(key)
+			ok, err := auth.Check(conn.RemoteAddr(), key)
 			if !ok {
 				return nil, err
 			}
@@ -35,7 +36,8 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 			if !auth.AllowAnonymous() {
 				return nil, errors.New("public key authentication required")
 			}
-			return nil, nil
+			_, err := auth.Check(conn.RemoteAddr(), nil)
+			return nil, err
 		},
 	}
 

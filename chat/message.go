@@ -55,7 +55,7 @@ func (m *Msg) Command() string {
 	return ""
 }
 
-// PublicMsg is any message from a user sent to the channel.
+// PublicMsg is any message from a user sent to the room.
 type PublicMsg struct {
 	Msg
 	from *User
@@ -105,7 +105,7 @@ func (m *PublicMsg) String() string {
 	return fmt.Sprintf("%s: %s", m.from.Name(), m.body)
 }
 
-// EmoteMsg is a /me message sent to the channel. It specifically does not
+// EmoteMsg is a /me message sent to the room. It specifically does not
 // extend PublicMsg because it doesn't implement MessageFrom to allow the
 // sender to see the emote.
 type EmoteMsg struct {
@@ -212,7 +212,7 @@ type CommandMsg struct {
 	*PublicMsg
 	command string
 	args    []string
-	channel *Channel
+	room *Room
 }
 
 func (m *CommandMsg) Command() string {

@@ -12,10 +12,20 @@ const messageBuffer = 20
 
 var ErrUserClosed = errors.New("user closed")
 
+// Id is a unique immutable identifier for a user.
+type Id string
+
+// Identifier is an interface that can uniquely identify itself.
+type Identifier interface {
+	Id() Id
+	SetId(Id)
+	Name() string
+}
+
 // User definition, implemented set Item interface and io.Writer
 type User struct {
+	Identifier
 	Config    UserConfig
-	name      string
 	colorIdx  int
 	joined    time.Time
 	msg       chan Message
@@ -25,38 +35,29 @@ type User struct {
 	closeOnce sync.Once
 }
 
-func NewUser(name string) *User {
+func NewUser(identity Identifier) *User {
 	u := User{
-		Config: *DefaultUserConfig,
-		joined: time.Now(),
-		msg:    make(chan Message, messageBuffer),
-		done:   make(chan struct{}, 1),
+		Identifier: identity,
+		Config:     *DefaultUserConfig,
+		joined:     time.Now(),
+		msg:        make(chan Message, messageBuffer),
+		done:       make(chan struct{}, 1),
 	}
-	u.SetName(name)
+	u.SetColorIdx(rand.Int())
 
 	return &u
 }
 
-func NewUserScreen(name string, screen io.Writer) *User {
-	u := NewUser(name)
+func NewUserScreen(identity Identifier, screen io.Writer) *User {
+	u := NewUser(identity)
 	go u.Consume(screen)
 
 	return u
 }
 
-// Id of the user, a unique identifier within a set
-func (u *User) Id() Id {
-	return Id(u.name)
-}
-
-// Name of the user
-func (u *User) Name() string {
-	return u.name
-}
-
-// SetName will change the name of the user and reset the colorIdx
-func (u *User) SetName(name string) {
-	u.name = name
+// Rename the user with a new Identifier.
+func (u *User) SetId(id Id) {
+	u.Identifier.SetId(id)
 	u.SetColorIdx(rand.Int())
 }
 

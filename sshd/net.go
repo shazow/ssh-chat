@@ -28,7 +28,7 @@ func ListenSSH(laddr string, config *ssh.ServerConfig) (*SSHListener, error) {
 func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
 	if l.RateLimit {
 		// TODO: Configurable Limiter?
-		conn = ReadLimitConn(conn, rateio.NewGracefulLimiter(1000, time.Minute*2, time.Second*3))
+		conn = ReadLimitConn(conn, rateio.NewGracefulLimiter(1024*10, time.Minute*2, time.Second*3))
 	}
 
 	// Upgrade TCP connection to SSH connection

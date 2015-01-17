@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestChannelServe(t *testing.T) {
-	ch := NewChannel()
+func TestRoomServe(t *testing.T) {
+	ch := NewRoom()
 	ch.Send(NewAnnounceMsg("hello"))
 
 	received := <-ch.broadcast
@@ -18,13 +18,13 @@ func TestChannelServe(t *testing.T) {
 	}
 }
 
-func TestChannelJoin(t *testing.T) {
+func TestRoomJoin(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
 	u := NewUser("foo")
 
-	ch := NewChannel()
+	ch := NewRoom()
 	go ch.Serve()
 	defer ch.Close()
 
@@ -57,13 +57,13 @@ func TestChannelJoin(t *testing.T) {
 	}
 }
 
-func TestChannelDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
+func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 	u := NewUser("foo")
 	u.Config = UserConfig{
 		Quiet: true,
 	}
 
-	ch := NewChannel()
+	ch := NewRoom()
 	defer ch.Close()
 
 	_, err := ch.Join(u)
@@ -92,13 +92,13 @@ func TestChannelDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 	ch.HandleMsg(NewPublicMsg("hello", u))
 }
 
-func TestChannelQuietToggleBroadcasts(t *testing.T) {
+func TestRoomQuietToggleBroadcasts(t *testing.T) {
 	u := NewUser("foo")
 	u.Config = UserConfig{
 		Quiet: true,
 	}
 
-	ch := NewChannel()
+	ch := NewRoom()
 	defer ch.Close()
 
 	_, err := ch.Join(u)
@@ -134,7 +134,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	s := &MockScreen{}
 	u := NewUser("foo")
 
-	ch := NewChannel()
+	ch := NewRoom()
 	go ch.Serve()
 	defer ch.Close()
 
@@ -164,13 +164,13 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	}
 }
 
-func TestChannelNames(t *testing.T) {
+func TestRoomNames(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
 	u := NewUser("foo")
 
-	ch := NewChannel()
+	ch := NewRoom()
 	go ch.Serve()
 	defer ch.Close()
 

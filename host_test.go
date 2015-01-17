@@ -184,7 +184,7 @@ func TestHostKick(t *testing.T) {
 		// First client
 		err = sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) {
 			// Make op
-			member, _ := host.channel.MemberById("foo")
+			member, _ := host.Room.MemberById("foo")
 			member.Op = true
 
 			// Block until second client is here
