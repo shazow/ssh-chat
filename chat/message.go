@@ -2,7 +2,6 @@ package chat
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -102,13 +101,20 @@ func (m *PublicMsg) Render(t *Theme) string {
 	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
 }
 
-func (m *PublicMsg) RenderHighlighted(t *Theme, highlight *regexp.Regexp) string {
-	if highlight == nil || t == nil {
-		return m.Render(t)
+func (m *PublicMsg) RenderFor(cfg UserConfig) string {
+	if cfg.Highlight == nil || cfg.Theme == nil {
+		return m.Render(cfg.Theme)
 	}
 
-	body := highlight.ReplaceAllString(m.body, t.Highlight("${1}"))
-	return fmt.Sprintf("%s: %s", t.ColorName(m.from), body)
+	if !cfg.Highlight.MatchString(m.body) {
+		return m.Render(cfg.Theme)
+	}
+
+	body := cfg.Highlight.ReplaceAllString(m.body, cfg.Theme.Highlight("${1}"))
+	if cfg.Bell {
+		body += Bel
+	}
+	return fmt.Sprintf("%s: %s", cfg.Theme.ColorName(m.from), body)
 }
 
 func (m *PublicMsg) String() string {

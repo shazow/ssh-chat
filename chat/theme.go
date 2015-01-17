@@ -26,6 +26,9 @@ const (
 
 	// Newline
 	Newline = "\r\n"
+
+	// BEL
+	Bel = "\007"
 )
 
 // Interface for Styles

@@ -116,7 +116,7 @@ func (u *User) SetHighlight(s string) error {
 func (u User) render(m Message) string {
 	switch m := m.(type) {
 	case *PublicMsg:
-		return m.RenderHighlighted(u.Config.Theme, u.Config.Highlight) + Newline
+		return m.RenderFor(u.Config) + Newline
 	default:
 		return m.Render(u.Config.Theme) + Newline
 	}
