@@ -2,6 +2,7 @@ package sshd
 
 import (
 	"errors"
+	"net"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -14,7 +15,7 @@ type RejectAuth struct{}
 func (a RejectAuth) AllowAnonymous() bool {
 	return false
 }
-func (a RejectAuth) Check(ssh.PublicKey) (bool, error) {
+func (a RejectAuth) Check(net.Addr, ssh.PublicKey) (bool, error) {
 	return false, errRejectAuth
 }
 

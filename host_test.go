@@ -26,7 +26,7 @@ func stripPrompt(s string) string {
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
-	u := chat.NewUser("foo")
+	u := chat.NewUser(&Identity{nil, "foo"})
 	u.SetColorIdx(2)
 
 	actual = GetPrompt(u)

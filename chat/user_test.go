@@ -9,7 +9,7 @@ func TestMakeUser(t *testing.T) {
 	var actual, expected []byte
 
 	s := &MockScreen{}
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 	m := NewAnnounceMsg("hello")
 
 	defer u.Close()

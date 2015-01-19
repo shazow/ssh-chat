@@ -15,13 +15,10 @@ const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
 
-// Id is a unique immutable identifier for a user.
-type Id string
-
 // Identifier is an interface that can uniquely identify itself.
 type Identifier interface {
-	Id() Id
-	SetId(Id)
+	Id() string
+	SetId(string)
 	Name() string
 }
 
@@ -59,7 +56,7 @@ func NewUserScreen(identity Identifier, screen io.Writer) *User {
 }
 
 // Rename the user with a new Identifier.
-func (u *User) SetId(id Id) {
+func (u *User) SetId(id string) {
 	u.Identifier.SetId(id)
 	u.SetColorIdx(rand.Int())
 }

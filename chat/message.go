@@ -34,10 +34,16 @@ func ParseInput(body string, from *User) Message {
 
 // Msg is a base type for other message types.
 type Msg struct {
-	Message
 	body      string
 	timestamp time.Time
 	// TODO: themeCache *map[*Theme]string
+}
+
+func NewMsg(body string) *Msg {
+	return &Msg{
+		body:      body,
+		timestamp: time.Now(),
+	}
 }
 
 // Render message based on a theme.

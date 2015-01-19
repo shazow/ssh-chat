@@ -28,7 +28,7 @@ func TestAuthWhitelist(t *testing.T) {
 	}
 
 	auth := NewAuth()
-	ok, err := auth.Check(key)
+	ok, err := auth.Check(nil, key)
 	if !ok || err != nil {
 		t.Error("Failed to permit in default state:", err)
 	}
@@ -44,7 +44,7 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Error("Clone key does not match.")
 	}
 
-	ok, err = auth.Check(keyClone)
+	ok, err = auth.Check(nil, keyClone)
 	if !ok || err != nil {
 		t.Error("Failed to permit whitelisted:", err)
 	}
@@ -54,7 +54,7 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok, err = auth.Check(key2)
+	ok, err = auth.Check(nil, key2)
 	if ok || err == nil {
 		t.Error("Failed to restrict not whitelisted:", err)
 	}

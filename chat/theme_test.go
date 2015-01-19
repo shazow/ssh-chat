@@ -54,7 +54,7 @@ func TestTheme(t *testing.T) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 	u.colorIdx = 4
 	actual = colorTheme.ColorName(u)
 	expected = "\033[38;05;4mfoo\033[0m"

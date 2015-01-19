@@ -28,6 +28,9 @@ func NewAuthKey(key ssh.PublicKey) string {
 
 // NewAuthAddr returns a string from a net.Addr
 func NewAuthAddr(addr net.Addr) string {
+	if addr == nil {
+		return ""
+	}
 	host, _, _ := net.SplitHostPort(addr.String())
 	return host
 }

@@ -145,7 +145,7 @@ func InitCommands(c *Commands) {
 			}
 			u := msg.From()
 			oldId := u.Id()
-			u.SetId(Id(args[0]))
+			u.SetId(args[0])
 
 			err := room.Rename(oldId, u)
 			if err != nil {
@@ -234,7 +234,7 @@ func InitCommands(c *Commands) {
 
 			// TODO: Add support for fingerprint-based op'ing. This will
 			// probably need to live in host land.
-			member, ok := room.MemberById(Id(args[0]))
+			member, ok := room.MemberById(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}

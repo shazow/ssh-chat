@@ -15,14 +15,14 @@ var ErrItemMissing = errors.New("item does not exist")
 // Set with string lookup.
 // TODO: Add trie for efficient prefix lookup?
 type Set struct {
-	lookup map[Id]Identifier
+	lookup map[string]Identifier
 	sync.RWMutex
 }
 
 // NewSet creates a new set.
 func NewSet() *Set {
 	return &Set{
-		lookup: map[Id]Identifier{},
+		lookup: map[string]Identifier{},
 	}
 }
 
@@ -30,7 +30,7 @@ func NewSet() *Set {
 func (s *Set) Clear() int {
 	s.Lock()
 	n := len(s.lookup)
-	s.lookup = map[Id]Identifier{}
+	s.lookup = map[string]Identifier{}
 	s.Unlock()
 	return n
 }
@@ -49,7 +49,7 @@ func (s *Set) In(item Identifier) bool {
 }
 
 // Get returns an item with the given Id.
-func (s *Set) Get(id Id) (Identifier, error) {
+func (s *Set) Get(id string) (Identifier, error) {
 	s.RLock()
 	item, ok := s.lookup[id]
 	s.RUnlock()
@@ -88,9 +88,9 @@ func (s *Set) Remove(item Identifier) error {
 	return nil
 }
 
-// Replace item from old Id with new Identifier.
+// Replace item from old id with new Identifier.
 // Used for moving the same identifier to a new Id, such as a rename.
-func (s *Set) Replace(oldId Id, item Identifier) error {
+func (s *Set) Replace(oldId string, item Identifier) error {
 	s.Lock()
 	defer s.Unlock()
 

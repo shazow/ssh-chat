@@ -22,7 +22,7 @@ func TestRoomJoin(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -58,7 +58,7 @@ func TestRoomJoin(t *testing.T) {
 }
 
 func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 	u.Config = UserConfig{
 		Quiet: true,
 	}
@@ -93,7 +93,7 @@ func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 }
 
 func TestRoomQuietToggleBroadcasts(t *testing.T) {
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 	u.Config = UserConfig{
 		Quiet: true,
 	}
@@ -132,7 +132,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -168,7 +168,7 @@ func TestRoomNames(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 
 	ch := NewRoom()
 	go ch.Serve()

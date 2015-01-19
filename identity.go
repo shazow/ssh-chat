@@ -11,32 +11,31 @@ import (
 // Identity is a container for everything that identifies a client.
 type Identity struct {
 	sshd.Connection
-	id chat.Id
+	id string
 }
 
 // NewIdentity returns a new identity object from an sshd.Connection.
 func NewIdentity(conn sshd.Connection) *Identity {
-	id := chat.Id(conn.Name())
 	return &Identity{
 		Connection: conn,
-		id:         id,
+		id:         conn.Name(),
 	}
 }
 
-func (i Identity) Id() chat.Id {
-	return chat.Id(i.id)
+func (i Identity) Id() string {
+	return i.id
 }
 
-func (i *Identity) SetId(id chat.Id) {
+func (i *Identity) SetId(id string) {
 	i.id = id
 }
 
 func (i *Identity) SetName(name string) {
-	i.SetId(chat.Id(name))
+	i.SetId(name)
 }
 
 func (i Identity) Name() string {
-	return string(i.id)
+	return i.id
 }
 
 func (i Identity) Whois() string {

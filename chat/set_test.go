@@ -5,7 +5,7 @@ import "testing"
 func TestSet(t *testing.T) {
 	var err error
 	s := NewSet()
-	u := NewUser("foo")
+	u := NewUser(testId("foo"))
 
 	if s.In(u) {
 		t.Errorf("Set should be empty.")
@@ -20,7 +20,7 @@ func TestSet(t *testing.T) {
 		t.Errorf("Set should contain user.")
 	}
 
-	u2 := NewUser("bar")
+	u2 := NewUser(testId("bar"))
 	err = s.Add(u2)
 	if err != nil {
 		t.Error(err)

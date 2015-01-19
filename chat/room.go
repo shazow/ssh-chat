@@ -79,6 +79,7 @@ func (r *Room) HandleMsg(m Message) {
 			skipUser = fromMsg.From()
 		}
 
+		r.history.Add(m)
 		r.members.Each(func(u Identifier) {
 			user := u.(*Member).User
 			if skip && skipUser == user {
@@ -91,10 +92,7 @@ func (r *Room) HandleMsg(m Message) {
 					return
 				}
 			}
-			err := user.Send(m)
-			if err != nil {
-				user.Close()
-			}
+			user.Send(m)
 		})
 	}
 }
@@ -112,6 +110,13 @@ func (r *Room) Send(m Message) {
 	r.broadcast <- m
 }
 
+// History feeds the room's recent message history to the user's handler.
+func (r *Room) History(u *User) {
+	for _, m := range r.history.Get(historyLen) {
+		u.Send(m)
+	}
+}
+
 // Join the room as a user, will announce.
 func (r *Room) Join(u *User) (*Member, error) {
 	if r.closed {
@@ -122,6 +127,7 @@ func (r *Room) Join(u *User) (*Member, error) {
 	if err != nil {
 		return nil, err
 	}
+	r.History(u)
 	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.members.Len())
 	r.Send(NewAnnounceMsg(s))
 	return &member, nil
@@ -139,7 +145,7 @@ func (r *Room) Leave(u *User) error {
 }
 
 // Rename member with a new identity. This will not call rename on the member.
-func (r *Room) Rename(oldId Id, identity Identifier) error {
+func (r *Room) Rename(oldId string, identity Identifier) error {
 	err := r.members.Replace(oldId, identity)
 	if err != nil {
 		return err
@@ -164,7 +170,7 @@ func (r *Room) Member(u *User) (*Member, bool) {
 	return m, true
 }
 
-func (r *Room) MemberById(id Id) (*Member, bool) {
+func (r *Room) MemberById(id string) (*Member, bool) {
 	m, err := r.members.Get(id)
 	if err != nil {
 		return nil, false

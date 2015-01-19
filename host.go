@@ -208,7 +208,7 @@ func (h *Host) AutoCompleteFunction(u *chat.User) func(line string, pos int, key
 
 // GetUser returns a chat.User based on a name.
 func (h *Host) GetUser(name string) (*chat.User, bool) {
-	m, ok := h.MemberById(chat.Id(name))
+	m, ok := h.MemberById(name)
 	if !ok {
 		return nil, false
 	}
