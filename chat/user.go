@@ -64,6 +64,16 @@ func (u *User) SetId(id Id) {
 	u.SetColorIdx(rand.Int())
 }
 
+// ReplyTo returns the last user that messaged this user.
+func (u *User) ReplyTo() *User {
+	return u.replyTo
+}
+
+// SetReplyTo sets the last user to message this user.
+func (u *User) SetReplyTo(user *User) {
+	u.replyTo = user
+}
+
 // ToggleQuietMode will toggle whether or not quiet mode is enabled
 func (u *User) ToggleQuietMode() {
 	u.Config.Quiet = !u.Config.Quiet
@@ -113,10 +123,13 @@ func (u *User) SetHighlight(s string) error {
 	return nil
 }
 
-func (u User) render(m Message) string {
+func (u *User) render(m Message) string {
 	switch m := m.(type) {
 	case *PublicMsg:
 		return m.RenderFor(u.Config) + Newline
+	case *PrivateMsg:
+		u.SetReplyTo(m.From())
+		return m.Render(u.Config.Theme) + Newline
 	default:
 		return m.Render(u.Config.Theme) + Newline
 	}

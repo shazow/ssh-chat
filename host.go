@@ -68,8 +68,6 @@ func (h Host) isOp(conn sshd.Connection) bool {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
-	term.AutoCompleteCallback = h.AutoCompleteFunction
-
 	user := chat.NewUserScreen(id, term)
 	user.Config.Theme = h.theme
 	go func() {
@@ -92,6 +90,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Successfully joined.
 	term.SetPrompt(GetPrompt(user))
+	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 	h.count++
 
@@ -159,44 +158,52 @@ func (h Host) completeCommand(partial string) string {
 	return ""
 }
 
-// AutoCompleteFunction is a callback for terminal autocompletion
-func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
-	if key != 9 {
-		return
-	}
-
-	if strings.HasSuffix(line[:pos], " ") {
-		// Don't autocomplete spaces.
-		return
-	}
-
-	fields := strings.Fields(line[:pos])
-	isFirst := len(fields) < 2
-	partial := fields[len(fields)-1]
-	posPartial := pos - len(partial)
-
-	var completed string
-	if isFirst && strings.HasPrefix(partial, "/") {
-		// Command
-		completed = h.completeCommand(partial)
-	} else {
-		// Name
-		completed = h.completeName(partial)
-		if completed == "" {
+// AutoCompleteFunction returns a callback for terminal autocompletion
+func (h *Host) AutoCompleteFunction(u *chat.User) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+	return func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		if key != 9 {
 			return
 		}
-		if isFirst {
-			completed += ":"
-		}
-	}
-	completed += " "
 
-	// Reposition the cursor
-	newLine = strings.Replace(line[posPartial:], partial, completed, 1)
-	newLine = line[:posPartial] + newLine
-	newPos = pos + (len(completed) - len(partial))
-	ok = true
-	return
+		if strings.HasSuffix(line[:pos], " ") {
+			// Don't autocomplete spaces.
+			return
+		}
+
+		fields := strings.Fields(line[:pos])
+		isFirst := len(fields) < 2
+		partial := fields[len(fields)-1]
+		posPartial := pos - len(partial)
+
+		var completed string
+		if isFirst && strings.HasPrefix(partial, "/") {
+			// Command
+			completed = h.completeCommand(partial)
+			if completed == "/reply" {
+				replyTo := u.ReplyTo()
+				if replyTo != nil {
+					completed = "/msg " + replyTo.Name()
+				}
+			}
+		} else {
+			// Name
+			completed = h.completeName(partial)
+			if completed == "" {
+				return
+			}
+			if isFirst {
+				completed += ":"
+			}
+		}
+		completed += " "
+
+		// Reposition the cursor
+		newLine = strings.Replace(line[posPartial:], partial, completed, 1)
+		newLine = line[:posPartial] + newLine
+		newPos = pos + (len(completed) - len(partial))
+		ok = true
+		return
+	}
 }
 
 // GetUser returns a chat.User based on a name.
@@ -230,6 +237,28 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			m := chat.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
+			room.Send(m)
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Prefix:     "/reply",
+		PrefixHelp: "MESSAGE",
+		Help:       "Reply with MESSAGE to the previous private message.",
+		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+			args := msg.Args()
+			switch len(args) {
+			case 0:
+				return errors.New("must specify message")
+			}
+
+			target := msg.From().ReplyTo()
+			if target == nil {
+				return errors.New("no message to reply to")
+			}
+
+			m := chat.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
 			room.Send(m)
 			return nil
 		},

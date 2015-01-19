@@ -201,7 +201,7 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix: "/quiet",
-		Help:   "Silence announcement-type messages (join, part, rename, etc).",
+		Help:   "Silence room announcements.",
 		Handler: func(room *Room, msg CommandMsg) error {
 			u := msg.From()
 			u.ToggleQuietMode()
