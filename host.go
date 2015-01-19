@@ -81,6 +81,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}()
 	defer user.Close()
 
+	// Send MOTD
+	if h.motd != "" {
+		user.Send(chat.NewAnnounceMsg(h.motd))
+	}
+
 	member, err := h.Join(user)
 	if err == chat.ErrIdTaken {
 		// Try again...
@@ -284,6 +289,28 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		},
 	})
 
+	c.Add(chat.Command{
+		Prefix:     "/whois",
+		PrefixHelp: "USER",
+		Help:       "Information about USER.",
+		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			target, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			id := target.Identifier.(*Identity)
+			room.Send(chat.NewSystemMsg(id.Whois(), msg.From()))
+
+			return nil
+		},
+	})
+
 	// Op commands
 	c.Add(chat.Command{
 		Op:         true,
@@ -349,27 +376,26 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 	c.Add(chat.Command{
 		Op:         true,
-		Prefix:     "/whois",
-		PrefixHelp: "USER",
-		Help:       "Information about USER.",
+		Prefix:     "/motd",
+		PrefixHelp: "MESSAGE",
+		Help:       "Set the MESSAGE of the day.",
 		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
-			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
 
+			motd := ""
 			args := msg.Args()
-			if len(args) == 0 {
-				return errors.New("must specify user")
+			if len(args) > 0 {
+				motd = strings.Join(args, " ")
 			}
 
-			target, ok := h.GetUser(args[0])
-			if !ok {
-				return errors.New("user not found")
+			h.motd = motd
+			body := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
+			room.Send(chat.NewAnnounceMsg(body))
+			if motd != "" {
+				room.Send(chat.NewAnnounceMsg(motd))
 			}
-
-			id := target.Identifier.(*Identity)
-			room.Send(chat.NewSystemMsg(id.Whois(), msg.From()))
 
 			return nil
 		},
