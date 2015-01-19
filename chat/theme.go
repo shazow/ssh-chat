@@ -186,5 +186,10 @@ func init() {
 		},
 	}
 
+	// Debug for printing colors:
+	//for _, color := range palette.colors {
+	//	fmt.Print(color.Format(color.String() + " "))
+	//}
+
 	DefaultTheme = &Themes[0]
 }

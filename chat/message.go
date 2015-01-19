@@ -196,11 +196,14 @@ func NewSystemMsg(body string, to *User) *SystemMsg {
 }
 
 func (m *SystemMsg) Render(t *Theme) string {
-	return fmt.Sprintf("-> %s", m.body)
+	if t == nil {
+		return m.String()
+	}
+	return t.ColorSys(m.String())
 }
 
 func (m *SystemMsg) String() string {
-	return m.Render(nil)
+	return fmt.Sprintf("-> %s", m.body)
 }
 
 func (m *SystemMsg) To() *User {
@@ -223,11 +226,14 @@ func NewAnnounceMsg(body string) *AnnounceMsg {
 }
 
 func (m *AnnounceMsg) Render(t *Theme) string {
-	return fmt.Sprintf(" * %s", m.body)
+	if t == nil {
+		return m.String()
+	}
+	return t.ColorSys(m.String())
 }
 
 func (m *AnnounceMsg) String() string {
-	return m.Render(nil)
+	return fmt.Sprintf(" * %s", m.body)
 }
 
 type CommandMsg struct {
