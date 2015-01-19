@@ -24,7 +24,7 @@ func GetPrompt(user *chat.User) string {
 type Host struct {
 	*chat.Room
 	listener *sshd.SSHListener
-	commands *chat.Commands
+	commands chat.Commands
 
 	motd  string
 	auth  *Auth
@@ -40,13 +40,13 @@ func NewHost(listener *sshd.SSHListener) *Host {
 	h := Host{
 		Room:     room,
 		listener: listener,
+		commands: chat.Commands{},
 	}
 
 	// Make our own commands registry instance.
-	commands := chat.Commands{}
-	chat.InitCommands(&commands)
-	h.InitCommands(&commands)
-	room.SetCommands(commands)
+	chat.InitCommands(&h.commands)
+	h.InitCommands(&h.commands)
+	room.SetCommands(h.commands)
 
 	go room.Serve()
 	return &h
@@ -140,34 +140,61 @@ func (h *Host) Serve() {
 	}
 }
 
+func (h Host) completeName(partial string) string {
+	names := h.NamesPrefix(partial)
+	if len(names) == 0 {
+		// Didn't find anything
+		return ""
+	}
+
+	return names[len(names)-1]
+}
+
+func (h Host) completeCommand(partial string) string {
+	for cmd, _ := range h.commands {
+		if strings.HasPrefix(cmd, partial) {
+			return cmd
+		}
+	}
+	return ""
+}
+
 // AutoCompleteFunction is a callback for terminal autocompletion
 func (h *Host) AutoCompleteFunction(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	if key != 9 {
 		return
 	}
 
-	fields := strings.Fields(line[:pos])
-	partial := fields[len(fields)-1]
-	names := h.NamesPrefix(partial)
-	if len(names) == 0 {
-		// Didn't find anything
+	if strings.HasSuffix(line[:pos], " ") {
+		// Don't autocomplete spaces.
 		return
 	}
 
-	name := names[len(names)-1]
+	fields := strings.Fields(line[:pos])
+	isFirst := len(fields) < 2
+	partial := fields[len(fields)-1]
 	posPartial := pos - len(partial)
 
-	// Append suffix separator
-	if len(fields) < 2 {
-		name += ": "
+	var completed string
+	if isFirst && strings.HasPrefix(partial, "/") {
+		// Command
+		completed = h.completeCommand(partial)
 	} else {
-		name += " "
+		// Name
+		completed = h.completeName(partial)
+		if completed == "" {
+			return
+		}
+		if isFirst {
+			completed += ":"
+		}
 	}
+	completed += " "
 
 	// Reposition the cursor
-	newLine = strings.Replace(line[posPartial:], partial, name, 1)
+	newLine = strings.Replace(line[posPartial:], partial, completed, 1)
 	newLine = line[:posPartial] + newLine
-	newPos = pos + (len(name) - len(partial))
+	newPos = pos + (len(completed) - len(partial))
 	ok = true
 	return
 }
