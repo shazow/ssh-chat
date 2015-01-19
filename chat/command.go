@@ -144,12 +144,18 @@ func InitCommands(c *Commands) {
 				return ErrMissingArg
 			}
 			u := msg.From()
-			oldId := u.Id()
-			u.SetId(args[0])
 
-			err := room.Rename(oldId, u)
+			member, ok := room.MemberById(u.Id())
+			if !ok {
+				return errors.New("failed to find member")
+			}
+
+			oldId := member.Id()
+			member.SetId(args[0])
+
+			err := room.Rename(oldId, member)
 			if err != nil {
-				u.SetId(oldId)
+				member.SetId(oldId)
 				return err
 			}
 			return nil
