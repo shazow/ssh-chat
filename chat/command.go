@@ -114,7 +114,7 @@ func InitCommands(c *Commands) {
 		Handler: func(room *Room, msg CommandMsg) error {
 			me := strings.TrimLeft(msg.body, "/me")
 			if me == "" {
-				me = " is at a loss for words."
+				me = "is at a loss for words."
 			} else {
 				me = me[1:]
 			}
@@ -213,6 +213,23 @@ func InitCommands(c *Commands) {
 				body = "Quiet mode is toggled OFF"
 			}
 			room.Send(NewSystemMsg(body, u))
+			return nil
+		},
+	})
+
+	c.Add(Command{
+		Prefix:     "/slap",
+		PrefixHelp: "NAME",
+		Handler: func(room *Room, msg CommandMsg) error {
+			var me string
+			args := msg.Args()
+			if len(args) == 0 {
+				me = "slaps themselves around a bit with a large trout."
+			} else {
+				me = fmt.Sprintf("slaps %s around a bit with a large trout.", strings.Join(args, " "))
+			}
+
+			room.Send(NewEmoteMsg(me, msg.From()))
 			return nil
 		},
 	})
