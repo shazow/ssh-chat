@@ -28,6 +28,7 @@ type Options struct {
 	Admin     string `long:"admin" description:"File of public keys who are admins."`
 	Whitelist string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
 	Motd      string `long:"motd" description:"Optional Message of the Day file."`
+	Log       string `long:"log" description:"Write chat log to this file."`
 	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
 }
 
@@ -116,7 +117,7 @@ func main() {
 			return err
 		}
 		auth.Op(key)
-		logger.Debugf("Added admin: %s", line)
+		logger.Debugf("Added admin: %s", sshd.Fingerprint(key))
 		return nil
 	})
 	if err != nil {
@@ -149,6 +150,17 @@ func main() {
 		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
 		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
 		host.SetMotd(motdString)
+	}
+
+	if options.Log == "-" {
+		host.SetLogging(os.Stdout)
+	} else if options.Log != "" {
+		fp, err := os.OpenFile(options.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			logger.Errorf("Failed to open log file for writing: %v", err)
+			return
+		}
+		host.SetLogging(fp)
 	}
 
 	go host.Serve()

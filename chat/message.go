@@ -11,6 +11,7 @@ type Message interface {
 	Render(*Theme) string
 	String() string
 	Command() string
+	Timestamp() time.Time
 }
 
 type MessageTo interface {
@@ -59,6 +60,10 @@ func (m *Msg) String() string {
 
 func (m *Msg) Command() string {
 	return ""
+}
+
+func (m *Msg) Timestamp() time.Time {
+	return m.timestamp
 }
 
 // PublicMsg is any message from a user sent to the room.

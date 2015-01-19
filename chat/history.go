@@ -1,13 +1,20 @@
 package chat
 
-import "sync"
+import (
+	"fmt"
+	"io"
+	"sync"
+)
+
+const timestampFmt = "2006-01-02 15:04:05"
 
 // History contains the history entries
 type History struct {
+	sync.RWMutex
 	entries []Message
 	head    int
 	size    int
-	lock    sync.Mutex
+	out     io.Writer
 }
 
 // NewHistory constructs a new history of the given size
@@ -19,14 +26,18 @@ func NewHistory(size int) *History {
 
 // Add adds the given entry to the entries in the history
 func (h *History) Add(entry Message) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.Lock()
+	defer h.Unlock()
 
 	max := cap(h.entries)
 	h.head = (h.head + 1) % max
 	h.entries[h.head] = entry
 	if h.size < max {
 		h.size++
+	}
+
+	if h.out != nil {
+		fmt.Fprintf(h.out, "[%s] %s\n", entry.Timestamp().UTC().Format(timestampFmt), entry.String())
 	}
 }
 
@@ -37,8 +48,8 @@ func (h *History) Len() int {
 
 // Get the entry with the given number
 func (h *History) Get(num int) []Message {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.RLock()
+	defer h.RUnlock()
 
 	max := cap(h.entries)
 	if num > h.size {
@@ -55,4 +66,11 @@ func (h *History) Get(num int) []Message {
 	}
 
 	return r
+}
+
+// SetOutput sets the output for logging added messages
+func (h *History) SetOutput(w io.Writer) {
+	h.Lock()
+	h.out = w
+	h.Unlock()
 }
