@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
+	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/sshd"
 )
+
+const maxInputLength int = 1024
 
 // GetPrompt will render the terminal prompt string based on the user.
 func GetPrompt(user *chat.User) string {
@@ -96,6 +100,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	member.Op = h.isOp(term.Conn)
+	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
 	for {
 		line, err := term.ReadLine()
@@ -106,6 +111,21 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			logger.Errorf("Terminal reading error: %s", err)
 			break
 		}
+
+		err = ratelimit.Count(1)
+		if err != nil {
+			user.Send(chat.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
+			continue
+		}
+		if len(line) > maxInputLength {
+			user.Send(chat.NewSystemMsg("Message rejected: Input too long.", user))
+			continue
+		}
+		if line == "" {
+			// Silently ignore empty lines.
+			continue
+		}
+
 		m := chat.ParseInput(line, user)
 
 		// FIXME: Any reason to use h.room.Send(m) instead?
