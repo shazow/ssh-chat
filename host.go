@@ -400,4 +400,34 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			return nil
 		},
 	})
+
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/op",
+		PrefixHelp: "USER",
+		Help:       "Set USER as admin.",
+		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) != 1 {
+				return errors.New("must specify user")
+			}
+
+			member, ok := room.MemberById(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+			member.Op = true
+			id := member.Identifier.(*Identity)
+			h.auth.Op(id.PublicKey())
+
+			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
+			room.Send(chat.NewSystemMsg(body, member.User))
+
+			return nil
+		},
+	})
 }

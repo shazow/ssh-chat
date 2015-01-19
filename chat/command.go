@@ -216,31 +216,4 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
-
-	c.Add(Command{
-		Op:         true,
-		Prefix:     "/op",
-		PrefixHelp: "USER",
-		Help:       "Mark user as admin.",
-		Handler: func(room *Room, msg CommandMsg) error {
-			if !room.IsOp(msg.From()) {
-				return errors.New("must be op")
-			}
-
-			args := msg.Args()
-			if len(args) != 1 {
-				return errors.New("must specify user")
-			}
-
-			// TODO: Add support for fingerprint-based op'ing. This will
-			// probably need to live in host land.
-			member, ok := room.MemberById(args[0])
-			if !ok {
-				return errors.New("user not found")
-			}
-
-			member.Op = true
-			return nil
-		},
-	})
 }
