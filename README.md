@@ -19,8 +19,6 @@ The server's RSA key fingerprint is `e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6
 
 ## Compiling / Developing
 
-**If you're going to be diving into the code, please use the [refactor branch](https://github.com/shazow/ssh-chat/tree/refactor) or see [issue #87](https://github.com/shazow/ssh-chat/pull/87).** It's not quite at feature parity yet, but the code is way nicer. The master branch is what's running on chat.shazow.net, but that will change soon.
-
 You can compile ssh-chat by using `make build`. The resulting binary is portable and
 can be run on any system with a similar OS and CPU arch. Go 1.3 or higher is required to compile.
 
@@ -40,7 +38,7 @@ Usage:
 Application Options:
   -v, --verbose    Show verbose logging.
   -i, --identity=  Private key to identify server with. (~/.ssh/id_rsa)
-      --bind=      Host and port to listen on. (0.0.0.0:22)
+      --bind=      Host and port to listen on. (0.0.0.0:2022)
       --admin=     Fingerprint of pubkey to mark as admin.
       --whitelist= Optional file of pubkey fingerprints that are allowed to connect
       --motd=      Message of the Day file (optional)
@@ -54,7 +52,7 @@ After doing `go get github.com/shazow/ssh-chat` on this repo, you should be able
 to run a command like:
 
 ```
-$ ssh-chat --verbose --bind ":2022" --identity ~/.ssh/id_dsa
+$ ssh-chat --verbose --bind ":22" --identity ~/.ssh/id_dsa
 ```
 
 To bind on port 22, you'll need to make sure it's free (move any other ssh

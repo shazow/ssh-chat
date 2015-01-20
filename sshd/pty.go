@@ -1,7 +1,8 @@
-// Borrowed from go.crypto circa 2011
-package main
+package sshd
 
 import "encoding/binary"
+
+// Helpers below are borrowed from go.crypto circa 2011:
 
 // parsePtyRequest parses the payload of the pty-req message and extracts the
 // dimensions of the terminal. See RFC 4254, section 6.2.
