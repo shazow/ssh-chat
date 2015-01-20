@@ -311,6 +311,24 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		},
 	})
 
+	// Hidden commands
+	c.Add(chat.Command{
+		Prefix: "/version",
+		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+			room.Send(chat.NewSystemMsg(buildCommit, msg.From()))
+			return nil
+		},
+	})
+
+	timeStarted := time.Now()
+	c.Add(chat.Command{
+		Prefix: "/uptime",
+		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+			room.Send(chat.NewSystemMsg(time.Now().Sub(timeStarted).String(), msg.From()))
+			return nil
+		},
+	})
+
 	// Op commands
 	c.Add(chat.Command{
 		Op:         true,
