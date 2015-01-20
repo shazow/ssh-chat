@@ -342,7 +342,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/ban",
-		PrefixHelp: "USER",
+		PrefixHelp: "USER [DURATION]",
 		Help:       "Ban USER from the server.",
 		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
 			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
@@ -360,9 +360,14 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
+			var until time.Duration = 0
+			if len(args) > 1 {
+				until, _ = time.ParseDuration(args[1])
+			}
+
 			id := target.Identifier.(*Identity)
-			h.auth.Ban(id.PublicKey())
-			h.auth.BanAddr(id.RemoteAddr())
+			h.auth.Ban(id.PublicKey(), until)
+			h.auth.BanAddr(id.RemoteAddr(), until)
 
 			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
 			room.Send(chat.NewAnnounceMsg(body))
@@ -404,7 +409,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/op",
-		PrefixHelp: "USER",
+		PrefixHelp: "USER [DURATION]",
 		Help:       "Set USER as admin.",
 		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
@@ -412,8 +417,13 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			args := msg.Args()
-			if len(args) != 1 {
+			if len(args) == 0 {
 				return errors.New("must specify user")
+			}
+
+			var until time.Duration = 0
+			if len(args) > 1 {
+				until, _ = time.ParseDuration(args[1])
 			}
 
 			member, ok := room.MemberById(args[0])
@@ -422,7 +432,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 			member.Op = true
 			id := member.Identifier.(*Identity)
-			h.auth.Op(id.PublicKey())
+			h.auth.Op(id.PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
 			room.Send(chat.NewSystemMsg(body, member.User))

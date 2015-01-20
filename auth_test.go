@@ -33,7 +33,7 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Error("Failed to permit in default state:", err)
 	}
 
-	auth.Whitelist(key)
+	auth.Whitelist(key, 0)
 
 	keyClone, err := ClonePublicKey(key)
 	if err != nil {

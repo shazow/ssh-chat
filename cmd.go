@@ -116,8 +116,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		auth.Op(key)
-		logger.Debugf("Added admin: %s", sshd.Fingerprint(key))
+		auth.Op(key, 0)
 		return nil
 	})
 	if err != nil {
@@ -130,7 +129,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		auth.Whitelist(key)
+		auth.Whitelist(key, 0)
 		logger.Debugf("Whitelisted: %s", line)
 		return nil
 	})

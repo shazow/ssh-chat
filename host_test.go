@@ -150,7 +150,7 @@ func TestHostWhitelist(t *testing.T) {
 	}
 
 	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
-	auth.Whitelist(clientpubkey)
+	auth.Whitelist(clientpubkey, 0)
 
 	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) {})
 	if err == nil {
