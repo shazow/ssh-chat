@@ -1,18 +1,6 @@
-package chat
+package message
 
 import "testing"
-
-type testId string
-
-func (i testId) Id() string {
-	return string(i)
-}
-func (i testId) SetId(s string) {
-	// no-op
-}
-func (i testId) Name() string {
-	return i.Id()
-}
 
 func TestMessage(t *testing.T) {
 	var expected, actual string
@@ -23,7 +11,7 @@ func TestMessage(t *testing.T) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 
-	u := NewUser(testId("foo"))
+	u := NewUser(SimpleId("foo"))
 	expected = "foo: hello"
 	actual = NewPublicMsg("hello", u).String()
 	if actual != expected {

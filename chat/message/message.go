@@ -1,4 +1,4 @@
-package chat
+package message
 
 import (
 	"fmt"
@@ -245,7 +245,6 @@ type CommandMsg struct {
 	*PublicMsg
 	command string
 	args    []string
-	room    *Room
 }
 
 func (m *CommandMsg) Command() string {
@@ -254,4 +253,8 @@ func (m *CommandMsg) Command() string {
 
 func (m *CommandMsg) Args() []string {
 	return m.args
+}
+
+func (m *CommandMsg) Body() string {
+	return m.body
 }

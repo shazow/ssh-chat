@@ -1,4 +1,4 @@
-package chat
+package message
 
 import (
 	"errors"
@@ -14,13 +14,6 @@ const messageBuffer = 20
 const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
-
-// Identifier is an interface that can uniquely identify itself.
-type Identifier interface {
-	Id() string
-	SetId(string)
-	Name() string
-}
 
 // User definition, implemented set Item interface and io.Writer
 type User struct {
@@ -106,8 +99,8 @@ func (u *User) Consume(out io.Writer) {
 }
 
 // Consume one message and stop, mostly for testing
-func (u *User) ConsumeOne(out io.Writer) {
-	u.HandleMsg(<-u.msg, out)
+func (u *User) ConsumeChan() <-chan Message {
+	return u.msg
 }
 
 // SetHighlight sets the highlighting regular expression to match string.

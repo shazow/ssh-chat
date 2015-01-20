@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 )
 import _ "net/http/pprof"
@@ -109,7 +110,7 @@ func main() {
 
 	host := NewHost(s)
 	host.auth = auth
-	host.theme = &chat.Themes[0]
+	host.theme = &message.Themes[0]
 
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
