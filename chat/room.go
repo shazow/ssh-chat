@@ -14,6 +14,10 @@ const roomBuffer = 10
 // closed.
 var ErrRoomClosed = errors.New("room closed")
 
+// The error returned when a user attempts to join with an invalid name, such
+// as empty string.
+var ErrInvalidName = errors.New("invalid name")
+
 // Member is a User with per-Room metadata attached to it.
 type Member struct {
 	*User
@@ -128,6 +132,9 @@ func (r *Room) Join(u *User) (*Member, error) {
 	if r.closed {
 		return nil, ErrRoomClosed
 	}
+	if u.Id() == "" {
+		return nil, ErrInvalidName
+	}
 	member := Member{u, false}
 	err := r.members.Add(&member)
 	if err != nil {
@@ -152,6 +159,9 @@ func (r *Room) Leave(u *User) error {
 
 // Rename member with a new identity. This will not call rename on the member.
 func (r *Room) Rename(oldId string, identity Identifier) error {
+	if identity.Id() == "" {
+		return ErrInvalidName
+	}
 	err := r.members.Replace(oldId, identity)
 	if err != nil {
 		return err

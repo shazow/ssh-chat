@@ -18,7 +18,7 @@ type Identity struct {
 func NewIdentity(conn sshd.Connection) *Identity {
 	return &Identity{
 		Connection: conn,
-		id:         conn.Name(),
+		id:         chat.SanitizeName(conn.Name()),
 	}
 }
 

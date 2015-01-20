@@ -87,7 +87,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	member, err := h.Join(user)
-	if err == chat.ErrIdTaken {
+	if err != nil {
 		// Try again...
 		id.SetName(fmt.Sprintf("Guest%d", h.count))
 		member, err = h.Join(user)
