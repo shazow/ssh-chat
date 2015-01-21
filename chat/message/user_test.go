@@ -9,12 +9,12 @@ func TestMakeUser(t *testing.T) {
 	var actual, expected []byte
 
 	s := &MockScreen{}
-	u := NewUser(testId("foo"))
+	u := NewUser(SimpleId("foo"))
 	m := NewAnnounceMsg("hello")
 
 	defer u.Close()
 	u.Send(m)
-	u.ConsumeOne(s)
+	u.HandleMsg(<-u.ConsumeChan(), s)
 
 	s.Read(&actual)
 	expected = []byte(m.String() + Newline)

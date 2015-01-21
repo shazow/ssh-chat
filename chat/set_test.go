@@ -8,7 +8,7 @@ import (
 
 func TestSet(t *testing.T) {
 	var err error
-	s := NewSet()
+	s := newIdSet()
 	u := message.NewUser(message.SimpleId("foo"))
 
 	if s.In(u) {

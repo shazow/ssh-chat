@@ -30,7 +30,7 @@ type Member struct {
 type Room struct {
 	topic     string
 	history   *message.History
-	members   *Set
+	members   *idSet
 	broadcast chan message.Message
 	commands  Commands
 	closed    bool
@@ -44,7 +44,7 @@ func NewRoom() *Room {
 	return &Room{
 		broadcast: broadcast,
 		history:   message.NewHistory(historyLen),
-		members:   NewSet(),
+		members:   newIdSet(),
 		commands:  *defaultCommands,
 	}
 }
@@ -58,7 +58,7 @@ func (r *Room) SetCommands(commands Commands) {
 func (r *Room) Close() {
 	r.closeOnce.Do(func() {
 		r.closed = true
-		r.members.Each(func(m Item) {
+		r.members.Each(func(m identified) {
 			m.(*Member).Close()
 		})
 		r.members.Clear()
@@ -92,7 +92,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 
 		r.history.Add(m)
-		r.members.Each(func(u Item) {
+		r.members.Each(func(u identified) {
 			user := u.(*Member).User
 			if skip && skipUser == user {
 				// Skip
