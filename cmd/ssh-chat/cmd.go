@@ -15,6 +15,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/shazow/ssh-chat"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
@@ -39,7 +40,10 @@ var logLevels = []log.Level{
 	log.Debug,
 }
 
-var buildCommit string
+func fail(code int, format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, format, args...)
+	os.Exit(code)
+}
 
 func main() {
 	options := Options{}
@@ -66,7 +70,7 @@ func main() {
 	}
 
 	logLevel := logLevels[numVerbose]
-	logger = golog.New(os.Stderr, logLevel)
+	sshchat.SetLogger(golog.New(os.Stderr, logLevel))
 
 	if logLevel == log.Debug {
 		// Enable logging from submodules
@@ -84,33 +88,29 @@ func main() {
 
 	privateKey, err := ReadPrivateKey(privateKeyPath)
 	if err != nil {
-		logger.Errorf("Couldn't read private key: %v", err)
-		os.Exit(2)
+		fail(2, "Couldn't read private key: %v\n", err)
 	}
 
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		logger.Errorf("Failed to parse key: %v", err)
-		os.Exit(3)
+		fail(3, "Failed to parse key: %v\n", err)
 	}
 
-	auth := NewAuth()
+	auth := sshchat.NewAuth()
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(signer)
 
 	s, err := sshd.ListenSSH(options.Bind, config)
 	if err != nil {
-		logger.Errorf("Failed to listen on socket: %v", err)
-		os.Exit(4)
+		fail(4, "Failed to listen on socket: %v\n", err)
 	}
 	defer s.Close()
 	s.RateLimit = true
 
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
-	host := NewHost(s)
-	host.auth = auth
-	host.theme = &message.Themes[0]
+	host := sshchat.NewHost(s, auth)
+	host.SetTheme(message.Themes[0])
 
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
@@ -121,8 +121,7 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		logger.Errorf("Failed to load admins: %v", err)
-		os.Exit(5)
+		fail(5, "Failed to load admins: %v\n", err)
 	}
 
 	err = fromFile(options.Whitelist, func(line []byte) error {
@@ -131,19 +130,16 @@ func main() {
 			return err
 		}
 		auth.Whitelist(key, 0)
-		logger.Debugf("Whitelisted: %s", line)
 		return nil
 	})
 	if err != nil {
-		logger.Errorf("Failed to load whitelist: %v", err)
-		os.Exit(5)
+		fail(6, "Failed to load whitelist: %v\n", err)
 	}
 
 	if options.Motd != "" {
 		motd, err := ioutil.ReadFile(options.Motd)
 		if err != nil {
-			logger.Errorf("Failed to load MOTD file: %v", err)
-			return
+			fail(7, "Failed to load MOTD file: %v\n", err)
 		}
 		motdString := strings.TrimSpace(string(motd))
 		// hack to normalize line endings into \r\n
@@ -157,8 +153,7 @@ func main() {
 	} else if options.Log != "" {
 		fp, err := os.OpenFile(options.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			logger.Errorf("Failed to open log file for writing: %v", err)
-			return
+			fail(8, "Failed to open log file for writing: %v", err)
 		}
 		host.SetLogging(fp)
 	}
@@ -170,7 +165,7 @@ func main() {
 	signal.Notify(sig, os.Interrupt)
 
 	<-sig // Wait for ^C signal
-	logger.Warningf("Interrupt signal detected, shutting down.")
+	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
 	os.Exit(0)
 }
 

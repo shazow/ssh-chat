@@ -1,4 +1,4 @@
-package main
+package sshchat
 
 import (
 	"errors"
@@ -16,8 +16,8 @@ var ErrNotWhitelisted = errors.New("not whitelisted")
 // The error returned a key is checked that is banned.
 var ErrBanned = errors.New("banned")
 
-// NewAuthKey returns string from an ssh.PublicKey.
-func NewAuthKey(key ssh.PublicKey) string {
+// newAuthKey returns string from an ssh.PublicKey used to index the key in our lookup.
+func newAuthKey(key ssh.PublicKey) string {
 	if key == nil {
 		return ""
 	}
@@ -25,8 +25,8 @@ func NewAuthKey(key ssh.PublicKey) string {
 	return sshd.Fingerprint(key)
 }
 
-// NewAuthAddr returns a string from a net.Addr
-func NewAuthAddr(addr net.Addr) string {
+// newAuthAddr returns a string from a net.Addr used to index the address the key in our lookup.
+func newAuthAddr(addr net.Addr) string {
 	if addr == nil {
 		return ""
 	}
@@ -34,8 +34,7 @@ func NewAuthAddr(addr net.Addr) string {
 	return host
 }
 
-// Auth stores fingerprint lookups
-// TODO: Add timed auth by using a time.Time instead of struct{} for values.
+// Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 type Auth struct {
 	sync.RWMutex
 	bannedAddr *Set
@@ -44,7 +43,7 @@ type Auth struct {
 	ops        *Set
 }
 
-// NewAuth creates a new default Auth.
+// NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
 		bannedAddr: NewSet(),
@@ -61,7 +60,7 @@ func (a Auth) AllowAnonymous() bool {
 
 // Check determines if a pubkey fingerprint is permitted.
 func (a *Auth) Check(addr net.Addr, key ssh.PublicKey) (bool, error) {
-	authkey := NewAuthKey(key)
+	authkey := newAuthKey(key)
 
 	if a.whitelist.Len() != 0 {
 		// Only check whitelist if there is something in it, otherwise it's disabled.
@@ -74,7 +73,7 @@ func (a *Auth) Check(addr net.Addr, key ssh.PublicKey) (bool, error) {
 
 	banned := a.banned.In(authkey)
 	if !banned {
-		banned = a.bannedAddr.In(NewAuthAddr(addr))
+		banned = a.bannedAddr.In(newAuthAddr(addr))
 	}
 	if banned {
 		return false, ErrBanned
@@ -88,7 +87,7 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
-	authkey := NewAuthKey(key)
+	authkey := newAuthKey(key)
 	if d != 0 {
 		a.ops.AddExpiring(authkey, d)
 	} else {
@@ -102,7 +101,7 @@ func (a *Auth) IsOp(key ssh.PublicKey) bool {
 	if key == nil {
 		return false
 	}
-	authkey := NewAuthKey(key)
+	authkey := newAuthKey(key)
 	return a.ops.In(authkey)
 }
 
@@ -111,7 +110,7 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
-	authkey := NewAuthKey(key)
+	authkey := newAuthKey(key)
 	if d != 0 {
 		a.whitelist.AddExpiring(authkey, d)
 	} else {
@@ -125,7 +124,7 @@ func (a *Auth) Ban(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
-	a.BanFingerprint(NewAuthKey(key), d)
+	a.BanFingerprint(newAuthKey(key), d)
 }
 
 // BanFingerprint will set a public key fingerprint as banned.
@@ -140,7 +139,7 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 
 // Ban will set an IP address as banned.
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
-	key := NewAuthAddr(addr)
+	key := newAuthAddr(addr)
 	if d != 0 {
 		a.bannedAddr.AddExpiring(key, d)
 	} else {

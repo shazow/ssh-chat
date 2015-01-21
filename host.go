@@ -1,4 +1,4 @@
-package main
+package sshchat
 
 import (
 	"errors"
@@ -12,6 +12,8 @@ import (
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 )
+
+var buildCommit string
 
 const maxInputLength int = 1024
 
@@ -36,16 +38,17 @@ type Host struct {
 	count int
 
 	// Default theme
-	theme *message.Theme
+	theme message.Theme
 }
 
 // NewHost creates a Host on top of an existing listener.
-func NewHost(listener *sshd.SSHListener) *Host {
+func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 	room := chat.NewRoom()
 	h := Host{
 		Room:     room,
 		listener: listener,
 		commands: chat.Commands{},
+		auth:     auth,
 	}
 
 	// Make our own commands registry instance.
@@ -55,6 +58,11 @@ func NewHost(listener *sshd.SSHListener) *Host {
 
 	go room.Serve()
 	return &h
+}
+
+// SetTheme sets the default theme for the host.
+func (h *Host) SetTheme(theme message.Theme) {
+	h.theme = theme
 }
 
 // SetMotd sets the host's message of the day.
@@ -74,7 +82,7 @@ func (h Host) isOp(conn sshd.Connection) bool {
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
-	user.Config.Theme = h.theme
+	user.Config.Theme = &h.theme
 	go func() {
 		// Close term once user is closed.
 		user.Wait()

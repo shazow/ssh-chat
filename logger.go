@@ -1,4 +1,4 @@
-package main
+package sshchat
 
 import (
 	"bytes"
@@ -9,8 +9,12 @@ import (
 
 var logger *golog.Logger
 
+func SetLogger(l *golog.Logger) {
+	logger = l
+}
+
 func init() {
 	// Set a default null logger
 	var b bytes.Buffer
-	logger = golog.New(&b, log.Debug)
+	SetLogger(golog.New(&b, log.Debug))
 }

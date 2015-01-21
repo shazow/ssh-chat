@@ -1,4 +1,4 @@
-package main
+package sshchat
 
 import (
 	"sync"
@@ -19,20 +19,20 @@ func (v value) Bool() bool {
 	return true
 }
 
-type SetValue interface {
+type setValue interface {
 	Bool() bool
 }
 
 // Set with expire-able keys
 type Set struct {
-	lookup map[string]SetValue
+	lookup map[string]setValue
 	sync.Mutex
 }
 
 // NewSet creates a new set.
 func NewSet() *Set {
 	return &Set{
-		lookup: map[string]SetValue{},
+		lookup: map[string]setValue{},
 	}
 }
 

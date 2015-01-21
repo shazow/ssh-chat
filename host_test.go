@@ -1,4 +1,4 @@
-package main
+package sshchat
 
 import (
 	"bufio"
@@ -56,7 +56,7 @@ func TestHostNameCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	host := NewHost(s)
+	host := NewHost(s, nil)
 	go host.Serve()
 
 	done := make(chan struct{}, 1)
@@ -70,7 +70,7 @@ func TestHostNameCollision(t *testing.T) {
 			scanner.Scan()
 			actual := scanner.Text()
 			if !strings.HasPrefix(actual, "[foo] ") {
-				t.Errorf("First client failed to get 'foo' name.")
+				t.Errorf("First client failed to get 'foo' name: %q", actual)
 			}
 
 			actual = stripPrompt(actual)
@@ -133,8 +133,7 @@ func TestHostWhitelist(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	host := NewHost(s)
-	host.auth = auth
+	host := NewHost(s, auth)
 	go host.Serve()
 
 	target := s.Addr().String()
@@ -174,7 +173,7 @@ func TestHostKick(t *testing.T) {
 	}
 	defer s.Close()
 	addr := s.Addr().String()
-	host := NewHost(s)
+	host := NewHost(s, nil)
 	go host.Serve()
 
 	connected := make(chan struct{})
