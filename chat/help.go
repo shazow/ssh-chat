@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/shazow/ssh-chat/chat/message"
 )
 
 type helpItem struct {
@@ -54,5 +56,5 @@ func (h help) String() string {
 	}
 
 	sort.Strings(r)
-	return strings.Join(r, Newline)
+	return strings.Join(r, message.Newline)
 }

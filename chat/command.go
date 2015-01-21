@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/shazow/ssh-chat/chat/message"
 )
 
 // The error returned when an invalid command is issued.
@@ -29,7 +31,7 @@ type Command struct {
 	PrefixHelp string
 	// If omitted, command is hidden from /help
 	Help    string
-	Handler func(*Room, CommandMsg) error
+	Handler func(*Room, message.CommandMsg) error
 	// Command requires Op permissions
 	Op bool
 }
@@ -59,7 +61,7 @@ func (c Commands) Alias(command string, alias string) error {
 }
 
 // Run executes a command message.
-func (c Commands) Run(room *Room, msg CommandMsg) error {
+func (c Commands) Run(room *Room, msg message.CommandMsg) error {
 	if msg.From == nil {
 		return ErrNoOwner
 	}
@@ -84,9 +86,9 @@ func (c Commands) Help(showOp bool) string {
 			normal = append(normal, cmd)
 		}
 	}
-	help := "Available commands:" + Newline + NewCommandsHelp(normal).String()
+	help := "Available commands:" + message.Newline + NewCommandsHelp(normal).String()
 	if showOp {
-		help += Newline + "-> Operator commands:" + Newline + NewCommandsHelp(op).String()
+		help += message.Newline + "-> Operator commands:" + message.Newline + NewCommandsHelp(op).String()
 	}
 	return help
 }
@@ -102,24 +104,24 @@ func init() {
 func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/help",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			op := room.IsOp(msg.From())
-			room.Send(NewSystemMsg(room.commands.Help(op), msg.From()))
+			room.Send(message.NewSystemMsg(room.commands.Help(op), msg.From()))
 			return nil
 		},
 	})
 
 	c.Add(Command{
 		Prefix: "/me",
-		Handler: func(room *Room, msg CommandMsg) error {
-			me := strings.TrimLeft(msg.body, "/me")
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			me := strings.TrimLeft(msg.Body(), "/me")
 			if me == "" {
 				me = "is at a loss for words."
 			} else {
 				me = me[1:]
 			}
 
-			room.Send(NewEmoteMsg(me, msg.From()))
+			room.Send(message.NewEmoteMsg(me, msg.From()))
 			return nil
 		},
 	})
@@ -127,7 +129,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/exit",
 		Help:   "Exit the chat.",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			msg.From().Close()
 			return nil
 		},
@@ -138,7 +140,7 @@ func InitCommands(c *Commands) {
 		Prefix:     "/nick",
 		PrefixHelp: "NAME",
 		Help:       "Rename yourself.",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			if len(args) != 1 {
 				return ErrMissingArg
@@ -164,11 +166,11 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/names",
 		Help:   "List users who are connected.",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			// TODO: colorize
 			names := room.NamesPrefix("")
 			body := fmt.Sprintf("%d connected: %s", len(names), strings.Join(names, ", "))
-			room.Send(NewSystemMsg(body, msg.From()))
+			room.Send(message.NewSystemMsg(body, msg.From()))
 			return nil
 		},
 	})
@@ -178,7 +180,7 @@ func InitCommands(c *Commands) {
 		Prefix:     "/theme",
 		PrefixHelp: "[mono|colors]",
 		Help:       "Set your color theme.",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			user := msg.From()
 			args := msg.Args()
 			if len(args) == 0 {
@@ -187,16 +189,16 @@ func InitCommands(c *Commands) {
 					theme = user.Config.Theme.Id()
 				}
 				body := fmt.Sprintf("Current theme: %s", theme)
-				room.Send(NewSystemMsg(body, user))
+				room.Send(message.NewSystemMsg(body, user))
 				return nil
 			}
 
 			id := args[0]
-			for _, t := range Themes {
+			for _, t := range message.Themes {
 				if t.Id() == id {
 					user.Config.Theme = &t
 					body := fmt.Sprintf("Set theme: %s", id)
-					room.Send(NewSystemMsg(body, user))
+					room.Send(message.NewSystemMsg(body, user))
 					return nil
 				}
 			}
@@ -207,7 +209,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/quiet",
 		Help:   "Silence room announcements.",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
 			u.ToggleQuietMode()
 
@@ -217,7 +219,7 @@ func InitCommands(c *Commands) {
 			} else {
 				body = "Quiet mode is toggled OFF"
 			}
-			room.Send(NewSystemMsg(body, u))
+			room.Send(message.NewSystemMsg(body, u))
 			return nil
 		},
 	})
@@ -225,7 +227,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix:     "/slap",
 		PrefixHelp: "NAME",
-		Handler: func(room *Room, msg CommandMsg) error {
+		Handler: func(room *Room, msg message.CommandMsg) error {
 			var me string
 			args := msg.Args()
 			if len(args) == 0 {
@@ -234,7 +236,7 @@ func InitCommands(c *Commands) {
 				me = fmt.Sprintf("slaps %s around a bit with a large trout.", strings.Join(args, " "))
 			}
 
-			room.Send(NewEmoteMsg(me, msg.From()))
+			room.Send(message.NewEmoteMsg(me, msg.From()))
 			return nil
 		},
 	})

@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -44,7 +45,7 @@ func (i Identity) Whois() string {
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
-	return fmt.Sprintf("name: %s"+chat.Newline+
-		" > ip: %s"+chat.Newline+
+	return fmt.Sprintf("name: %s"+message.Newline+
+		" > ip: %s"+message.Newline+
 		" > fingerprint: %s", i.Name(), ip, fingerprint)
 }

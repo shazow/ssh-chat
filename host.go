@@ -9,13 +9,14 @@ import (
 
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
 const maxInputLength int = 1024
 
 // GetPrompt will render the terminal prompt string based on the user.
-func GetPrompt(user *chat.User) string {
+func GetPrompt(user *message.User) string {
 	name := user.Name()
 	if user.Config.Theme != nil {
 		name = user.Config.Theme.ColorName(user)
@@ -35,7 +36,7 @@ type Host struct {
 	count int
 
 	// Default theme
-	theme *chat.Theme
+	theme *message.Theme
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -72,7 +73,7 @@ func (h Host) isOp(conn sshd.Connection) bool {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
-	user := chat.NewUserScreen(id, term)
+	user := message.NewUserScreen(id, term)
 	user.Config.Theme = h.theme
 	go func() {
 		// Close term once user is closed.
@@ -83,7 +84,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Send MOTD
 	if h.motd != "" {
-		user.Send(chat.NewAnnounceMsg(h.motd))
+		user.Send(message.NewAnnounceMsg(h.motd))
 	}
 
 	member, err := h.Join(user)
@@ -119,11 +120,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 		err = ratelimit.Count(1)
 		if err != nil {
-			user.Send(chat.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
+			user.Send(message.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
 			continue
 		}
 		if len(line) > maxInputLength {
-			user.Send(chat.NewSystemMsg("Message rejected: Input too long.", user))
+			user.Send(message.NewSystemMsg("Message rejected: Input too long.", user))
 			continue
 		}
 		if line == "" {
@@ -131,7 +132,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			continue
 		}
 
-		m := chat.ParseInput(line, user)
+		m := message.ParseInput(line, user)
 
 		// FIXME: Any reason to use h.room.Send(m) instead?
 		h.HandleMsg(m)
@@ -184,7 +185,7 @@ func (h Host) completeCommand(partial string) string {
 }
 
 // AutoCompleteFunction returns a callback for terminal autocompletion
-func (h *Host) AutoCompleteFunction(u *chat.User) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	return func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		if key != 9 {
 			return
@@ -231,8 +232,8 @@ func (h *Host) AutoCompleteFunction(u *chat.User) func(line string, pos int, key
 	}
 }
 
-// GetUser returns a chat.User based on a name.
-func (h *Host) GetUser(name string) (*chat.User, bool) {
+// GetUser returns a message.User based on a name.
+func (h *Host) GetUser(name string) (*message.User, bool) {
 	m, ok := h.MemberById(name)
 	if !ok {
 		return nil, false
@@ -247,7 +248,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/msg",
 		PrefixHelp: "USER MESSAGE",
 		Help:       "Send MESSAGE to USER.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			switch len(args) {
 			case 0:
@@ -261,7 +262,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			m := chat.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
+			m := message.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
 			room.Send(m)
 			return nil
 		},
@@ -271,7 +272,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/reply",
 		PrefixHelp: "MESSAGE",
 		Help:       "Reply with MESSAGE to the previous private message.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			switch len(args) {
 			case 0:
@@ -283,7 +284,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("no message to reply to")
 			}
 
-			m := chat.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
+			m := message.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
 			room.Send(m)
 			return nil
 		},
@@ -293,7 +294,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/whois",
 		PrefixHelp: "USER",
 		Help:       "Information about USER.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			if len(args) == 0 {
 				return errors.New("must specify user")
@@ -305,7 +306,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			id := target.Identifier.(*Identity)
-			room.Send(chat.NewSystemMsg(id.Whois(), msg.From()))
+			room.Send(message.NewSystemMsg(id.Whois(), msg.From()))
 
 			return nil
 		},
@@ -314,8 +315,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	// Hidden commands
 	c.Add(chat.Command{
 		Prefix: "/version",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
-			room.Send(chat.NewSystemMsg(buildCommit, msg.From()))
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			room.Send(message.NewSystemMsg(buildCommit, msg.From()))
 			return nil
 		},
 	})
@@ -323,8 +324,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	timeStarted := time.Now()
 	c.Add(chat.Command{
 		Prefix: "/uptime",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
-			room.Send(chat.NewSystemMsg(time.Now().Sub(timeStarted).String(), msg.From()))
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			room.Send(message.NewSystemMsg(time.Now().Sub(timeStarted).String(), msg.From()))
 			return nil
 		},
 	})
@@ -335,7 +336,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/kick",
 		PrefixHelp: "USER",
 		Help:       "Kick USER from the server.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
@@ -351,7 +352,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			body := fmt.Sprintf("%s was kicked by %s.", target.Name(), msg.From().Name())
-			room.Send(chat.NewAnnounceMsg(body))
+			room.Send(message.NewAnnounceMsg(body))
 			target.Close()
 			return nil
 		},
@@ -362,7 +363,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/ban",
 		PrefixHelp: "USER [DURATION]",
 		Help:       "Ban USER from the server.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
@@ -388,7 +389,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			h.auth.BanAddr(id.RemoteAddr(), until)
 
 			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
-			room.Send(chat.NewAnnounceMsg(body))
+			room.Send(message.NewAnnounceMsg(body))
 			target.Close()
 
 			logger.Debugf("Banned: \n-> %s", id.Whois())
@@ -402,7 +403,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/motd",
 		PrefixHelp: "MESSAGE",
 		Help:       "Set the MESSAGE of the day.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
@@ -415,9 +416,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			h.motd = motd
 			body := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
-			room.Send(chat.NewAnnounceMsg(body))
+			room.Send(message.NewAnnounceMsg(body))
 			if motd != "" {
-				room.Send(chat.NewAnnounceMsg(motd))
+				room.Send(message.NewAnnounceMsg(motd))
 			}
 
 			return nil
@@ -429,7 +430,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Prefix:     "/op",
 		PrefixHelp: "USER [DURATION]",
 		Help:       "Set USER as admin.",
-		Handler: func(room *chat.Room, msg chat.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
@@ -453,7 +454,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			h.auth.Op(id.PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
-			room.Send(chat.NewSystemMsg(body, member.User))
+			room.Send(message.NewSystemMsg(body, member.User))
 
 			return nil
 		},

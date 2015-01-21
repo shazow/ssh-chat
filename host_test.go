@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
@@ -26,7 +26,7 @@ func stripPrompt(s string) string {
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
-	u := chat.NewUser(&Identity{nil, "foo"})
+	u := message.NewUser(&Identity{nil, "foo"})
 	u.SetColorIdx(2)
 
 	actual = GetPrompt(u)
@@ -35,7 +35,7 @@ func TestHostGetPrompt(t *testing.T) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
-	u.Config.Theme = &chat.Themes[0]
+	u.Config.Theme = &message.Themes[0]
 	actual = GetPrompt(u)
 	expected = "[\033[38;05;2mfoo\033[0m] "
 	if actual != expected {

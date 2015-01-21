@@ -10,38 +10,43 @@ import (
 var ErrIdTaken = errors.New("id already taken")
 
 // The error returned when a requested item does not exist in the set.
-var ErrItemMissing = errors.New("item does not exist")
+var ErridentifiedMissing = errors.New("item does not exist")
+
+// Interface for an item storeable in the set
+type identified interface {
+	Id() string
+}
 
 // Set with string lookup.
 // TODO: Add trie for efficient prefix lookup?
-type Set struct {
-	lookup map[string]Identifier
+type idSet struct {
+	lookup map[string]identified
 	sync.RWMutex
 }
 
-// NewSet creates a new set.
-func NewSet() *Set {
-	return &Set{
-		lookup: map[string]Identifier{},
+// newIdSet creates a new set.
+func newIdSet() *idSet {
+	return &idSet{
+		lookup: map[string]identified{},
 	}
 }
 
 // Clear removes all items and returns the number removed.
-func (s *Set) Clear() int {
+func (s *idSet) Clear() int {
 	s.Lock()
 	n := len(s.lookup)
-	s.lookup = map[string]Identifier{}
+	s.lookup = map[string]identified{}
 	s.Unlock()
 	return n
 }
 
 // Len returns the size of the set right now.
-func (s *Set) Len() int {
+func (s *idSet) Len() int {
 	return len(s.lookup)
 }
 
 // In checks if an item exists in this set.
-func (s *Set) In(item Identifier) bool {
+func (s *idSet) In(item identified) bool {
 	s.RLock()
 	_, ok := s.lookup[item.Id()]
 	s.RUnlock()
@@ -49,20 +54,20 @@ func (s *Set) In(item Identifier) bool {
 }
 
 // Get returns an item with the given Id.
-func (s *Set) Get(id string) (Identifier, error) {
+func (s *idSet) Get(id string) (identified, error) {
 	s.RLock()
 	item, ok := s.lookup[id]
 	s.RUnlock()
 
 	if !ok {
-		return nil, ErrItemMissing
+		return nil, ErridentifiedMissing
 	}
 
 	return item, nil
 }
 
 // Add item to this set if it does not exist already.
-func (s *Set) Add(item Identifier) error {
+func (s *idSet) Add(item identified) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -76,21 +81,21 @@ func (s *Set) Add(item Identifier) error {
 }
 
 // Remove item from this set.
-func (s *Set) Remove(item Identifier) error {
+func (s *idSet) Remove(item identified) error {
 	s.Lock()
 	defer s.Unlock()
 	id := item.Id()
 	_, found := s.lookup[id]
 	if !found {
-		return ErrItemMissing
+		return ErridentifiedMissing
 	}
 	delete(s.lookup, id)
 	return nil
 }
 
-// Replace item from old id with new Identifier.
-// Used for moving the same identifier to a new Id, such as a rename.
-func (s *Set) Replace(oldId string, item Identifier) error {
+// Replace item from old id with new identified.
+// Used for moving the same identified to a new Id, such as a rename.
+func (s *idSet) Replace(oldId string, item identified) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -103,11 +108,11 @@ func (s *Set) Replace(oldId string, item Identifier) error {
 	// Remove oldId
 	_, found = s.lookup[oldId]
 	if !found {
-		return ErrItemMissing
+		return ErridentifiedMissing
 	}
 	delete(s.lookup, oldId)
 
-	// Add new identifier
+	// Add new identified
 	s.lookup[item.Id()] = item
 
 	return nil
@@ -115,7 +120,7 @@ func (s *Set) Replace(oldId string, item Identifier) error {
 
 // Each loops over every item while holding a read lock and applies fn to each
 // element.
-func (s *Set) Each(fn func(item Identifier)) {
+func (s *idSet) Each(fn func(item identified)) {
 	s.RLock()
 	for _, item := range s.lookup {
 		fn(item)
@@ -124,8 +129,8 @@ func (s *Set) Each(fn func(item Identifier)) {
 }
 
 // ListPrefix returns a list of items with a prefix, case insensitive.
-func (s *Set) ListPrefix(prefix string) []Identifier {
-	r := []Identifier{}
+func (s *idSet) ListPrefix(prefix string) []identified {
+	r := []identified{}
 	prefix = strings.ToLower(prefix)
 
 	s.RLock()
