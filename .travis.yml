@@ -10,7 +10,7 @@ install:
   - make deps
 
 script:
-  - fgt golint
+  # TODO: Bring this back: - fgt golint
   - make test
 
 go:
