@@ -2,13 +2,12 @@ BINARY = ssh-chat
 KEY = host_key
 PORT = 2022
 
+SRCS = %.go
+
 all: $(BINARY)
 
-**/*.go:
-	go build ./...
-
-$(BINARY): **/*.go *.go
-	go build -ldflags "-X main.buildCommit `git describe --long --tags --dirty --always`" .
+$(BINARY): **/**/*.go **/*.go *.go
+	go build -ldflags "-X main.buildCommit `git describe --long --tags --dirty --always`" ./cmd/ssh-chat
 
 deps:
 	go get .
