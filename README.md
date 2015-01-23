@@ -62,6 +62,8 @@ daemons to another port) and run ssh-chat as root (or with sudo).
 
 You can run ssh-chat using a Docker image without manually installing go-lang:
 
+**Note: alvin/ssh-chat has v0 which is not the latest master branch as of this writing (Jan 23, 2015)**
+
 ```
 $ docker pull alvin/ssh-chat
 $ docker run -d -p 0.0.0.0:(your host machine port):2022 --name ssh-chat alvin/ssh-chat
