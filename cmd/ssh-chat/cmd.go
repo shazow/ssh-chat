@@ -105,7 +105,7 @@ func main() {
 		fail(4, "Failed to listen on socket: %v\n", err)
 	}
 	defer s.Close()
-	s.RateLimit = true
+	s.RateLimit = sshd.NewInputLimiter
 
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 

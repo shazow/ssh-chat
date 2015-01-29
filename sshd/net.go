@@ -2,7 +2,6 @@ package sshd
 
 import (
 	"net"
-	"time"
 
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
@@ -12,7 +11,7 @@ import (
 type SSHListener struct {
 	net.Listener
 	config    *ssh.ServerConfig
-	RateLimit bool
+	RateLimit func() rateio.Limiter
 }
 
 // Make an SSH listener socket
@@ -26,9 +25,9 @@ func ListenSSH(laddr string, config *ssh.ServerConfig) (*SSHListener, error) {
 }
 
 func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
-	if l.RateLimit {
+	if l.RateLimit != nil {
 		// TODO: Configurable Limiter?
-		conn = ReadLimitConn(conn, rateio.NewGracefulLimiter(1024*10, time.Minute*2, time.Second*3))
+		conn = ReadLimitConn(conn, l.RateLimit())
 	}
 
 	// Upgrade TCP connection to SSH connection
