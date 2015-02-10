@@ -199,7 +199,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			return
 		}
 
-		if strings.HasSuffix(line[:pos], " ") {
+		if line == "" || strings.HasSuffix(line[:pos], " ") {
 			// Don't autocomplete spaces.
 			return
 		}
