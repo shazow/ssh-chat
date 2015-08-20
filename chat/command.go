@@ -62,7 +62,7 @@ func (c Commands) Alias(command string, alias string) error {
 
 // Run executes a command message.
 func (c Commands) Run(room *Room, msg message.CommandMsg) error {
-	if msg.From == nil {
+	if msg.From() == nil {
 		return ErrNoOwner
 	}
 
