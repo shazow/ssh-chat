@@ -54,7 +54,7 @@ func NewAuth() *Auth {
 }
 
 // AllowAnonymous determines if anonymous users are permitted.
-func (a Auth) AllowAnonymous() bool {
+func (a *Auth) AllowAnonymous() bool {
 	return a.whitelist.Len() == 0
 }
 
