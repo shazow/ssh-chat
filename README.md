@@ -49,7 +49,7 @@ Help Options:
   -h, --help       Show this help message
 ```
 
-After doing `go get github.com/shazow/ssh-chat` on this repo, you should be able
+After doing `go get github.com/shazow/ssh-chat/...` on this repo, you should be able
 to run a command like:
 
 ```
