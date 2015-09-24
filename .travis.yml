@@ -14,7 +14,7 @@ install:
   - make deps
 
 go:
-  - 1.4
+  - tip
 
 script:
   # TODO: Bring this back: - fgt golint
