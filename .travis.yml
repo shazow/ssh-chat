@@ -24,5 +24,8 @@ script:
   - cp ~/.ssh/id_rsa id_rsa
   - docker build -t "$DOCKER_USER"/ssh-chat:latest .
 
-after_success:
-  - ./docker-deploy.sh
+deploy:
+  provider: script
+  script: deploy-docker.sh
+  on:
+  	branch: master
