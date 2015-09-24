@@ -19,5 +19,5 @@ script:
   - make test
   - make build
   - ssh-keygen -f ~/.ssh/id_rsa -t rsa -N ''
-  - cp .ssh/id_rsa id_rsa
+  - cp ~/.ssh/id_rsa id_rsa
   - docker build -t "$DOCKER_USER"/ssh-chat:latest .
