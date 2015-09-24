@@ -18,8 +18,8 @@ go:
 
 script:
   # TODO: Bring this back: - fgt golint
-  # - make test
-  - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-X main.buildCommit `git describe --long --tags --dirty --always`" ./cmd/ssh-chat
+  - make test
+  - make build
   - ssh-keygen -f ~/.ssh/id_rsa -t rsa -N ''
   - cp ~/.ssh/id_rsa id_rsa
   - docker build -t "$DOCKER_USER"/ssh-chat:latest .
