@@ -26,6 +26,6 @@ script:
 
 deploy:
   provider: script
-  script: ./deploy-docker.sh
+  script: docker-deploy.sh
   on:
     branch: master
