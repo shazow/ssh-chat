@@ -13,9 +13,6 @@ install:
   - go get github.com/golang/lint/golint
   - make deps
 
-go:
-  - tip
-
 script:
   # TODO: Bring this back: - fgt golint
   - make test
@@ -29,3 +26,6 @@ deploy:
   script: ./docker-deploy.sh
   on:
     branch: master
+
+go:
+  - tip
