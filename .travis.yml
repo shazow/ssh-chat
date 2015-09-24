@@ -9,9 +9,10 @@ install:
   - go get github.com/golang/lint/golint
   - make deps
 
+go:
+  - 1.4
+
 script:
   # TODO: Bring this back: - fgt golint
   - make test
-
-go:
-  - 1.4
+  - make build
