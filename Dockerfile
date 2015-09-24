@@ -11,5 +11,5 @@ ADD id_rsa id_rsa
 
 EXPOSE 2022
 
-CMD ["-i", "id_rsa", "-vv", "--bind", "\":2022\""]
-ENTRYPOINT ["ssh-chat"]
+CMD ["/ssh-chat", "-i", "id_rsa", "-vv", "--bind", "\":2022\""]
+# ENTRYPOINT ["ssh-chat"]
