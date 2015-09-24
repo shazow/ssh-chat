@@ -1,3 +1,5 @@
+sudo: required
+
 language: go
 
 notifications:
@@ -16,3 +18,6 @@ script:
   # TODO: Bring this back: - fgt golint
   - make test
   - make build
+  - ssh-keygen -f ~/.ssh/id_rsa -t rsa -N ''
+  - cp .ssh/id_rsa id_rsa
+  - docker build -t scottmiller171/ssh-chat:latest .
