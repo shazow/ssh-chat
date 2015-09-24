@@ -28,4 +28,4 @@ deploy:
   provider: script
   script: deploy-docker.sh
   on:
-  	branch: master
+    branch: master
