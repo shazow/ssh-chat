@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"code.google.com/p/gopass"
+	"github.com/mewbak/gopass"
 )
 
 // ReadPrivateKey attempts to read your private key and possibly decrypt it if it
