@@ -6,7 +6,7 @@ SRCS = %.go
 
 all: $(BINARY)
 
-$(BINARY): deps **/**/*.go **/*.go *.go
+$(BINARY): deps **/**/*.go **/*.go
 	go build -ldflags "-X main.buildCommit=`git describe --long --tags --dirty --always`" ./cmd/ssh-chat
 
 deps:

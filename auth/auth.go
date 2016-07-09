@@ -1,4 +1,4 @@
-package sshchat
+package auth
 
 import (
 	"errors"
@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shazow/ssh-chat/log"
 	"github.com/shazow/ssh-chat/sshd"
+	"github.com/shazow/ssh-chat/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -37,19 +39,19 @@ func newAuthAddr(addr net.Addr) string {
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 type Auth struct {
 	sync.RWMutex
-	bannedAddr *Set
-	banned     *Set
-	whitelist  *Set
-	ops        *Set
+	bannedAddr *utils.Set
+	banned     *utils.Set
+	whitelist  *utils.Set
+	ops        *utils.Set
 }
 
 // NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
-		bannedAddr: NewSet(),
-		banned:     NewSet(),
-		whitelist:  NewSet(),
-		ops:        NewSet(),
+		bannedAddr: utils.NewSet(),
+		banned:     utils.NewSet(),
+		whitelist:  utils.NewSet(),
+		ops:        utils.NewSet(),
 	}
 }
 
@@ -93,7 +95,7 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.ops.Add(authkey)
 	}
-	logger.Debugf("Added to ops: %s (for %s)", authkey, d)
+	log.Logger.Debugf("Added to ops: %s (for %s)", authkey, d)
 }
 
 // IsOp checks if a public key is an op.
@@ -116,7 +118,7 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.whitelist.Add(authkey)
 	}
-	logger.Debugf("Added to whitelist: %s (for %s)", authkey, d)
+	log.Logger.Debugf("Added to whitelist: %s (for %s)", authkey, d)
 }
 
 // Ban will set a public key as banned.
@@ -134,7 +136,7 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 	} else {
 		a.banned.Add(authkey)
 	}
-	logger.Debugf("Added to banned: %s (for %s)", authkey, d)
+	log.Logger.Debugf("Added to banned: %s (for %s)", authkey, d)
 }
 
 // Ban will set an IP address as banned.
@@ -145,5 +147,5 @@ func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
 	} else {
 		a.bannedAddr.Add(key)
 	}
-	logger.Debugf("Added to bannedAddr: %s (for %s)", key, d)
+	log.Logger.Debugf("Added to bannedAddr: %s (for %s)", key, d)
 }
