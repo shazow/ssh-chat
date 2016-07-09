@@ -1,0 +1,16 @@
+[submodule "vendor/github.com/alexcesaro/log"]
+	path = vendor/github.com/alexcesaro/log
+	url = https://github.com/alexcesaro/log
+	branch = master
+[submodule "vendor/github.com/jessevdk/go-flags"]
+	path = vendor/github.com/jessevdk/go-flags
+	url = https://github.com/jessevdk/go-flags
+	branch = master
+[submodule "vendor/github.com/mewbak/gopass"]
+	path = vendor/github.com/mewbak/gopass
+	url = https://github.com/mewbak/gopass
+	branch = master
+[submodule "vendor/github.com/shazow/rateio"]
+	path = vendor/github.com/shazow/rateio
+	url = https://github.com/shazow/rateio
+	branch = master
