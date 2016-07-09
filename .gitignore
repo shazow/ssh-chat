@@ -2,5 +2,6 @@
 host_key
 host_key.pub
 ssh-chat
+id_rsa
 *.log
 .*
