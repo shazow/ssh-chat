@@ -1,4 +1,4 @@
-package sshchat
+package utils
 
 import (
 	"sync"

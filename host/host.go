@@ -1,4 +1,4 @@
-package sshchat
+package host
 
 import (
 	"errors"
@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/shazow/rateio"
+	"github.com/shazow/ssh-chat/auth"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/identity"
+	"github.com/shazow/ssh-chat/log"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -34,7 +37,7 @@ type Host struct {
 	commands chat.Commands
 
 	motd  string
-	auth  *Auth
+	auth  *auth.Auth
 	count int
 
 	// Default theme
@@ -42,7 +45,7 @@ type Host struct {
 }
 
 // NewHost creates a Host on top of an existing listener.
-func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
+func NewHost(listener *sshd.SSHListener, auth *auth.Auth) *Host {
 	room := chat.NewRoom()
 	h := Host{
 		Room:     room,
@@ -80,7 +83,7 @@ func (h Host) isOp(conn sshd.Connection) bool {
 
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
-	id := NewIdentity(term.Conn)
+	id := identity.NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	user.Config.Theme = &h.theme
 	go func() {
@@ -102,7 +105,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		member, err = h.Join(user)
 	}
 	if err != nil {
-		logger.Errorf("Failed to join: %s", err)
+		log.Logger.Errorf("Failed to join: %s", err)
 		return
 	}
 
@@ -122,7 +125,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			// Closed
 			break
 		} else if err != nil {
-			logger.Errorf("Terminal reading error: %s", err)
+			log.Logger.Errorf("Terminal reading error: %s", err)
 			break
 		}
 
@@ -159,7 +162,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	err = h.Leave(user)
 	if err != nil {
-		logger.Errorf("Failed to leave: %s", err)
+		log.Logger.Errorf("Failed to leave: %s", err)
 		return
 	}
 }
@@ -313,7 +316,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			id := target.Identifier.(*Identity)
+			id := target.Identifier.(*identity.Identity)
 			room.Send(message.NewSystemMsg(id.Whois(), msg.From()))
 
 			return nil
@@ -392,7 +395,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			id := target.Identifier.(*Identity)
+			id := target.Identifier.(*identity.Identity)
 			h.auth.Ban(id.PublicKey(), until)
 			h.auth.BanAddr(id.RemoteAddr(), until)
 
@@ -400,7 +403,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			room.Send(message.NewAnnounceMsg(body))
 			target.Close()
 
-			logger.Debugf("Banned: \n-> %s", id.Whois())
+			log.Logger.Debugf("Banned: \n-> %s", id.Whois())
 
 			return nil
 		},
@@ -458,7 +461,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 			member.Op = true
-			id := member.Identifier.(*Identity)
+			id := member.Identifier.(*identity.Identity)
 			h.auth.Op(id.PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())

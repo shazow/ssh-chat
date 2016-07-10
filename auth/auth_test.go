@@ -1,4 +1,4 @@
-package sshchat
+package auth
 
 import (
 	"crypto/rand"

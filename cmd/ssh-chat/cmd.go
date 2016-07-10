@@ -10,14 +10,13 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/alexcesaro/log"
-	"github.com/alexcesaro/log/golog"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/shazow/ssh-chat"
-	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/auth"
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/host"
+	"github.com/shazow/ssh-chat/log"
 	"github.com/shazow/ssh-chat/sshd"
 )
 import _ "net/http/pprof"
@@ -32,12 +31,6 @@ type Options struct {
 	Motd      string `long:"motd" description:"Optional Message of the Day file."`
 	Log       string `long:"log" description:"Write chat log to this file."`
 	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
-}
-
-var logLevels = []log.Level{
-	log.Warning,
-	log.Info,
-	log.Debug,
 }
 
 func fail(code int, format string, args ...interface{}) {
@@ -63,20 +56,8 @@ func main() {
 		}()
 	}
 
-	// Figure out the log level
 	numVerbose := len(options.Verbose)
-	if numVerbose > len(logLevels) {
-		numVerbose = len(logLevels) - 1
-	}
-
-	logLevel := logLevels[numVerbose]
-	sshchat.SetLogger(golog.New(os.Stderr, logLevel))
-
-	if logLevel == log.Debug {
-		// Enable logging from submodules
-		chat.SetLogger(os.Stderr)
-		sshd.SetLogger(os.Stderr)
-	}
+	log.Init(numVerbose)
 
 	privateKeyPath := options.Identity
 	if strings.HasPrefix(privateKeyPath, "~/") {
@@ -96,7 +77,7 @@ func main() {
 		fail(3, "Failed to parse key: %v\n", err)
 	}
 
-	auth := sshchat.NewAuth()
+	auth := auth.NewAuth()
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(signer)
 
@@ -109,7 +90,7 @@ func main() {
 
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
-	host := sshchat.NewHost(s, auth)
+	host := host.NewHost(s, auth)
 	host.SetTheme(message.Themes[0])
 
 	err = fromFile(options.Admin, func(line []byte) error {

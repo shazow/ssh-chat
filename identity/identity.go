@@ -1,4 +1,4 @@
-package sshchat
+package identity
 
 import (
 	"fmt"
