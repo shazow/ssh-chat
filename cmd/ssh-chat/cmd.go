@@ -22,9 +22,13 @@ import (
 )
 import _ "net/http/pprof"
 
+// Version of the binary, assigned during build.
+var Version string = "dev"
+
 // Options contains the flag options
 type Options struct {
 	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose logging."`
+	Version   bool   `long:"version" description:"Print version and exit."`
 	Identity  string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
 	Bind      string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
 	Admin     string `long:"admin" description:"File of public keys who are admins."`
@@ -61,6 +65,11 @@ func main() {
 		go func() {
 			fmt.Println(http.ListenAndServe(fmt.Sprintf("localhost:%d", options.Pprof), nil))
 		}()
+	}
+
+	if options.Version {
+		fmt.Println(Version)
+		os.Exit(0)
 	}
 
 	// Figure out the log level
@@ -111,6 +120,7 @@ func main() {
 
 	host := sshchat.NewHost(s, auth)
 	host.SetTheme(message.Themes[0])
+	host.Version = Version
 
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)

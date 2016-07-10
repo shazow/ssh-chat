@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+usage() {
+    echo "Build and bundle Go releases with the current dir as the build dir."
+    echo "Usage: $0 PACKAGE [ASSETS...]"
+}
+
+main() {
+    set -eo pipefail
+    [[ "$TRACE" ]] && set -x
+
+    if [[ ! "$1" ]]; then
+        usage
+        exit 1
+    fi
+
+    if [[ ! "$GOOS" ]]; then
+        export GOOS="linux"
+    fi
+    if [[ ! "$GOARCH" ]]; then
+        export GOARCH="amd64"
+    fi
+    if [[ ! "$BUILDDIR" ]]; then
+        export BUILDDIR="build"
+    fi
+
+    build "$@"
+}
+
+build() {
+    local package="$1"; shift
+    local assets="$@"
+
+    local bin="$(basename $package)"
+    local tarball="${bin}-${GOOS}_${GOARCH}.tgz"
+    local outdir="$BUILDDIR/$bin"
+
+    if [[ -d "$outdir" ]]; then
+        echo "err: outdir already exists: $PWD/$outdir"
+    fi
+    mkdir -p "$outdir"
+
+    go build -ldflags "$LDFLAGS" -o "$outdir/$bin" "$package"
+
+    # Stage asset bundle
+    if [[ "$assets" ]]; then
+        ln -f $assets "$outdir"
+    fi
+
+    # Create tarball
+    tar -C "$BUILDDIR" -czvf "$BUILDDIR/$tarball" "$bin"
+
+    # Cleanup
+    rm -rf "$outdir"
+
+    echo "Packaged: $tarball"
+}
+
+main "$@"

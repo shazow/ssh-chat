@@ -3,11 +3,13 @@ KEY = host_key
 PORT = 2022
 
 SRCS = %.go
+VERSION := $(shell git describe --long --tags --dirty --always)
+LDFLAGS = LDFLAGS="-X main.Version=$(VERSION)"
 
 all: $(BINARY)
 
 $(BINARY): deps **/**/*.go **/*.go *.go
-	go build -ldflags "-X main.buildCommit=`git describe --long --tags --dirty --always`" ./cmd/ssh-chat
+	go build $(BUILDFLAGS) ./cmd/ssh-chat
 
 deps:
 	go get ./...
@@ -29,3 +31,8 @@ debug: $(BINARY) $(KEY)
 test:
 	go test ./...
 	golint ./...
+
+release:
+	ENV=GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	ENV=GOOS=linux GOARCH=386 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	ENV=GOOS=darwin GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE

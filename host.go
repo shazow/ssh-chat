@@ -13,8 +13,6 @@ import (
 	"github.com/shazow/ssh-chat/sshd"
 )
 
-var buildCommit string
-
 const maxInputLength int = 1024
 
 // GetPrompt will render the terminal prompt string based on the user.
@@ -36,6 +34,9 @@ type Host struct {
 	motd  string
 	auth  *Auth
 	count int
+
+	// Version string to print on /version
+	Version string
 
 	// Default theme
 	theme message.Theme
@@ -324,7 +325,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Prefix: "/version",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			room.Send(message.NewSystemMsg(buildCommit, msg.From()))
+			room.Send(message.NewSystemMsg(h.Version, msg.From()))
 			return nil
 		},
 	})
