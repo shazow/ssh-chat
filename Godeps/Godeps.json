@@ -1,0 +1,39 @@
+{
+	"ImportPath": "github.com/shazow/ssh-chat",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v74",
+	"Deps": [
+		{
+			"ImportPath": "github.com/alexcesaro/log",
+			"Rev": "61e686294e58a8698a9e1091268bb4ac1116bd5e"
+		},
+		{
+			"ImportPath": "github.com/alexcesaro/log/golog",
+			"Rev": "61e686294e58a8698a9e1091268bb4ac1116bd5e"
+		},
+		{
+			"ImportPath": "github.com/shazow/rateio",
+			"Rev": "e8e00881e5c12090412414be41c04ca9c8a71106"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "c2f4947f41766b144bb09066e919466da5eddeae"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ed25519",
+			"Rev": "c2f4947f41766b144bb09066e919466da5eddeae"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"Rev": "c2f4947f41766b144bb09066e919466da5eddeae"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "c2f4947f41766b144bb09066e919466da5eddeae"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh/terminal",
+			"Rev": "c2f4947f41766b144bb09066e919466da5eddeae"
+		}
+	]
+}

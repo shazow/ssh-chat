@@ -14,3 +14,6 @@
 	path = vendor/github.com/shazow/rateio
 	url = https://github.com/shazow/rateio
 	branch = master
+[submodule "vendor/golang.org/x/crypto"]
+	path = vendor/golang.org/x/crypto
+	url = https://go.googlesource.com/crypto
