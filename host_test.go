@@ -63,7 +63,7 @@ func TestHostNameCollision(t *testing.T) {
 
 	// First client
 	go func() {
-		err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
