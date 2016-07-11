@@ -106,9 +106,12 @@ func TestHostNameCollision(t *testing.T) {
 
 		// Consume the initial buffer
 		scanner.Scan()
+		scanner.Scan()
+		scanner.Scan()
+
 		actual := scanner.Text()
 		if !strings.HasPrefix(actual, "[Guest1] ") {
-			t.Errorf("Second client did not get Guest1 name.")
+			t.Errorf("Second client did not get Guest1 name: %q", actual)
 		}
 	})
 	if err != nil {
