@@ -184,10 +184,13 @@ func TestHostKick(t *testing.T) {
 
 	go func() {
 		// First client
-		err = sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) {
 			// Make op
 			member, _ := host.Room.MemberById("foo")
-			member.Op = true
+			if member == nil {
+				t.Fatal("failed to load MemberById")
+			}
+			host.Room.Ops.Add(member)
 
 			// Block until second client is here
 			connected <- struct{}{}
@@ -200,7 +203,7 @@ func TestHostKick(t *testing.T) {
 
 	go func() {
 		// Second client
-		err = sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) {
 			<-connected
 
 			// Consume while we're connected. Should break when kicked.
