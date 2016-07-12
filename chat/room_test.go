@@ -161,10 +161,15 @@ func TestQuietToggleDisplayState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Drain the initial Join message
-	<-ch.broadcast
+	u.HandleMsg(<-u.ConsumeChan(), s)
+	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
+	s.Read(&actual)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
 
 	ch.Send(message.ParseInput("/quiet", u))
+
 	u.HandleMsg(<-u.ConsumeChan(), s)
 	expected = []byte("-> Quiet mode is toggled ON" + message.Newline)
 	s.Read(&actual)
@@ -173,9 +178,9 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	}
 
 	ch.Send(message.ParseInput("/quiet", u))
+
 	u.HandleMsg(<-u.ConsumeChan(), s)
 	expected = []byte("-> Quiet mode is toggled OFF" + message.Newline)
-
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
@@ -197,10 +202,15 @@ func TestRoomNames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Drain the initial Join message
-	<-ch.broadcast
+	u.HandleMsg(<-u.ConsumeChan(), s)
+	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
+	s.Read(&actual)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+	}
 
 	ch.Send(message.ParseInput("/names", u))
+
 	u.HandleMsg(<-u.ConsumeChan(), s)
 	expected = []byte("-> 1 connected: foo" + message.Newline)
 	s.Read(&actual)

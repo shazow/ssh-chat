@@ -23,18 +23,19 @@ var ErrInvalidName = errors.New("invalid name")
 // Member is a User with per-Room metadata attached to it.
 type Member struct {
 	*message.User
-	Op bool
 }
 
 // Room definition, also a Set of User Items
 type Room struct {
 	topic     string
 	history   *message.History
-	members   *idSet
 	broadcast chan message.Message
 	commands  Commands
 	closed    bool
 	closeOnce sync.Once
+
+	Members *idSet
+	Ops     *idSet
 }
 
 // NewRoom creates a new room.
@@ -44,8 +45,10 @@ func NewRoom() *Room {
 	return &Room{
 		broadcast: broadcast,
 		history:   message.NewHistory(historyLen),
-		members:   newIdSet(),
 		commands:  *defaultCommands,
+
+		Members: newIdSet(),
+		Ops:     newIdSet(),
 	}
 }
 
@@ -58,10 +61,10 @@ func (r *Room) SetCommands(commands Commands) {
 func (r *Room) Close() {
 	r.closeOnce.Do(func() {
 		r.closed = true
-		r.members.Each(func(m identified) {
+		r.Members.Each(func(m identified) {
 			m.(*Member).Close()
 		})
-		r.members.Clear()
+		r.Members.Clear()
 		close(r.broadcast)
 	})
 }
@@ -92,7 +95,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 
 		r.history.Add(m)
-		r.members.Each(func(u identified) {
+		r.Members.Each(func(u identified) {
 			user := u.(*Member).User
 			if skip && skipUser == user {
 				// Skip
@@ -137,23 +140,24 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	if u.Id() == "" {
 		return nil, ErrInvalidName
 	}
-	member := Member{u, false}
-	err := r.members.Add(&member)
+	member := Member{u}
+	err := r.Members.Add(&member)
 	if err != nil {
 		return nil, err
 	}
 	r.History(u)
-	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.members.Len())
+	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.Members.Len())
 	r.Send(message.NewAnnounceMsg(s))
 	return &member, nil
 }
 
 // Leave the room as a user, will announce. Mostly used during setup.
 func (r *Room) Leave(u message.Identifier) error {
-	err := r.members.Remove(u)
+	err := r.Members.Remove(u)
 	if err != nil {
 		return err
 	}
+	r.Ops.Remove(u)
 	s := fmt.Sprintf("%s left.", u.Name())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
@@ -164,7 +168,7 @@ func (r *Room) Rename(oldId string, identity message.Identifier) error {
 	if identity.Id() == "" {
 		return ErrInvalidName
 	}
-	err := r.members.Replace(oldId, identity)
+	err := r.Members.Replace(oldId, identity)
 	if err != nil {
 		return err
 	}
@@ -189,7 +193,7 @@ func (r *Room) Member(u *message.User) (*Member, bool) {
 }
 
 func (r *Room) MemberById(id string) (*Member, bool) {
-	m, err := r.members.Get(id)
+	m, err := r.Members.Get(id)
 	if err != nil {
 		return nil, false
 	}
@@ -198,8 +202,7 @@ func (r *Room) MemberById(id string) (*Member, bool) {
 
 // IsOp returns whether a user is an operator in this room.
 func (r *Room) IsOp(u *message.User) bool {
-	m, ok := r.Member(u)
-	return ok && m.Op
+	return r.Ops.In(u)
 }
 
 // Topic of the room.
@@ -215,7 +218,7 @@ func (r *Room) SetTopic(s string) {
 // NamesPrefix lists all members' names with a given prefix, used to query
 // for autocompletion purposes.
 func (r *Room) NamesPrefix(prefix string) []string {
-	members := r.members.ListPrefix(prefix)
+	members := r.Members.ListPrefix(prefix)
 	names := make([]string, len(members))
 	for i, u := range members {
 		names[i] = u.(*Member).User.Name()

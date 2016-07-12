@@ -114,7 +114,9 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	h.count++
 
 	// Should the user be op'd on join?
-	member.Op = h.isOp(term.Conn)
+	if h.isOp(term.Conn) {
+		h.Room.Ops.Add(member)
+	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
 	for {
@@ -458,7 +460,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if !ok {
 				return errors.New("user not found")
 			}
-			member.Op = true
+			room.Ops.Add(member)
 			id := member.Identifier.(*Identity)
 			h.auth.Op(id.PublicKey(), until)
 
