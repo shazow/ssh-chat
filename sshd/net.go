@@ -46,15 +46,12 @@ func (l *SSHListener) ServeTerminal() <-chan *Terminal {
 	ch := make(chan *Terminal)
 
 	go func() {
-		defer l.Close()
-		defer close(ch)
-
 		for {
 			conn, err := l.Accept()
 
 			if err != nil {
 				logger.Printf("Failed to accept connection: %v", err)
-				return
+				break
 			}
 
 			// Goroutineify to resume accepting sockets early
@@ -67,6 +64,9 @@ func (l *SSHListener) ServeTerminal() <-chan *Terminal {
 				ch <- term
 			}()
 		}
+
+		l.Close()
+		close(ch)
 	}()
 
 	return ch

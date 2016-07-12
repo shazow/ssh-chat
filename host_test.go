@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
@@ -215,9 +214,5 @@ func TestHostKick(t *testing.T) {
 		close(done)
 	}()
 
-	select {
-	case <-done:
-	case <-time.After(time.Second * 1):
-		t.Fatal("Timeout.")
-	}
+	<-done
 }

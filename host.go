@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shazow/rateio"
@@ -30,16 +31,17 @@ type Host struct {
 	*chat.Room
 	listener *sshd.SSHListener
 	commands chat.Commands
-
-	motd  string
-	auth  *Auth
-	count int
+	auth     *Auth
 
 	// Version string to print on /version
 	Version string
 
 	// Default theme
 	theme message.Theme
+
+	mu    sync.Mutex
+	motd  string
+	count int
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -63,12 +65,16 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 
 // SetTheme sets the default theme for the host.
 func (h *Host) SetTheme(theme message.Theme) {
+	h.mu.Lock()
 	h.theme = theme
+	h.mu.Unlock()
 }
 
 // SetMotd sets the host's message of the day.
 func (h *Host) SetMotd(motd string) {
+	h.mu.Lock()
 	h.motd = motd
+	h.mu.Unlock()
 }
 
 func (h Host) isOp(conn sshd.Connection) bool {
@@ -91,15 +97,21 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}()
 	defer user.Close()
 
+	h.mu.Lock()
+	motd := h.motd
+	count := h.count
+	h.count++
+	h.mu.Unlock()
+
 	// Send MOTD
-	if h.motd != "" {
-		user.Send(message.NewAnnounceMsg(h.motd))
+	if motd != "" {
+		go user.Send(message.NewAnnounceMsg(motd))
 	}
 
 	member, err := h.Join(user)
 	if err != nil {
 		// Try again...
-		id.SetName(fmt.Sprintf("Guest%d", h.count))
+		id.SetName(fmt.Sprintf("Guest%d", count))
 		member, err = h.Join(user)
 	}
 	if err != nil {
@@ -111,7 +123,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.SetPrompt(GetPrompt(user))
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
-	h.count++
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
