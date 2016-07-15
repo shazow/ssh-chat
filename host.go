@@ -77,7 +77,7 @@ func (h *Host) SetMotd(motd string) {
 	h.mu.Unlock()
 }
 
-func (h Host) isOp(conn sshd.Connection) bool {
+func (h *Host) isOp(conn sshd.Connection) bool {
 	key := conn.PublicKey()
 	if key == nil {
 		return false
@@ -185,7 +185,7 @@ func (h *Host) Serve() {
 	}
 }
 
-func (h Host) completeName(partial string) string {
+func (h *Host) completeName(partial string) string {
 	names := h.NamesPrefix(partial)
 	if len(names) == 0 {
 		// Didn't find anything
@@ -195,7 +195,7 @@ func (h Host) completeName(partial string) string {
 	return names[len(names)-1]
 }
 
-func (h Host) completeCommand(partial string) string {
+func (h *Host) completeCommand(partial string) string {
 	for cmd, _ := range h.commands {
 		if strings.HasPrefix(cmd, partial) {
 			return cmd
