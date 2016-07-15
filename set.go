@@ -25,8 +25,8 @@ type setValue interface {
 
 // Set with expire-able keys
 type Set struct {
-	lookup map[string]setValue
 	sync.Mutex
+	lookup map[string]setValue
 }
 
 // NewSet creates a new set.
@@ -38,6 +38,8 @@ func NewSet() *Set {
 
 // Len returns the size of the set right now.
 func (s *Set) Len() int {
+	s.Lock()
+	defer s.Unlock()
 	return len(s.lookup)
 }
 

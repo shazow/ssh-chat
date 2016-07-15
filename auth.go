@@ -3,7 +3,6 @@ package sshchat
 import (
 	"errors"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/shazow/ssh-chat/sshd"
@@ -36,7 +35,6 @@ func newAuthAddr(addr net.Addr) string {
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 type Auth struct {
-	sync.RWMutex
 	bannedAddr *Set
 	banned     *Set
 	whitelist  *Set

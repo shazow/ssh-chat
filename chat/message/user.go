@@ -18,14 +18,16 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
-	Config    UserConfig
-	colorIdx  int
-	joined    time.Time
-	msg       chan Message
-	done      chan struct{}
-	replyTo   *User // Set when user gets a /msg, for replying.
-	closed    bool
-	closeOnce sync.Once
+	Config   UserConfig
+	colorIdx int
+	joined   time.Time
+	msg      chan Message
+	done     chan struct{}
+
+	mu      sync.Mutex
+	replyTo *User // Set when user gets a /msg, for replying.
+	screen  io.Closer
+	closed  bool
 }
 
 func NewUser(identity Identifier) *User {
@@ -41,8 +43,9 @@ func NewUser(identity Identifier) *User {
 	return &u
 }
 
-func NewUserScreen(identity Identifier, screen io.Writer) *User {
+func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 	u := NewUser(identity)
+	u.screen = screen
 	go u.Consume(screen)
 
 	return u
@@ -82,11 +85,20 @@ func (u *User) Wait() {
 
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
-	u.closeOnce.Do(func() {
-		u.closed = true
-		close(u.done)
-		close(u.msg)
-	})
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	if u.closed {
+		return
+	}
+
+	u.closed = true
+	close(u.done)
+	close(u.msg)
+
+	if u.screen != nil {
+		u.screen.Close()
+	}
 }
 
 // Consume message buffer into an io.Writer. Will block, should be called in a
@@ -136,6 +148,9 @@ func (u *User) HandleMsg(m Message, out io.Writer) {
 
 // Add message to consume by user
 func (u *User) Send(m Message) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	if u.closed {
 		return ErrUserClosed
 	}

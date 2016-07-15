@@ -48,21 +48,21 @@ func NewMsg(body string) *Msg {
 }
 
 // Render message based on a theme.
-func (m *Msg) Render(t *Theme) string {
+func (m Msg) Render(t *Theme) string {
 	// TODO: Render based on theme
 	// TODO: Cache based on theme
 	return m.String()
 }
 
-func (m *Msg) String() string {
+func (m Msg) String() string {
 	return m.body
 }
 
-func (m *Msg) Command() string {
+func (m Msg) Command() string {
 	return ""
 }
 
-func (m *Msg) Timestamp() time.Time {
+func (m Msg) Timestamp() time.Time {
 	return m.timestamp
 }
 
@@ -72,8 +72,8 @@ type PublicMsg struct {
 	from *User
 }
 
-func NewPublicMsg(body string, from *User) *PublicMsg {
-	return &PublicMsg{
+func NewPublicMsg(body string, from *User) PublicMsg {
+	return PublicMsg{
 		Msg: Msg{
 			body:      body,
 			timestamp: time.Now(),
@@ -82,11 +82,11 @@ func NewPublicMsg(body string, from *User) *PublicMsg {
 	}
 }
 
-func (m *PublicMsg) From() *User {
+func (m PublicMsg) From() *User {
 	return m.from
 }
 
-func (m *PublicMsg) ParseCommand() (*CommandMsg, bool) {
+func (m PublicMsg) ParseCommand() (*CommandMsg, bool) {
 	// Check if the message is a command
 	if !strings.HasPrefix(m.body, "/") {
 		return nil, false
@@ -104,7 +104,7 @@ func (m *PublicMsg) ParseCommand() (*CommandMsg, bool) {
 	return &msg, true
 }
 
-func (m *PublicMsg) Render(t *Theme) string {
+func (m PublicMsg) Render(t *Theme) string {
 	if t == nil {
 		return m.String()
 	}
@@ -112,7 +112,7 @@ func (m *PublicMsg) Render(t *Theme) string {
 	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
 }
 
-func (m *PublicMsg) RenderFor(cfg UserConfig) string {
+func (m PublicMsg) RenderFor(cfg UserConfig) string {
 	if cfg.Highlight == nil || cfg.Theme == nil {
 		return m.Render(cfg.Theme)
 	}
@@ -128,7 +128,7 @@ func (m *PublicMsg) RenderFor(cfg UserConfig) string {
 	return fmt.Sprintf("%s: %s", cfg.Theme.ColorName(m.from), body)
 }
 
-func (m *PublicMsg) String() string {
+func (m PublicMsg) String() string {
 	return fmt.Sprintf("%s: %s", m.from.Name(), m.body)
 }
 
@@ -164,9 +164,9 @@ type PrivateMsg struct {
 	to *User
 }
 
-func NewPrivateMsg(body string, from *User, to *User) *PrivateMsg {
-	return &PrivateMsg{
-		PublicMsg: *NewPublicMsg(body, from),
+func NewPrivateMsg(body string, from *User, to *User) PrivateMsg {
+	return PrivateMsg{
+		PublicMsg: NewPublicMsg(body, from),
 		to:        to,
 	}
 }
@@ -242,19 +242,19 @@ func (m *AnnounceMsg) String() string {
 }
 
 type CommandMsg struct {
-	*PublicMsg
+	PublicMsg
 	command string
 	args    []string
 }
 
-func (m *CommandMsg) Command() string {
+func (m CommandMsg) Command() string {
 	return m.command
 }
 
-func (m *CommandMsg) Args() []string {
+func (m CommandMsg) Args() []string {
 	return m.args
 }
 
-func (m *CommandMsg) Body() string {
+func (m CommandMsg) Body() string {
 	return m.body
 }

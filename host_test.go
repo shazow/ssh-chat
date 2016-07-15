@@ -206,7 +206,7 @@ func TestHostKick(t *testing.T) {
 			<-connected
 
 			// Consume while we're connected. Should break when kicked.
-			ioutil.ReadAll(r)
+			ioutil.ReadAll(r) // XXX?
 		})
 		if err != nil {
 			t.Fatal(err)

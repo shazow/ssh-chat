@@ -90,12 +90,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	user.Config.Theme = &h.theme
-	go func() {
-		// Close term once user is closed.
-		user.Wait()
-		term.Close()
-	}()
+
+	// Close term once user is closed.
 	defer user.Close()
+	defer term.Close()
 
 	h.mu.Lock()
 	motd := h.motd
@@ -285,7 +283,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			m := message.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
-			room.Send(m)
+			room.Send(&m)
 			return nil
 		},
 	})
@@ -307,7 +305,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			m := message.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
-			room.Send(m)
+			room.Send(&m)
 			return nil
 		},
 	})

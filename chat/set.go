@@ -20,8 +20,8 @@ type identified interface {
 // Set with string lookup.
 // TODO: Add trie for efficient prefix lookup?
 type idSet struct {
-	lookup map[string]identified
 	sync.RWMutex
+	lookup map[string]identified
 }
 
 // newIdSet creates a new set.
@@ -42,6 +42,8 @@ func (s *idSet) Clear() int {
 
 // Len returns the size of the set right now.
 func (s *idSet) Len() int {
+	s.RLock()
+	defer s.RUnlock()
 	return len(s.lookup)
 }
 
