@@ -150,11 +150,11 @@ func NewEmoteMsg(body string, from *User) *EmoteMsg {
 	}
 }
 
-func (m *EmoteMsg) Render(t *Theme) string {
+func (m EmoteMsg) Render(t *Theme) string {
 	return fmt.Sprintf("** %s %s", m.from.Name(), m.body)
 }
 
-func (m *EmoteMsg) String() string {
+func (m EmoteMsg) String() string {
 	return m.Render(nil)
 }
 
@@ -171,15 +171,15 @@ func NewPrivateMsg(body string, from *User, to *User) PrivateMsg {
 	}
 }
 
-func (m *PrivateMsg) To() *User {
+func (m PrivateMsg) To() *User {
 	return m.to
 }
 
-func (m *PrivateMsg) Render(t *Theme) string {
+func (m PrivateMsg) Render(t *Theme) string {
 	return fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.body)
 }
 
-func (m *PrivateMsg) String() string {
+func (m PrivateMsg) String() string {
 	return m.Render(nil)
 }
 
@@ -230,14 +230,14 @@ func NewAnnounceMsg(body string) *AnnounceMsg {
 	}
 }
 
-func (m *AnnounceMsg) Render(t *Theme) string {
+func (m AnnounceMsg) Render(t *Theme) string {
 	if t == nil {
 		return m.String()
 	}
 	return t.ColorSys(m.String())
 }
 
-func (m *AnnounceMsg) String() string {
+func (m AnnounceMsg) String() string {
 	return fmt.Sprintf(" * %s", m.body)
 }
 
