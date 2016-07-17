@@ -18,6 +18,15 @@ The server's RSA key fingerprint is `e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6
 
 (Apologies if the server is down, try again shortly.)
 
+
+## Downloading a release
+
+Recent releases include builds for MacOS (darwin/amd64) and Linux (386 and 
+amd64).
+
+**[Grab the latest release here](https://github.com/shazow/ssh-chat/releases/)**.
+
+
 ## Compiling / Developing
 
 You can compile ssh-chat by using `make build`. The resulting binary is portable and
@@ -29,6 +38,7 @@ things up with `make run`.
 Additionally, `make debug` runs the server with an http `pprof` server. This allows you to open
 [http://localhost:6060/debug/pprof/]() and view profiling data. See
 [net/http/pprof](http://golang.org/pkg/net/http/pprof/) for more information about `pprof`.
+
 
 ## Quick Start
 
