@@ -34,7 +34,11 @@ func TestServeTerminals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	terminals := s.ServeTerminal()
+	terminals := make(chan *Terminal)
+	s.HandlerFunc = func(term *Terminal) {
+		terminals <- term
+	}
+	go s.Serve()
 
 	go func() {
 		// Accept one terminal, read from it, echo back, close.

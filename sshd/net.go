@@ -10,8 +10,10 @@ import (
 // Container for the connection and ssh-related configuration
 type SSHListener struct {
 	net.Listener
-	config    *ssh.ServerConfig
-	RateLimit func() rateio.Limiter
+	config *ssh.ServerConfig
+
+	RateLimit   func() rateio.Limiter
+	HandlerFunc func(term *Terminal)
 }
 
 // Make an SSH listener socket
@@ -42,32 +44,24 @@ func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
 }
 
 // Accept incoming connections as terminal requests and yield them
-func (l *SSHListener) ServeTerminal() <-chan *Terminal {
-	ch := make(chan *Terminal)
+func (l *SSHListener) Serve() {
+	defer l.Close()
+	for {
+		conn, err := l.Accept()
 
-	go func() {
-		for {
-			conn, err := l.Accept()
-
-			if err != nil {
-				logger.Printf("Failed to accept connection: %v", err)
-				break
-			}
-
-			// Goroutineify to resume accepting sockets early
-			go func() {
-				term, err := l.handleConn(conn)
-				if err != nil {
-					logger.Printf("Failed to handshake: %v", err)
-					return
-				}
-				ch <- term
-			}()
+		if err != nil {
+			logger.Printf("Failed to accept connection: %v", err)
+			break
 		}
 
-		l.Close()
-		close(ch)
-	}()
-
-	return ch
+		// Goroutineify to resume accepting sockets early
+		go func() {
+			term, err := l.handleConn(conn)
+			if err != nil {
+				logger.Printf("Failed to handshake: %v", err)
+				return
+			}
+			l.HandlerFunc(term)
+		}()
+	}
 }

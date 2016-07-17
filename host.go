@@ -178,11 +178,8 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 // Serve our chat room onto the listener
 func (h *Host) Serve() {
-	terminals := h.listener.ServeTerminal()
-
-	for term := range terminals {
-		go h.Connect(term)
-	}
+	h.listener.HandlerFunc = h.Connect
+	h.listener.Serve()
 }
 
 func (h *Host) completeName(partial string) string {

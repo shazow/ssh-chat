@@ -19,11 +19,6 @@ func (a RejectAuth) Check(net.Addr, ssh.PublicKey) (bool, error) {
 	return false, errRejectAuth
 }
 
-func consume(ch <-chan *Terminal) {
-	for _ = range ch {
-	}
-}
-
 func TestClientReject(t *testing.T) {
 	signer, err := NewRandomSigner(512)
 	config := MakeAuth(RejectAuth{})
@@ -35,7 +30,7 @@ func TestClientReject(t *testing.T) {
 	}
 	defer s.Close()
 
-	go consume(s.ServeTerminal())
+	go s.Serve()
 
 	conn, err := ssh.Dial("tcp", s.Addr().String(), NewClientConfig("foo"))
 	if err == nil {
