@@ -30,7 +30,6 @@ debug: $(BINARY) $(KEY)
 
 test:
 	go test ./...
-	golint ./...
 
 release:
 	GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE

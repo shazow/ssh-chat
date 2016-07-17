@@ -5,8 +5,6 @@ notifications:
 
 install:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go get github.com/GeertJohan/fgt
-  - go get github.com/golang/lint/golint
   - make deps
 
 script:
@@ -14,4 +12,4 @@ script:
   - make test
 
 go:
-  - 1.4
+  - tip
