@@ -16,12 +16,15 @@ main() {
 
     if [[ ! "$GOOS" ]]; then
         export GOOS="linux"
+        echo "Defaulting to GOOS=$GOOS"
     fi
     if [[ ! "$GOARCH" ]]; then
         export GOARCH="amd64"
+        echo "Defaulting to GOARCH=$GOARCH"
     fi
     if [[ ! "$BUILDDIR" ]]; then
         export BUILDDIR="build"
+        echo "Defaulting to BUILDDIR=$BUILDDIR"
     fi
 
     build "$@"

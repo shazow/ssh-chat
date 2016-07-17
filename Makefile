@@ -3,7 +3,7 @@ KEY = host_key
 PORT = 2022
 
 SRCS = %.go
-VERSION := $(shell git describe --long --tags --dirty --always)
+VERSION := $(shell git describe --tags --dirty --always)
 LDFLAGS = LDFLAGS="-X main.Version=$(VERSION)"
 
 all: $(BINARY)
@@ -33,6 +33,6 @@ test:
 	golint ./...
 
 release:
-	ENV=GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
-	ENV=GOOS=linux GOARCH=386 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
-	ENV=GOOS=darwin GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	GOOS=linux GOARCH=386 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	GOOS=darwin GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
