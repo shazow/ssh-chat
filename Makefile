@@ -29,7 +29,7 @@ debug: $(BINARY) $(KEY)
 	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv
 
 test:
-	go test ./...
+	go test -v ./...
 
 release:
 	GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
