@@ -4,10 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
+
+var keepaliveInterval = time.Second * 30
+var keepaliveRequest = "keepalive@ssh-chat"
 
 // Connection is an interface with fields necessary to operate an sshd host.
 type Connection interface {
@@ -70,6 +74,17 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 		// FIXME: Is this necessary?
 		conn.Wait()
 		channel.Close()
+	}()
+
+	go func() {
+		for range time.Tick(keepaliveInterval) {
+			_, err := channel.SendRequest(keepaliveRequest, true, nil)
+			if err != nil {
+				// Connection is gone
+				conn.Close()
+				return
+			}
+		}
 	}()
 
 	return &term, nil
