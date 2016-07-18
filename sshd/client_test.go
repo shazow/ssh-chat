@@ -37,5 +37,4 @@ func TestClientReject(t *testing.T) {
 		defer conn.Close()
 		t.Error("Failed to reject conncetion")
 	}
-	t.Log(err)
 }

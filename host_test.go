@@ -69,6 +69,7 @@ func TestHostNameCollision(t *testing.T) {
 			scanner.Scan()
 			actual := scanner.Text()
 			if !strings.HasPrefix(actual, "[foo] ") {
+				// FIXME: Technically this is flakey. :/
 				t.Errorf("First client failed to get 'foo' name: %q", actual)
 			}
 

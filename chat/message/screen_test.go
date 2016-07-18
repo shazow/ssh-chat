@@ -21,6 +21,10 @@ func (s *MockScreen) Read(p *[]byte) (n int, err error) {
 	return len(*p), nil
 }
 
+func (s *MockScreen) Close() error {
+	return nil
+}
+
 func TestScreen(t *testing.T) {
 	var actual, expected []byte
 

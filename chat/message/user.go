@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const messageBuffer = 20
+const messageBuffer = 5
 const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
@@ -24,10 +24,10 @@ type User struct {
 	msg      chan Message
 	done     chan struct{}
 
-	mu      sync.Mutex
-	replyTo *User // Set when user gets a /msg, for replying.
-	screen  io.Closer
-	closed  bool
+	mu        sync.RWMutex
+	replyTo   *User // Set when user gets a /msg, for replying.
+	screen    io.WriteCloser
+	closeOnce sync.Once
 }
 
 func NewUser(identity Identifier) *User {
@@ -46,7 +46,6 @@ func NewUser(identity Identifier) *User {
 func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 	u := NewUser(identity)
 	u.screen = screen
-	go u.Consume(screen)
 
 	return u
 }
@@ -85,34 +84,30 @@ func (u *User) Wait() {
 
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	if u.closed {
-		return
-	}
-
-	u.closed = true
-	close(u.done)
-	close(u.msg)
-
-	if u.screen != nil {
-		u.screen.Close()
-	}
+	u.closeOnce.Do(func() {
+		u.mu.Lock()
+		if u.screen != nil {
+			u.screen.Close()
+		}
+		close(u.msg)
+		close(u.done)
+		u.msg = nil
+		u.mu.Unlock()
+	})
 }
 
 // Consume message buffer into an io.Writer. Will block, should be called in a
 // goroutine.
 // TODO: Not sure if this is a great API.
-func (u *User) Consume(out io.Writer) {
+func (u *User) Consume() {
 	for m := range u.msg {
-		u.HandleMsg(m, out)
+		u.HandleMsg(m)
 	}
 }
 
 // Consume one message and stop, mostly for testing
-func (u *User) ConsumeChan() <-chan Message {
-	return u.msg
+func (u *User) ConsumeOne() Message {
+	return <-u.msg
 }
 
 // SetHighlight sets the highlighting regular expression to match string.
@@ -137,24 +132,21 @@ func (u *User) render(m Message) string {
 	}
 }
 
-func (u *User) HandleMsg(m Message, out io.Writer) {
+// HandleMsg will render the message to the screen, blocking.
+func (u *User) HandleMsg(m Message) error {
 	r := u.render(m)
-	_, err := out.Write([]byte(r))
+	_, err := u.screen.Write([]byte(r))
 	if err != nil {
 		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
 		u.Close()
 	}
+	return err
 }
 
 // Add message to consume by user
 func (u *User) Send(m Message) error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	if u.closed {
-		return ErrUserClosed
-	}
-
+	u.mu.RLock()
+	defer u.mu.RUnlock()
 	select {
 	case u.msg <- m:
 	default:

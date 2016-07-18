@@ -90,6 +90,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	user.Config.Theme = &h.theme
+	go user.Consume()
 
 	// Close term once user is closed.
 	defer user.Close()
