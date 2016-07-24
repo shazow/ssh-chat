@@ -78,6 +78,7 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 
 	go func() {
 		for range time.Tick(keepaliveInterval) {
+			// TODO: Could break out earlier with a select if we want, rather than waiting for an error.
 			_, err := channel.SendRequest(keepaliveRequest, true, nil)
 			if err != nil {
 				// Connection is gone

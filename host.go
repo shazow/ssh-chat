@@ -129,6 +129,8 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
+	logger.Debugf("Joined: %s", user.Name())
+
 	for {
 		line, err := term.ReadLine()
 		if err == io.EOF {
@@ -175,6 +177,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		logger.Errorf("Failed to leave: %s", err)
 		return
 	}
+	logger.Debugf("Leaving: %s", user.Name())
 }
 
 // Serve our chat room onto the listener

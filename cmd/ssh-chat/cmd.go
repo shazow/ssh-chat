@@ -85,6 +85,7 @@ func main() {
 		// Enable logging from submodules
 		chat.SetLogger(os.Stderr)
 		sshd.SetLogger(os.Stderr)
+		message.SetLogger(os.Stderr)
 	}
 
 	privateKeyPath := options.Identity

@@ -11,6 +11,7 @@ import (
 )
 
 const messageBuffer = 5
+const messageTimeout = 5 * time.Second
 const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
@@ -152,8 +153,8 @@ func (u *User) Send(m Message) error {
 	case u.msg <- m:
 	case <-u.done:
 		return ErrUserClosed
-	default:
-		logger.Printf("Msg buffer full, closing: %s", u.Name())
+	case <-time.After(messageTimeout):
+		logger.Printf("Message buffer full, closing: %s", u.Name())
 		u.Close()
 		return ErrUserClosed
 	}
