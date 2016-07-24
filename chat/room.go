@@ -134,9 +134,7 @@ func (r *Room) History(u *message.User) {
 
 // Join the room as a user, will announce.
 func (r *Room) Join(u *message.User) (*Member, error) {
-	if r.closed {
-		return nil, ErrRoomClosed
-	}
+	// TODO: Check if closed
 	if u.Id() == "" {
 		return nil, ErrInvalidName
 	}

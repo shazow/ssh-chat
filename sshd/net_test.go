@@ -60,23 +60,24 @@ func TestServeTerminals(t *testing.T) {
 	host := s.Addr().String()
 	name := "foo"
 
-	err = ConnectShell(host, name, func(r io.Reader, w io.WriteCloser) {
+	err = ConnectShell(host, name, func(r io.Reader, w io.WriteCloser) error {
 		// Consume if there is anything
 		buf := new(bytes.Buffer)
 		w.Write([]byte("hello\r\n"))
 
 		buf.Reset()
 		_, err := io.Copy(buf, r)
-		if err != nil {
-			t.Error(err)
-		}
 
 		expected := "> hello\r\necho: hello\r\n"
 		actual := buf.String()
 		if actual != expected {
+			if err != nil {
+				t.Error(err)
+			}
 			t.Errorf("Got %q; expected %q", actual, expected)
 		}
 		s.Close()
+		return nil
 	})
 
 	if err != nil {

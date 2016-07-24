@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -62,7 +63,7 @@ func TestHostNameCollision(t *testing.T) {
 
 	// First client
 	go func() {
-		err := sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -91,6 +92,7 @@ func TestHostNameCollision(t *testing.T) {
 
 			// Wrap it up.
 			close(done)
+			return nil
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -101,7 +103,7 @@ func TestHostNameCollision(t *testing.T) {
 	<-done
 
 	// Second client
-	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) {
+	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 		scanner := bufio.NewScanner(r)
 
 		// Consume the initial buffer
@@ -113,6 +115,7 @@ func TestHostNameCollision(t *testing.T) {
 		if !strings.HasPrefix(actual, "[Guest1] ") {
 			t.Errorf("Second client did not get Guest1 name: %q", actual)
 		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +144,7 @@ func TestHostWhitelist(t *testing.T) {
 
 	target := s.Addr().String()
 
-	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
 	if err != nil {
 		t.Error(err)
 	}
@@ -154,7 +157,7 @@ func TestHostWhitelist(t *testing.T) {
 	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
 	auth.Whitelist(clientpubkey, 0)
 
-	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) {})
+	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
 	if err == nil {
 		t.Error("Failed to block unwhitelisted connection.")
 	}
@@ -184,30 +187,33 @@ func TestHostKick(t *testing.T) {
 
 	go func() {
 		// First client
-		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
 			// Make op
 			member, _ := host.Room.MemberById("foo")
 			if member == nil {
-				t.Fatal("failed to load MemberById")
+				return errors.New("failed to load MemberById")
 			}
 			host.Room.Ops.Add(member)
 
 			// Block until second client is here
 			connected <- struct{}{}
 			w.Write([]byte("/kick bar\r\n"))
+			return nil
 		})
 		if err != nil {
+			close(connected)
 			t.Fatal(err)
 		}
 	}()
 
 	go func() {
 		// Second client
-		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) {
+		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
 			<-connected
 
 			// Consume while we're connected. Should break when kicked.
-			ioutil.ReadAll(r) // XXX?
+			ioutil.ReadAll(r)
+			return nil
 		})
 		if err != nil {
 			t.Fatal(err)

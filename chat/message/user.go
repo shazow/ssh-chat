@@ -24,7 +24,6 @@ type User struct {
 	msg      chan Message
 	done     chan struct{}
 
-	mu        sync.RWMutex
 	replyTo   *User // Set when user gets a /msg, for replying.
 	screen    io.WriteCloser
 	closeOnce sync.Once
@@ -33,10 +32,10 @@ type User struct {
 func NewUser(identity Identifier) *User {
 	u := User{
 		Identifier: identity,
-		Config:     *DefaultUserConfig,
+		Config:     DefaultUserConfig,
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
-		done:       make(chan struct{}, 1),
+		done:       make(chan struct{}),
 	}
 	u.SetColorIdx(rand.Int())
 
@@ -85,23 +84,27 @@ func (u *User) Wait() {
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
 	u.closeOnce.Do(func() {
-		u.mu.Lock()
 		if u.screen != nil {
 			u.screen.Close()
 		}
-		close(u.msg)
+		// close(u.msg) TODO: Close?
 		close(u.done)
-		u.msg = nil
-		u.mu.Unlock()
 	})
 }
 
-// Consume message buffer into an io.Writer. Will block, should be called in a
+// Consume message buffer into the handler. Will block, should be called in a
 // goroutine.
-// TODO: Not sure if this is a great API.
 func (u *User) Consume() {
-	for m := range u.msg {
-		u.HandleMsg(m)
+	for {
+		select {
+		case <-u.done:
+			return
+		case m, ok := <-u.msg:
+			if !ok {
+				return
+			}
+			u.HandleMsg(m)
+		}
 	}
 }
 
@@ -145,10 +148,10 @@ func (u *User) HandleMsg(m Message) error {
 
 // Add message to consume by user
 func (u *User) Send(m Message) error {
-	u.mu.RLock()
-	defer u.mu.RUnlock()
 	select {
 	case u.msg <- m:
+	case <-u.done:
+		return ErrUserClosed
 	default:
 		logger.Printf("Msg buffer full, closing: %s", u.Name())
 		u.Close()
@@ -166,10 +169,10 @@ type UserConfig struct {
 }
 
 // Default user configuration to use
-var DefaultUserConfig *UserConfig
+var DefaultUserConfig UserConfig
 
 func init() {
-	DefaultUserConfig = &UserConfig{
+	DefaultUserConfig = UserConfig{
 		Bell:  true,
 		Quiet: false,
 	}
