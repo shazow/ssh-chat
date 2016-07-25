@@ -21,8 +21,8 @@ The server's RSA key fingerprint is `e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6
 
 ## Downloading a release
 
-Recent releases include builds for MacOS (darwin/amd64) and Linux (386 and 
-amd64).
+Recent releases include builds for MacOS (darwin/amd64) and Linux (386,
+amd64, and ARM6 for your RaspberryPi).
 
 **[Grab the latest release here](https://github.com/shazow/ssh-chat/releases/)**.
 
@@ -69,18 +69,6 @@ $ ssh-chat --verbose --bind ":22" --identity ~/.ssh/id_dsa
 To bind on port 22, you'll need to make sure it's free (move any other ssh
 daemons to another port) and run ssh-chat as root (or with sudo).
 
-## Deploying with Docker
-
-You can run ssh-chat using a Docker image without manually installing go-lang:
-
-**Note: alvin/ssh-chat has v0 which is not the latest master branch as of this writing (Jan 23, 2015)**
-
-```
-$ docker pull alvin/ssh-chat
-$ docker run -d -p 0.0.0.0:(your host machine port):2022 --name ssh-chat alvin/ssh-chat
-```
-
-See notes in the header of our Dockerfile for details on building your own image.
 
 ## License
 
