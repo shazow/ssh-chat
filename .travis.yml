@@ -1,15 +1,25 @@
-language: go
-
 notifications:
   email: false
 
-install:
-  - export PATH=$PATH:$HOME/gopath/bin
-  - make deps
-
-script:
-  # TODO: Bring this back: - fgt golint
-  - make test
+language: go
 
 go:
+  - 1.6.2
   - tip
+
+env:
+  - CGO_ENABLED=0
+
+install:
+  - go get -t ./...
+  - go get github.com/golang/lint/golint
+  - go get github.com/gordonklaus/ineffassign
+
+script:
+  - diff <(echo -n) <(gofmt -s -d .)
+  - ineffassign .
+  - go vet ./...
+  - go test $(go list ./... | grep -v /vendor/)
+
+after_script:
+  - golint ./...

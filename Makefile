@@ -6,6 +6,8 @@ SRCS = %.go
 VERSION := $(shell git describe --tags --dirty --always)
 LDFLAGS = LDFLAGS="-X main.Version=$(VERSION)"
 
+SUBPACKAGES := $(shell go list ./... | grep -v /vendor/)
+
 all: $(BINARY)
 
 $(BINARY): deps **/**/*.go **/*.go *.go
@@ -29,7 +31,7 @@ debug: $(BINARY) $(KEY)
 	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv
 
 test:
-	go test -v ./...
+	go test -v $(SUBPACKAGES)
 
 release:
 	GOOS=linux GOARCH=arm GOARM=6 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
