@@ -24,10 +24,13 @@ type User struct {
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
+	ignored  []string
 
 	replyTo   *User // Set when user gets a /msg, for replying.
 	screen    io.WriteCloser
 	closeOnce sync.Once
+
+	mu sync.RWMutex
 }
 
 func NewUser(identity Identifier) *User {
@@ -114,6 +117,17 @@ func (u *User) ConsumeOne() Message {
 	return <-u.msg
 }
 
+// Check if there are pending messages, used for testing
+func (u *User) HasMessages() bool {
+	select {
+	case msg := <-u.msg:
+		u.msg <- msg
+		return true
+	default:
+		return false
+	}
+}
+
 // SetHighlight sets the highlighting regular expression to match string.
 func (u *User) SetHighlight(s string) error {
 	re, err := regexp.Compile(fmt.Sprintf(reHighlight, s))
@@ -159,6 +173,65 @@ func (u *User) Send(m Message) error {
 		return ErrUserClosed
 	}
 	return nil
+}
+
+func (u *User) Ignore(id string) error {
+	if id == "" {
+		return errors.New("user is nil.")
+	}
+
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	for _, userId := range u.ignored {
+		if userId == id {
+			return errors.New("user already ignored.")
+		}
+	}
+
+	u.ignored = append(u.ignored, id)
+	return nil
+}
+
+func (u *User) Unignore(id string) error {
+	if id == "" {
+		return errors.New("user is nil.")
+	}
+
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	for i, userId := range u.ignored {
+		if userId == id {
+			u.ignored = append(u.ignored[:i], u.ignored[i+1:]...)
+			return nil
+		}
+	}
+
+	return errors.New("user not found or not currently ignored.")
+}
+
+func (u *User) IgnoredNames() []string {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+
+	names := make([]string, len(u.ignored))
+	for i := range u.ignored {
+		names[i] = u.ignored[i]
+	}
+	return names
+}
+
+func (u *User) IsIgnoring(id string) bool {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+
+	for _, userId := range u.ignored {
+		if userId == id {
+			return true
+		}
+	}
+	return false
 }
 
 // Container for per-user configurations.

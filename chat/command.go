@@ -240,4 +240,64 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+
+	c.Add(Command{
+		Prefix:     "/ignore",
+		PrefixHelp: "[USER]",
+		Help:       "Ignore messages from USER, list ignored users without parameters.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
+			if id == "" {
+				ignored := msg.From().IgnoredNames()
+
+				var systemMsg string
+				if len(ignored) == 0 {
+					systemMsg = "0 users ignored."
+				} else {
+					systemMsg = fmt.Sprintf("%d ignored: %s", len(ignored), strings.Join(ignored, ", "))
+				}
+
+				room.Send(message.NewSystemMsg(systemMsg, msg.From()))
+				return nil
+			}
+
+			target, ok := room.MemberById(id)
+			if !ok {
+				return fmt.Errorf("user %s not found.", id)
+			}
+
+			// Don't ignore yourself
+			if target.Id() == msg.From().Id() {
+				return errors.New("cannot ignore self.")
+			}
+
+			err := msg.From().Ignore(target.Id())
+			if err != nil {
+				return err
+			}
+
+			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is now being ignored.", target.Name()), msg.From()))
+			return nil
+		},
+	})
+
+	c.Add(Command{
+		Prefix:     "/unignore",
+		PrefixHelp: "[USER]",
+		Help:       "Stop ignoring USER.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/unignore"))
+			if id == "" {
+				return errors.New("missing user id")
+			}
+
+			err := msg.From().Unignore(id)
+			if err != nil {
+				return err
+			}
+
+			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is not ignored anymore.", id), msg.From()))
+			return nil
+		},
+	})
 }

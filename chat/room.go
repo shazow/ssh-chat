@@ -97,6 +97,12 @@ func (r *Room) HandleMsg(m message.Message) {
 		r.history.Add(m)
 		r.Members.Each(func(u identified) {
 			user := u.(*Member).User
+
+			if fromMsg != nil && user.IsIgnoring(fromMsg.From().Id()) {
+				// Skip because ignored
+				return
+			}
+
 			if skip && skipUser == user {
 				// Skip
 				return
