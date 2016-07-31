@@ -197,7 +197,7 @@ func (h *Host) completeName(partial string) string {
 }
 
 func (h *Host) completeCommand(partial string) string {
-	for cmd, _ := range h.commands {
+	for cmd := range h.commands {
 		if strings.HasPrefix(cmd, partial) {
 			return cmd
 		}

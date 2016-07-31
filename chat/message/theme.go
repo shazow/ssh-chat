@@ -174,14 +174,14 @@ func init() {
 	palette := readableColors256()
 
 	Themes = []Theme{
-		Theme{
+		{
 			id:        "colors",
 			names:     palette,
 			sys:       palette.Get(8),                             // Grey
 			pm:        palette.Get(7),                             // White
 			highlight: style(Bold + "\033[48;5;11m\033[38;5;16m"), // Yellow highlight
 		},
-		Theme{
+		{
 			id: "mono",
 		},
 	}

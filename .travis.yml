@@ -18,7 +18,7 @@ install:
 script:
   - diff <(echo -n) <(gofmt -s -d .)
   - ineffassign .
-  - go vet ./...
+  - go vet $(go list ./... | grep -v /vendor/)
   - go test $(go list ./... | grep -v /vendor/)
 
 after_script:

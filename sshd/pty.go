@@ -28,11 +28,11 @@ func parsePtyRequest(s []byte) (width, height int, ok bool) {
 }
 
 func parseWinchRequest(s []byte) (width, height int, ok bool) {
-	width32, s, ok := parseUint32(s)
+	width32, _, ok := parseUint32(s)
 	if !ok {
 		return
 	}
-	height32, s, ok := parseUint32(s)
+	height32, _, ok := parseUint32(s)
 	if !ok {
 		return
 	}
