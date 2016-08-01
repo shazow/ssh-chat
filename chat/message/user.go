@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/shazow/ssh-chat/common"
 )
 
 const messageBuffer = 5
@@ -24,13 +26,11 @@ type User struct {
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
-	ignored  []string
+	Ignored  *common.IdSet
 
 	replyTo   *User // Set when user gets a /msg, for replying.
 	screen    io.WriteCloser
 	closeOnce sync.Once
-
-	mu sync.RWMutex
 }
 
 func NewUser(identity Identifier) *User {
@@ -40,6 +40,7 @@ func NewUser(identity Identifier) *User {
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
+		Ignored:    common.NewIdSet(),
 	}
 	u.SetColorIdx(rand.Int())
 
@@ -175,21 +176,20 @@ func (u *User) Send(m Message) error {
 	return nil
 }
 
-func (u *User) Ignore(id string) error {
-	if id == "" {
+func (u *User) Ignore(identified common.Identified) error {
+	if identified == nil {
 		return errors.New("user is nil.")
 	}
 
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	for _, userId := range u.ignored {
-		if userId == id {
-			return errors.New("user already ignored.")
-		}
+	if identified.Id() == u.Id() {
+		return errors.New("cannot ignore self.")
 	}
 
-	u.ignored = append(u.ignored, id)
+	if u.Ignored.In(identified) {
+		return errors.New("user already ignored.")
+	}
+
+	u.Ignored.Add(identified)
 	return nil
 }
 
@@ -198,40 +198,12 @@ func (u *User) Unignore(id string) error {
 		return errors.New("user is nil.")
 	}
 
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	for i, userId := range u.ignored {
-		if userId == id {
-			u.ignored = append(u.ignored[:i], u.ignored[i+1:]...)
-			return nil
-		}
+	identified, err := u.Ignored.Get(id)
+	if err != nil {
+		return err
 	}
 
-	return errors.New("user not found or not currently ignored.")
-}
-
-func (u *User) IgnoredNames() []string {
-	u.mu.RLock()
-	defer u.mu.RUnlock()
-
-	names := make([]string, len(u.ignored))
-	for i := range u.ignored {
-		names[i] = u.ignored[i]
-	}
-	return names
-}
-
-func (u *User) IsIgnoring(id string) bool {
-	u.mu.RLock()
-	defer u.mu.RUnlock()
-
-	for _, userId := range u.ignored {
-		if userId == id {
-			return true
-		}
-	}
-	return false
+	return u.Ignored.Remove(identified)
 }
 
 // Container for per-user configurations.

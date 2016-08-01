@@ -100,8 +100,8 @@ func TestIgnore(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectOutput(t, buffer, "-> Err: user already ignored."+message.Newline)
-	if names := ignorer.user.IgnoredNames(); len(names) != 1 {
-		t.Fatalf("should have %d ignored users, has %d", 1, len(names))
+	if ignoredList := ignorer.user.Ignored.ListPrefix(""); len(ignoredList) != 1 {
+		t.Fatalf("should have %d ignored users, has %d", 1, len(ignoredList))
 	}
 
 	// when a message is sent from the ignored user, it is delivered to non-ignoring users
@@ -132,15 +132,15 @@ func TestIgnore(t *testing.T) {
 	}
 	expectOutput(t, buffer, "-> 0 users ignored."+message.Newline)
 
-	if names := ignorer.user.IgnoredNames(); len(names) != 0 {
-		t.Fatalf("should have %d ignored users, has %d", 0, len(names))
+	if ignoredList := ignorer.user.Ignored.ListPrefix(""); len(ignoredList) != 0 {
+		t.Fatalf("should have %d ignored users, has %d", 0, len(ignoredList))
 	}
 
 	// after unignoring a user, its messages can be received again
 	ch.Send(message.NewPublicMsg("hello again!", ignored.user))
 
 	// give some time for the channel to get the message
-	time.Sleep(50)
+	time.Sleep(100)
 
 	// ensure ignorer has received the message
 	if !ignorer.user.HasMessages() {

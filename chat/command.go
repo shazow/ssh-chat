@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/common"
 )
 
 // The error returned when an invalid command is issued.
@@ -248,13 +249,16 @@ func InitCommands(c *Commands) {
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
-				ignored := msg.From().IgnoredNames()
+				var names []string
+				msg.From().Ignored.Each(func(i common.Identified) {
+					names = append(names, i.Id())
+				})
 
 				var systemMsg string
-				if len(ignored) == 0 {
+				if len(names) == 0 {
 					systemMsg = "0 users ignored."
 				} else {
-					systemMsg = fmt.Sprintf("%d ignored: %s", len(ignored), strings.Join(ignored, ", "))
+					systemMsg = fmt.Sprintf("%d ignored: %s", len(names), strings.Join(names, ", "))
 				}
 
 				room.Send(message.NewSystemMsg(systemMsg, msg.From()))
@@ -266,12 +270,7 @@ func InitCommands(c *Commands) {
 				return fmt.Errorf("user %s not found.", id)
 			}
 
-			// Don't ignore yourself
-			if target.Id() == msg.From().Id() {
-				return errors.New("cannot ignore self.")
-			}
-
-			err := msg.From().Ignore(target.Id())
+			err := msg.From().Ignore(target)
 			if err != nil {
 				return err
 			}

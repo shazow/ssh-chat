@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/common"
 )
 
 func TestSet(t *testing.T) {
 	var err error
-	s := newIdSet()
+	s := common.NewIdSet()
 	u := message.NewUser(message.SimpleId("foo"))
 
 	if s.In(u) {
@@ -31,7 +32,7 @@ func TestSet(t *testing.T) {
 	}
 
 	err = s.Add(u2)
-	if err != ErrIdTaken {
+	if err != common.ErrIdTaken {
 		t.Error(err)
 	}
 
