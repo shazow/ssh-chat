@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/common"
 )
 
 const historyLen = 20
@@ -34,8 +35,8 @@ type Room struct {
 	closed    bool
 	closeOnce sync.Once
 
-	Members *idSet
-	Ops     *idSet
+	Members *common.IdSet
+	Ops     *common.IdSet
 }
 
 // NewRoom creates a new room.
@@ -47,8 +48,8 @@ func NewRoom() *Room {
 		history:   message.NewHistory(historyLen),
 		commands:  *defaultCommands,
 
-		Members: newIdSet(),
-		Ops:     newIdSet(),
+		Members: common.NewIdSet(),
+		Ops:     common.NewIdSet(),
 	}
 }
 
@@ -61,7 +62,7 @@ func (r *Room) SetCommands(commands Commands) {
 func (r *Room) Close() {
 	r.closeOnce.Do(func() {
 		r.closed = true
-		r.Members.Each(func(m identified) {
+		r.Members.Each(func(m common.Identified) {
 			m.(*Member).Close()
 		})
 		r.Members.Clear()
@@ -95,8 +96,14 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 
 		r.history.Add(m)
-		r.Members.Each(func(u identified) {
+		r.Members.Each(func(u common.Identified) {
 			user := u.(*Member).User
+
+			if fromMsg != nil && user.Ignored.In(fromMsg.From()) {
+				// Skip because ignored
+				return
+			}
+
 			if skip && skipUser == user {
 				// Skip
 				return

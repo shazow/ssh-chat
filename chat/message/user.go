@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/shazow/ssh-chat/common"
 )
 
 const messageBuffer = 5
@@ -24,6 +26,7 @@ type User struct {
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
+	Ignored  *common.IdSet
 
 	replyTo   *User // Set when user gets a /msg, for replying.
 	screen    io.WriteCloser
@@ -37,6 +40,7 @@ func NewUser(identity Identifier) *User {
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
+		Ignored:    common.NewIdSet(),
 	}
 	u.SetColorIdx(rand.Int())
 
@@ -114,6 +118,17 @@ func (u *User) ConsumeOne() Message {
 	return <-u.msg
 }
 
+// Check if there are pending messages, used for testing
+func (u *User) HasMessages() bool {
+	select {
+	case msg := <-u.msg:
+		u.msg <- msg
+		return true
+	default:
+		return false
+	}
+}
+
 // SetHighlight sets the highlighting regular expression to match string.
 func (u *User) SetHighlight(s string) error {
 	re, err := regexp.Compile(fmt.Sprintf(reHighlight, s))
@@ -159,6 +174,36 @@ func (u *User) Send(m Message) error {
 		return ErrUserClosed
 	}
 	return nil
+}
+
+func (u *User) Ignore(identified common.Identified) error {
+	if identified == nil {
+		return errors.New("user is nil.")
+	}
+
+	if identified.Id() == u.Id() {
+		return errors.New("cannot ignore self.")
+	}
+
+	if u.Ignored.In(identified) {
+		return errors.New("user already ignored.")
+	}
+
+	u.Ignored.Add(identified)
+	return nil
+}
+
+func (u *User) Unignore(id string) error {
+	if id == "" {
+		return errors.New("user is nil.")
+	}
+
+	identified, err := u.Ignored.Get(id)
+	if err != nil {
+		return err
+	}
+
+	return u.Ignored.Remove(identified)
 }
 
 // Container for per-user configurations.

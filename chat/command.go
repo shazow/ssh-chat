@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/common"
 )
 
 // The error returned when an invalid command is issued.
@@ -237,6 +238,64 @@ func InitCommands(c *Commands) {
 			}
 
 			room.Send(message.NewEmoteMsg(me, msg.From()))
+			return nil
+		},
+	})
+
+	c.Add(Command{
+		Prefix:     "/ignore",
+		PrefixHelp: "[USER]",
+		Help:       "Ignore messages from USER, list ignored users without parameters.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
+			if id == "" {
+				var names []string
+				msg.From().Ignored.Each(func(i common.Identified) {
+					names = append(names, i.Id())
+				})
+
+				var systemMsg string
+				if len(names) == 0 {
+					systemMsg = "0 users ignored."
+				} else {
+					systemMsg = fmt.Sprintf("%d ignored: %s", len(names), strings.Join(names, ", "))
+				}
+
+				room.Send(message.NewSystemMsg(systemMsg, msg.From()))
+				return nil
+			}
+
+			target, ok := room.MemberById(id)
+			if !ok {
+				return fmt.Errorf("user %s not found.", id)
+			}
+
+			err := msg.From().Ignore(target)
+			if err != nil {
+				return err
+			}
+
+			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is now being ignored.", target.Name()), msg.From()))
+			return nil
+		},
+	})
+
+	c.Add(Command{
+		Prefix:     "/unignore",
+		PrefixHelp: "[USER]",
+		Help:       "Stop ignoring USER.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/unignore"))
+			if id == "" {
+				return errors.New("missing user id")
+			}
+
+			err := msg.From().Unignore(id)
+			if err != nil {
+				return err
+			}
+
+			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is not ignored anymore.", id), msg.From()))
 			return nil
 		},
 	})
