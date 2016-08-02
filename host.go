@@ -423,7 +423,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Op:         true,
 		Prefix:     "/motd",
 		PrefixHelp: "[MESSAGE]",
-		Help:       "Set a new message of the day, print current motd without parameters",
+		Help:       "Set a new MESSAGE of the day, print the current motd without parameters.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			user := msg.From()
