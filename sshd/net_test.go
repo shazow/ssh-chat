@@ -8,12 +8,12 @@ import (
 
 func TestServerInit(t *testing.T) {
 	config := MakeNoAuth()
-	s, err := ListenSSH(":badport", config)
+	s, err := ListenSSH("localhost:badport", config)
 	if err == nil {
 		t.Fatal("should fail on bad port")
 	}
 
-	s, err = ListenSSH(":0", config)
+	s, err = ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Error(err)
 	}
@@ -29,7 +29,7 @@ func TestServeTerminals(t *testing.T) {
 	config := MakeNoAuth()
 	config.AddHostKey(signer)
 
-	s, err := ListenSSH(":0", config)
+	s, err := ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}

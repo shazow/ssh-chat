@@ -24,7 +24,7 @@ func TestClientReject(t *testing.T) {
 	config := MakeAuth(RejectAuth{})
 	config.AddHostKey(signer)
 
-	s, err := ListenSSH(":0", config)
+	s, err := ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}

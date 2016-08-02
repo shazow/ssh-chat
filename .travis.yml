@@ -12,14 +12,9 @@ env:
 
 install:
   - go get -t ./...
-  - go get github.com/golang/lint/golint
   - go get github.com/gordonklaus/ineffassign
 
 script:
-  - diff <(echo -n) <(gofmt -s -d .)
   - ineffassign .
   - go vet $(go list ./... | grep -v /vendor/)
-  - go test $(go list ./... | grep -v /vendor/)
-
-after_script:
-  - golint ./...
+  - go test -v $(go list ./... | grep -v /vendor/)

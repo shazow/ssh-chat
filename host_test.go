@@ -51,7 +51,7 @@ func TestHostNameCollision(t *testing.T) {
 	config := sshd.MakeNoAuth()
 	config.AddHostKey(key)
 
-	s, err := sshd.ListenSSH(":0", config)
+	s, err := sshd.ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestHostWhitelist(t *testing.T) {
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(key)
 
-	s, err := sshd.ListenSSH(":0", config)
+	s, err := sshd.ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestHostKick(t *testing.T) {
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(key)
 
-	s, err := sshd.ListenSSH(":0", config)
+	s, err := sshd.ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}
