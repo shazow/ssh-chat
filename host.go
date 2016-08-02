@@ -422,8 +422,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/motd",
-		PrefixHelp: "MESSAGE",
-		Help:       "Set the MESSAGE of the day.",
+		PrefixHelp: "[MESSAGE]",
+		Help:       "Set a new message of the day, print current motd without parameters",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
