@@ -28,9 +28,11 @@ type User struct {
 	done     chan struct{}
 	Ignored  *common.IdSet
 
-	replyTo   *User // Set when user gets a /msg, for replying.
 	screen    io.WriteCloser
 	closeOnce sync.Once
+
+	mu      sync.Mutex
+	replyTo *User // Set when user gets a /msg, for replying.
 }
 
 func NewUser(identity Identifier) *User {
@@ -62,11 +64,15 @@ func (u *User) SetId(id string) {
 
 // ReplyTo returns the last user that messaged this user.
 func (u *User) ReplyTo() *User {
+	u.mu.Lock()
+	defer u.mu.Unlock()
 	return u.replyTo
 }
 
 // SetReplyTo sets the last user to message this user.
 func (u *User) SetReplyTo(user *User) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
 	u.replyTo = user
 }
 

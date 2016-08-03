@@ -120,7 +120,8 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Successfully joined.
 	term.SetPrompt(GetPrompt(user))
-	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
+	// FIXME: Re-enable once https://github.com/shazow/ssh-chat/issues/166 is fixed.
+	//term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
 	// Should the user be op'd on join?
