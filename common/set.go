@@ -49,8 +49,9 @@ func (s *IdSet) Len() int {
 
 // In checks if an item exists in this set.
 func (s *IdSet) In(item Identified) bool {
+	id := s.normalize(item.Id())
 	s.RLock()
-	_, ok := s.lookup[item.Id()]
+	_, ok := s.lookup[id]
 	s.RUnlock()
 	return ok
 }
@@ -58,7 +59,7 @@ func (s *IdSet) In(item Identified) bool {
 // Get returns an item with the given Id.
 func (s *IdSet) Get(id string) (Identified, error) {
 	s.RLock()
-	item, ok := s.lookup[id]
+	item, ok := s.lookup[s.normalize(id)]
 	s.RUnlock()
 
 	if !ok {
@@ -73,12 +74,13 @@ func (s *IdSet) Add(item Identified) error {
 	s.Lock()
 	defer s.Unlock()
 
-	_, found := s.lookup[item.Id()]
+	id := s.normalize(item.Id())
+	_, found := s.lookup[id]
 	if found {
 		return ErrIdTaken
 	}
 
-	s.lookup[item.Id()] = item
+	s.lookup[id] = item
 	return nil
 }
 
@@ -86,7 +88,7 @@ func (s *IdSet) Add(item Identified) error {
 func (s *IdSet) Remove(item Identified) error {
 	s.Lock()
 	defer s.Unlock()
-	id := item.Id()
+	id := s.normalize(item.Id())
 	_, found := s.lookup[id]
 	if !found {
 		return ErrIdentifiedMissing
@@ -98,11 +100,14 @@ func (s *IdSet) Remove(item Identified) error {
 // Replace item from old id with new Identified.
 // Used for moving the same Identified to a new Id, such as a rename.
 func (s *IdSet) Replace(oldId string, item Identified) error {
+	id := s.normalize(item.Id())
+	oldId = s.normalize(oldId)
+
 	s.Lock()
 	defer s.Unlock()
 
 	// Check if it already exists
-	_, found := s.lookup[item.Id()]
+	_, found := s.lookup[id]
 	if found {
 		return ErrIdTaken
 	}
@@ -115,7 +120,7 @@ func (s *IdSet) Replace(oldId string, item Identified) error {
 	delete(s.lookup, oldId)
 
 	// Add new Identified
-	s.lookup[item.Id()] = item
+	s.lookup[id] = item
 
 	return nil
 }
@@ -146,4 +151,8 @@ func (s *IdSet) ListPrefix(prefix string) []Identified {
 	}
 
 	return r
+}
+
+func (s *IdSet) normalize(id string) string {
+	return strings.ToLower(id)
 }
