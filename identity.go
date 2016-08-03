@@ -45,6 +45,7 @@ func (i Identity) Whois() string {
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
+	// TODO: Include time joined, client, etc.
 	return fmt.Sprintf("name: %s"+message.Newline+
 		" > ip: %s"+message.Newline+
 		" > fingerprint: %s", i.Name(), ip, fingerprint)

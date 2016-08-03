@@ -425,15 +425,21 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/motd",
-		PrefixHelp: "MESSAGE",
-		Help:       "Set the MESSAGE of the day.",
+		PrefixHelp: "[MESSAGE]",
+		Help:       "Set a new MESSAGE of the day, print the current motd without parameters.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
-				return errors.New("must be op")
+			args := msg.Args()
+			user := msg.From()
+			motd := h.motd
+
+			if len(args) == 0 {
+				room.Send(message.NewSystemMsg(motd, user))
+				return nil
+			}
+			if !room.IsOp(user) {
+				return errors.New("must be OP to modify the MOTD")
 			}
 
-			motd := ""
-			args := msg.Args()
 			if len(args) > 0 {
 				motd = strings.Join(args, " ")
 			}
@@ -444,7 +450,6 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if motd != "" {
 				room.Send(message.NewAnnounceMsg(motd))
 			}
-
 			return nil
 		},
 	})
