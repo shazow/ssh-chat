@@ -425,26 +425,32 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/motd",
-		PrefixHelp: "MESSAGE",
-		Help:       "Set the MESSAGE of the day.",
+		PrefixHelp: "[MESSAGE]",
+		Help:       "Set a new MESSAGE of the day, print the current motd without parameters.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
-				return errors.New("must be op")
-			}
-
-			motd := ""
 			args := msg.Args()
-			if len(args) > 0 {
-				motd = strings.Join(args, " ")
-			}
+			user := msg.From()
+			motd := h.motd
 
-			h.motd = motd
-			body := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
-			room.Send(message.NewAnnounceMsg(body))
-			if motd != "" {
-				room.Send(message.NewAnnounceMsg(motd))
-			}
+			if len(args) == 0 {
+				room.Send(message.NewSystemMsg(motd, user))
+			} else if !room.IsOp(user) {
+				return errors.New("must be OP to modify the MOTD")
+			} else {
+				motd := ""
+				args := msg.Args()
 
+				if len(args) > 0 {
+					motd = strings.Join(args, " ")
+				}
+
+				h.motd = motd
+				body := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
+				room.Send(message.NewAnnounceMsg(body))
+				if motd != "" {
+					room.Send(message.NewAnnounceMsg(motd))
+				}
+			}
 			return nil
 		},
 	})
