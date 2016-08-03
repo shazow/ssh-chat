@@ -120,8 +120,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Successfully joined.
 	term.SetPrompt(GetPrompt(user))
-	// FIXME: Re-enable once https://github.com/shazow/ssh-chat/issues/166 is fixed.
-	//term.AutoCompleteCallback = h.AutoCompleteFunction(user)
+	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
 	// Should the user be op'd on join?
@@ -220,7 +219,10 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 
 		fields := strings.Fields(line[:pos])
 		isFirst := len(fields) < 2
-		partial := fields[len(fields)-1]
+		partial := ""
+		if len(fields) > 0 {
+			partial = fields[len(fields)-1]
+		}
 		posPartial := pos - len(partial)
 
 		var completed string
