@@ -422,7 +422,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 	c.Add(chat.Command{
 		Op:         true,
-		Prefix:     "/motd",
+		Prefix:     "/setmotd",
 		PrefixHelp: "MESSAGE",
 		Help:       "Set the MESSAGE of the day.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
@@ -442,6 +442,17 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if motd != "" {
 				room.Send(message.NewAnnounceMsg(motd))
 			}
+
+			return nil
+		},
+	})
+	
+	c.Add(chat.Command{
+		Prefix:     "/motd",
+		Help:       "Display the MESSAGE of the day.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+
+			room.Send(message.NewAnnounceMsg(h.motd))
 
 			return nil
 		},
