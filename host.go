@@ -288,6 +288,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			m := message.NewPrivateMsg(strings.Join(args[1:], " "), msg.From(), target)
 			room.Send(&m)
+			room.Send(message.NewSystemMsg(fmt.Sprintf("[Sent PM to %s]", target.Name()), msg.From()))
 			return nil
 		},
 	})
