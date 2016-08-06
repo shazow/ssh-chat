@@ -15,6 +15,15 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+func nextScanToken(scanner *bufio.Scanner, i int) *bufio.Scanner {
+	count := 0
+	for count < i {
+		scanner.Scan()
+		count++
+	}
+	return scanner
+}
+
 func stripPrompt(s string) string {
 	pos := strings.LastIndex(s, "\033[K")
 	if pos < 0 {
@@ -107,9 +116,7 @@ func TestHostNameCollision(t *testing.T) {
 		scanner := bufio.NewScanner(r)
 
 		// Consume the initial buffer
-		scanner.Scan()
-		scanner.Scan()
-		scanner.Scan()
+		nextScanToken(scanner, 3)
 
 		actual := scanner.Text()
 		if !strings.HasPrefix(actual, "[Guest1] ") {
