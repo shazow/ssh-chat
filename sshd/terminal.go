@@ -22,6 +22,7 @@ type Connection interface {
 	PublicKey() ssh.PublicKey
 	RemoteAddr() net.Addr
 	Name() string
+	ClientVersion() []byte
 	Close() error
 }
 
