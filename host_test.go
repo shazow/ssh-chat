@@ -132,6 +132,54 @@ func TestHostNameCollision(t *testing.T) {
 	<-done
 }
 
+func TestMotdCommand(t *testing.T) {
+	key, err := sshd.NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auth := NewAuth()
+	config := sshd.MakeAuth(auth)
+	config.AddHostKey(key)
+
+	s, err := sshd.ListenSSH("localhost:0", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	host := NewHost(s, auth)
+	go host.Serve()
+
+	err = sshd.ConnectShell(s.Addr().String(), "baz", func(r io.Reader, w io.WriteCloser) error {
+		if err != nil {
+			t.Error(err)
+		}
+		member, _ := host.Room.MemberById("baz")
+		if member == nil {
+			return errors.New("failed to load MemberById")
+		}
+
+		scanner := bufio.NewScanner(r)
+		testMotd := "foobar"
+		host.motd = testMotd
+
+		// Test as regular user with no parameters - expected behaviour: should print the MOTD
+		w.Write([]byte("/motd\r\n"))
+
+		// Consuming buffer
+		nextScanToken(scanner, 3)
+
+		actual := scanner.Text()
+		actual = stripPrompt(actual)[3:]
+		expected := "foobar"
+		if strings.Compare(actual, expected) != 0 {
+			t.Error("failed to print MOTD using /motd with no parameters", "actual:", actual, "expected:", expected)
+		}
+
+		return nil
+	})
+}
+
 func TestHostWhitelist(t *testing.T) {
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
