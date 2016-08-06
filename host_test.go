@@ -176,6 +176,11 @@ func TestMotdCommand(t *testing.T) {
 			t.Error("failed to print MOTD using /motd with no parameters", "actual:", actual, "expected:", expected)
 		}
 
+		// Test as regular user - expected behaviour: should return an error
+		w.Write([]byte("/motd foobarbaz\r\n"))
+		if strings.Compare(host.motd, "foobar") != 0 {
+			t.Error("failed to hinder non-OPs to modify the MOTD")
+		}
 		return nil
 	})
 }
