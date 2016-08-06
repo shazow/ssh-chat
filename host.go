@@ -330,7 +330,14 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			id := target.Identifier.(*Identity)
-			room.Send(message.NewSystemMsg(id.Whois(), msg.From()))
+			var whois string
+			switch room.IsOp(msg.From()) {
+			case true:
+				whois = id.WhoisAdmin()
+			case false:
+				whois = id.Whois()
+			}
+			room.Send(message.NewSystemMsg(whois, msg.From()))
 
 			return nil
 		},
