@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
