@@ -44,7 +44,7 @@ type inputLimiter struct {
 func NewInputLimiter() rateio.Limiter {
 	grace := time.Second * 3
 	return &inputLimiter{
-		Amount:    200 * 4 * 5, // Assume fairly high typing rate + margin for copypasta of links + large key handshakes
+		Amount:    2 << 14, // ~16kb, should be plenty for a high typing rate/copypasta/large key handshakes.
 		Frequency: time.Minute * 1,
 		readCap:   128,          // Allow up to 128 bytes per read (anecdotally, 1 character = 52 bytes over ssh)
 		numRead:   -1024 * 1024, // Start with a 1mb grace
