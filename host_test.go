@@ -181,6 +181,34 @@ func TestMotdCommand(t *testing.T) {
 		if strings.Compare(host.motd, "foobar") != 0 {
 			t.Error("failed to hinder non-OPs to modify the MOTD")
 		}
+
+		// Test as OP - expected behaviour: should modify the MOTD
+		host.Room.Ops.Add(member)
+		testMotd = "barfoo"
+		w.Write([]byte("/motd barfoo\r\n"))
+
+		// Fix this during the code-review process
+		time.Sleep(time.Millisecond * 500)
+
+		if strings.Compare(host.motd, testMotd) != 0 {
+			t.Error("failed to allow OPs to modify the MOTD")
+		}
+
+		// Get around rate limitation
+		time.Sleep(time.Second * 3)
+
+		// Test as OP - expected behaviour: should print the MOTD even if OP
+		w.Write([]byte("/motd\r\n"))
+
+		nextScanToken(scanner, 8)
+
+		actual = scanner.Text()
+		actual = stripPrompt(actual)[3:]
+		expected = "barfoo"
+		if strings.Compare(actual, expected) != 0 {
+			t.Error("failed to print MOTD using /motd with no parameters - as OP")
+		}
+
 		return nil
 	})
 }
