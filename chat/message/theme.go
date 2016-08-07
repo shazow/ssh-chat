@@ -83,6 +83,9 @@ type Palette struct {
 
 // Get a color by index, overflows are looped around.
 func (p Palette) Get(i int) Style {
+	if p.size == 1 {
+		return p.colors[0]
+	}
 	return p.colors[i%(p.size-1)]
 }
 
