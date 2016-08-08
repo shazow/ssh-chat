@@ -173,8 +173,35 @@ func readableColors256() *Palette {
 	return &p
 }
 
+// A theme that users Solarized theme accents
+func solarizedColors() *Palette {
+	size := 9
+	p := Palette{
+		colors: make([]Style, size),
+		size:   size,
+	}
+	nums := [9]int{1, 2, 3, 4, 5, 6, 7, 9, 13}
+	for x := 0; x < 9; x++ {
+		p.colors[x] = Color256(nums[x])
+	}
+	return &p
+}
+
+// Hacker green colors (only uses one color)
+func hackerColors() *Palette {
+	size := 1
+	p := Palette{
+		colors: make([]Style, size),
+		size:   size,
+	}
+	p.colors[0] = Color256(82)
+	return &p
+}
+
 func init() {
 	palette := readableColors256()
+	solar   := solarizedColors()
+	hacker  := hackerColors()
 
 	Themes = []Theme{
 		{
@@ -183,6 +210,20 @@ func init() {
 			sys:       palette.Get(8),                             // Grey
 			pm:        palette.Get(7),                             // White
 			highlight: style(Bold + "\033[48;5;11m\033[38;5;16m"), // Yellow highlight
+		},
+		{
+			id:        "solarized",
+			names:     solar,
+			sys:       Color256(11),
+			pm:        Color256(15),
+			highlight: style(Bold + "\033[48;5;202m\033[38;5;256m"), // orange highlight
+		},
+		{
+			id:        "hacker",
+			names:     hacker,
+			sys:       Color256(22),
+			pm:        Color256(22),
+			highlight: style(Bold + "\033[48;5;22m\033[38;5;256m"), // green bg black fg
 		},
 		{
 			id: "mono",
