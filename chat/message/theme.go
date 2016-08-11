@@ -200,8 +200,8 @@ func hackerColors() *Palette {
 
 func init() {
 	palette := readableColors256()
-	solar   := solarizedColors()
-	hacker  := hackerColors()
+	solarized := solarizedColors()
+	hacker := hackerColors()
 
 	Themes = []Theme{
 		{
@@ -213,27 +213,31 @@ func init() {
 		},
 		{
 			id:        "solarized",
-			names:     solar,
-			sys:       Color256(11),
-			pm:        Color256(15),
-			highlight: style(Bold + "\033[48;5;202m\033[38;5;256m"), // orange highlight
+			names:     solarized,
+			sys:       Color256(11),                                 // Yellow
+			pm:        Color256(15),                                 // White
+			highlight: style(Bold + "\033[48;5;202m\033[38;5;256m"), // Orange highlight
 		},
 		{
 			id:        "hacker",
 			names:     hacker,
-			sys:       Color256(22),
-			pm:        Color256(22),
-			highlight: style(Bold + "\033[48;5;22m\033[38;5;256m"), // green bg black fg
+			sys:       Color256(22),                                // Green
+			pm:        Color256(28),                                // More green, slightly lighter
+			highlight: style(Bold + "\033[48;5;22m\033[38;5;256m"), // Green on black
 		},
 		{
 			id: "mono",
 		},
 	}
 
-	// Debug for printing colors:
-	//for _, color := range palette.colors {
-	//	fmt.Print(color.Format(color.String() + " "))
-	//}
-
 	DefaultTheme = &Themes[0]
+
+	// Debug for printing colors:
+	//printPalette(palette)
+}
+
+func printPalette(p *Palette) {
+	for _, color := range p.colors {
+		fmt.Print(color.Format(color.String() + " "))
+	}
 }

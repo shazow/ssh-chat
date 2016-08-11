@@ -180,7 +180,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix:     "/theme",
 		PrefixHelp: "[mono|colors]",
-		Help:       "Set your color theme.",
+		Help:       "Set your color theme. (More themes: solarized, hacker)",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			user := msg.From()
 			args := msg.Args()

@@ -176,7 +176,11 @@ func (m PrivateMsg) To() *User {
 }
 
 func (m PrivateMsg) Render(t *Theme) string {
-	return fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.body)
+	s := fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.body)
+	if t == nil {
+		return s
+	}
+	return t.ColorPM(s)
 }
 
 func (m PrivateMsg) String() string {
