@@ -21,7 +21,6 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
-	Config   UserConfig
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -32,6 +31,7 @@ type User struct {
 	closeOnce sync.Once
 
 	mu      sync.Mutex
+	Config  UserConfig
 	replyTo *User // Set when user gets a /msg, for replying.
 }
 
@@ -78,6 +78,8 @@ func (u *User) SetReplyTo(user *User) {
 
 // ToggleQuietMode will toggle whether or not quiet mode is enabled
 func (u *User) ToggleQuietMode() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
 	u.Config.Quiet = !u.Config.Quiet
 }
 
@@ -141,19 +143,24 @@ func (u *User) SetHighlight(s string) error {
 	if err != nil {
 		return err
 	}
+	u.mu.Lock()
 	u.Config.Highlight = re
+	u.mu.Unlock()
 	return nil
 }
 
 func (u *User) render(m Message) string {
+	u.mu.Lock()
+	cfg := u.Config
+	u.mu.Unlock()
 	switch m := m.(type) {
-	case *PublicMsg:
-		return m.RenderFor(u.Config) + Newline
-	case *PrivateMsg:
+	case PublicMsg:
+		return m.RenderFor(cfg) + Newline
+	case PrivateMsg:
 		u.SetReplyTo(m.From())
-		return m.Render(u.Config.Theme) + Newline
+		return m.Render(cfg.Theme) + Newline
 	default:
-		return m.Render(u.Config.Theme) + Newline
+		return m.Render(cfg.Theme) + Newline
 	}
 }
 
