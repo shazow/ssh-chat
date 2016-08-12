@@ -104,7 +104,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Send MOTD
 	if motd != "" {
-		go user.Send(message.NewAnnounceMsg(motd))
+		user.Send(message.NewAnnounceMsg(motd))
 	}
 
 	member, err := h.Join(user)
@@ -445,7 +445,10 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			user := msg.From()
+
+			h.mu.Lock()
 			motd := h.motd
+			h.mu.Unlock()
 
 			if len(args) == 0 {
 				room.Send(message.NewSystemMsg(motd, user))
@@ -455,16 +458,11 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must be OP to modify the MOTD")
 			}
 
-			if len(args) > 0 {
-				motd = strings.Join(args, " ")
-			}
+			motd = strings.Join(args, " ")
+			h.SetMotd(motd)
+			fromMsg := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
+			room.Send(message.NewAnnounceMsg(fromMsg + message.Newline + "-> " + motd))
 
-			h.motd = motd
-			body := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
-			room.Send(message.NewAnnounceMsg(body))
-			if motd != "" {
-				room.Send(message.NewAnnounceMsg(motd))
-			}
 			return nil
 		},
 	})
