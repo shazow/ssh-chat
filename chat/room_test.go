@@ -144,6 +144,7 @@ func TestIgnore(t *testing.T) {
 
 	// ensure ignorer has received the message
 	if !ignorer.user.HasMessages() {
+		// FIXME: This is flaky :/
 		t.Fatal("should have messages")
 	}
 	ignorer.user.HandleMsg(ignorer.user.ConsumeOne())

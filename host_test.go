@@ -37,7 +37,7 @@ func TestHostGetPrompt(t *testing.T) {
 
 	u.Config.Theme = &message.Themes[0]
 	actual = GetPrompt(u)
-	expected = "[\033[38;05;2mfoo\033[0m] "
+	expected = "[\033[38;05;3mfoo\033[0m] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -70,7 +70,7 @@ func TestHostNameCollision(t *testing.T) {
 			scanner.Scan()
 			actual := scanner.Text()
 			if !strings.HasPrefix(actual, "[foo] ") {
-				// FIXME: Technically this is flakey. :/
+				// FIXME: This is flaky. :/
 				t.Errorf("First client failed to get 'foo' name: %q", actual)
 			}
 

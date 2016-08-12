@@ -156,19 +156,17 @@ var Themes []Theme
 var DefaultTheme *Theme
 
 func readableColors256() *Palette {
-	size := 247
+	size := 225
 	p := Palette{
-		colors: make([]Style, size),
+		colors: make([]Style, 0, size),
 		size:   size,
 	}
-	j := 0
 	for i := 0; i < 256; i++ {
-		if (16 <= i && i <= 18) || (232 <= i && i <= 237) {
-			// Remove the ones near black, this is kinda sadpanda.
+		if i == 0 || i == 7 || i == 8 || i == 15 || i == 16 || i == 17 || i > 230 {
+			// Skip 31 Shades of Grey, and one hyperintelligent shade of blue.
 			continue
 		}
-		p.colors[j] = Color256(i)
-		j++
+		p.colors = append(p.colors, Color256(i))
 	}
 	return &p
 }
@@ -207,8 +205,8 @@ func init() {
 		{
 			id:        "colors",
 			names:     palette,
-			sys:       palette.Get(8),                             // Grey
-			pm:        palette.Get(7),                             // White
+			sys:       Color256(245),                              // Grey
+			pm:        Color256(7),                                // White
 			highlight: style(Bold + "\033[48;5;11m\033[38;5;16m"), // Yellow highlight
 		},
 		{
@@ -237,7 +235,7 @@ func init() {
 }
 
 func printPalette(p *Palette) {
-	for _, color := range p.colors {
-		fmt.Print(color.Format(color.String() + " "))
+	for i, color := range p.colors {
+		fmt.Printf("%d\t%s\n", i, color.Format(color.String()+" "))
 	}
 }

@@ -1,9 +1,6 @@
 package message
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestThemePalette(t *testing.T) {
 	var expected, actual string
@@ -15,21 +12,21 @@ func TestThemePalette(t *testing.T) {
 	}
 
 	actual = color.String()
-	expected = "38;05;5"
+	expected = "38;05;6"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	actual = color.Format("foo")
-	expected = "\033[38;05;5mfoo\033[0m"
+	expected = "\033[38;05;6mfoo\033[0m"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	actual = palette.Get(palette.Len() + 1).String()
-	expected = fmt.Sprintf("38;05;%d", 2)
+	expected = "38;05;3"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 }
@@ -44,28 +41,28 @@ func TestTheme(t *testing.T) {
 	}
 
 	actual = color.Format("foo")
-	expected = "\033[38;05;8mfoo\033[0m"
+	expected = "\033[38;05;245mfoo\033[0m"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	actual = colorTheme.ColorSys("foo")
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	u := NewUser(SimpleId("foo"))
 	u.colorIdx = 4
 	actual = colorTheme.ColorName(u)
-	expected = "\033[38;05;4mfoo\033[0m"
+	expected = "\033[38;05;5mfoo\033[0m"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	msg := NewPublicMsg("hello", u)
 	actual = msg.Render(&colorTheme)
-	expected = "\033[38;05;4mfoo\033[0m: hello"
+	expected = "\033[38;05;5mfoo\033[0m: hello"
 	if actual != expected {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 }
