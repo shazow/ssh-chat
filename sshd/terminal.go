@@ -90,6 +90,7 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 				_, err := channel.SendRequest(keepaliveRequest, true, nil)
 				if err != nil {
 					// Connection is gone
+					logger.Printf("[%s] Keepalive failed, closing terminal: %s", term.Conn.RemoteAddr(), err)
 					term.Close()
 					return
 				}
@@ -107,6 +108,7 @@ func NewSession(conn *ssh.ServerConn, channels <-chan ssh.NewChannel) (*Terminal
 	// Make a terminal from the first session found
 	for ch := range channels {
 		if t := ch.ChannelType(); t != "session" {
+			logger.Printf("[%s] Ignored channel type: %s", conn.RemoteAddr(), t)
 			ch.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
 			continue
 		}
