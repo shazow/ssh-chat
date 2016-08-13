@@ -5,7 +5,6 @@ language: go
 
 go:
   - 1.6.2
-  - tip
 
 env:
   - CGO_ENABLED=0
