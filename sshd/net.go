@@ -50,7 +50,7 @@ func (l *SSHListener) Serve() {
 		conn, err := l.Accept()
 
 		if err != nil {
-			logger.Printf("Failed to accept connection: %v", err)
+			logger.Printf("Failed to accept connection: %s", err)
 			break
 		}
 
@@ -58,7 +58,7 @@ func (l *SSHListener) Serve() {
 		go func() {
 			term, err := l.handleConn(conn)
 			if err != nil {
-				logger.Printf("Failed to handshake: %v", err)
+				logger.Printf("[%s] Failed to handshake: %s", conn.RemoteAddr(), err)
 				return
 			}
 			l.HandlerFunc(term)

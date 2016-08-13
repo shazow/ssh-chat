@@ -114,7 +114,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		member, err = h.Join(user)
 	}
 	if err != nil {
-		logger.Errorf("Failed to join: %s", err)
+		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
-	logger.Debugf("Joined: %s", user.Name())
+	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
 
 	for {
 		line, err := term.ReadLine()
@@ -137,7 +137,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			// Closed
 			break
 		} else if err != nil {
-			logger.Errorf("Terminal reading error: %s", err)
+			logger.Errorf("[%s] Terminal reading error: %s", term.Conn.RemoteAddr(), err)
 			break
 		}
 
@@ -174,10 +174,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	err = h.Leave(user)
 	if err != nil {
-		logger.Errorf("Failed to leave: %s", err)
+		logger.Errorf("[%s] Failed to leave: %s", term.Conn.RemoteAddr(), err)
 		return
 	}
-	logger.Debugf("Leaving: %s", user.Name())
+	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
 }
 
 // Serve our chat room onto the listener
