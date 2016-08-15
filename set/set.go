@@ -15,6 +15,8 @@ var ErrMissing = errors.New("item does not exist")
 // Returned when a nil item is added. Nil values are considered expired and invalid.
 var ErrNil = errors.New("item value must not be nil")
 
+type IterFunc func(key string, item Item) error
+
 type Set struct {
 	sync.RWMutex
 	lookup    map[string]Item
@@ -153,24 +155,20 @@ func (s *Set) Replace(oldKey string, item Item) error {
 
 // Each loops over every item while holding a read lock and applies fn to each
 // element.
-func (s *Set) Each(fn func(item Item)) {
-	cleanup := []string{}
+func (s *Set) Each(fn IterFunc) error {
 	s.RLock()
+	defer s.RUnlock()
 	for key, item := range s.lookup {
 		if item.Value() == nil {
-			cleanup = append(cleanup, key)
+			defer s.cleanup(key)
 			continue
 		}
-		fn(item)
+		if err := fn(key, item); err != nil {
+			// Abort early
+			return err
+		}
 	}
-	s.RUnlock()
-
-	if len(cleanup) == 0 {
-		return
-	}
-	for _, key := range cleanup {
-		s.cleanup(key)
-	}
+	return nil
 }
 
 // ListPrefix returns a list of items with a prefix, normalized.
@@ -179,8 +177,11 @@ func (s *Set) ListPrefix(prefix string) []Item {
 	r := []Item{}
 	prefix = s.normalize(prefix)
 
-	s.Each(func(item Item) {
-		r = append(r, item)
+	s.Each(func(key string, item Item) error {
+		if strings.HasPrefix(key, prefix) {
+			r = append(r, item)
+		}
+		return nil
 	})
 
 	return r

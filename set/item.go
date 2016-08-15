@@ -15,7 +15,7 @@ func (item StringItem) Key() string {
 }
 
 func (item StringItem) Value() interface{} {
-	return string(item)
+	return true
 }
 
 func Expire(item Item, d time.Duration) Item {

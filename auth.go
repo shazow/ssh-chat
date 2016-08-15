@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
@@ -20,8 +21,12 @@ func newAuthKey(key ssh.PublicKey) string {
 	if key == nil {
 		return ""
 	}
-	// FIXME: Is there a way to index pubkeys without marshal'ing them into strings?
+	// FIXME: Is there a better way to index pubkeys without marshal'ing them into strings?
 	return sshd.Fingerprint(key)
+}
+
+func newAuthItem(key ssh.PublicKey) set.Item {
+	return set.StringItem(newAuthKey(key))
 }
 
 // newAuthAddr returns a string from a net.Addr used to index the address the key in our lookup.
@@ -35,19 +40,19 @@ func newAuthAddr(addr net.Addr) string {
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 type Auth struct {
-	bannedAddr *Set
-	banned     *Set
-	whitelist  *Set
-	ops        *Set
+	bannedAddr *set.Set
+	banned     *set.Set
+	whitelist  *set.Set
+	ops        *set.Set
 }
 
 // NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
-		bannedAddr: NewSet(),
-		banned:     NewSet(),
-		whitelist:  NewSet(),
-		ops:        NewSet(),
+		bannedAddr: set.New(),
+		banned:     set.New(),
+		whitelist:  set.New(),
+		ops:        set.New(),
 	}
 }
 
@@ -85,13 +90,13 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
-	authkey := newAuthKey(key)
+	authItem := newAuthItem(key)
 	if d != 0 {
-		a.ops.AddExpiring(authkey, d)
+		a.ops.Add(set.Expire(authItem, d))
 	} else {
-		a.ops.Add(authkey)
+		a.ops.Add(authItem)
 	}
-	logger.Debugf("Added to ops: %s (for %s)", authkey, d)
+	logger.Debugf("Added to ops: %s (for %s)", authItem.Key(), d)
 }
 
 // IsOp checks if a public key is an op.
@@ -108,13 +113,13 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
-	authkey := newAuthKey(key)
+	authItem := newAuthItem(key)
 	if d != 0 {
-		a.whitelist.AddExpiring(authkey, d)
+		a.whitelist.Add(set.Expire(authItem, d))
 	} else {
-		a.whitelist.Add(authkey)
+		a.whitelist.Add(authItem)
 	}
-	logger.Debugf("Added to whitelist: %s (for %s)", authkey, d)
+	logger.Debugf("Added to whitelist: %s (for %s)", authItem.Key(), d)
 }
 
 // Ban will set a public key as banned.
@@ -127,21 +132,22 @@ func (a *Auth) Ban(key ssh.PublicKey, d time.Duration) {
 
 // BanFingerprint will set a public key fingerprint as banned.
 func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
+	authItem := set.StringItem(authkey)
 	if d != 0 {
-		a.banned.AddExpiring(authkey, d)
+		a.banned.Add(set.Expire(authItem, d))
 	} else {
-		a.banned.Add(authkey)
+		a.banned.Add(authItem)
 	}
-	logger.Debugf("Added to banned: %s (for %s)", authkey, d)
+	logger.Debugf("Added to banned: %s (for %s)", authItem.Key(), d)
 }
 
 // Ban will set an IP address as banned.
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
-	key := newAuthAddr(addr)
+	authItem := set.StringItem(addr.String())
 	if d != 0 {
-		a.bannedAddr.AddExpiring(key, d)
+		a.bannedAddr.Add(set.Expire(authItem, d))
 	} else {
-		a.bannedAddr.Add(key)
+		a.bannedAddr.Add(authItem)
 	}
-	logger.Debugf("Added to bannedAddr: %s (for %s)", key, d)
+	logger.Debugf("Added to bannedAddr: %s (for %s)", authItem.Key(), d)
 }

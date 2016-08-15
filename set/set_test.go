@@ -26,14 +26,14 @@ func TestSetExpiring(t *testing.T) {
 		t.Errorf("ExpiringItem a nanosec ago is not expiring")
 	}
 
-	item = &ExpiringItem{nil, time.Now().Add(time.Minute * 2)}
+	item = &ExpiringItem{nil, time.Now().Add(time.Minute * 5)}
 	if item.Expired() {
 		t.Errorf("ExpiringItem in 2 minutes is expiring now")
 	}
 
-	item = Expire(StringItem("bar"), time.Minute*2).(*ExpiringItem)
+	item = Expire(StringItem("bar"), time.Minute*5).(*ExpiringItem)
 	until := item.Time
-	if !until.After(time.Now().Add(time.Minute*1)) || !until.Before(time.Now().Add(time.Minute*3)) {
+	if !until.After(time.Now().Add(time.Minute*4)) || !until.Before(time.Now().Add(time.Minute*6)) {
 		t.Errorf("until is not a minute after %s: %s", time.Now(), until)
 	}
 	if item.Value() == nil {
@@ -54,11 +54,38 @@ func TestSetExpiring(t *testing.T) {
 	if s.Len() != 2 {
 		t.Error("not len 2 after set")
 	}
+	if err := s.Replace("bar", Expire(StringItem("quux"), time.Minute*5)); err != nil {
+		t.Fatalf("failed to add quux: %s", err)
+	}
 
-	if err := s.Replace("bar", Expire(StringItem("bar"), time.Minute*5)); err != nil {
+	if err := s.Replace("quux", Expire(StringItem("bar"), time.Minute*5)); err != nil {
 		t.Fatalf("failed to add bar: %s", err)
 	}
-	if !s.In("bar") {
-		t.Error("failed to match before expiry")
+	if s.In("quux") {
+		t.Error("quux in set after replace")
+	}
+	if _, err := s.Get("bar"); err != nil {
+		t.Errorf("failed to get before expiry: %s", err)
+	}
+	if err := s.Add(StringItem("barbar")); err != nil {
+		t.Fatalf("failed to add barbar")
+	}
+	if _, err := s.Get("barbar"); err != nil {
+		t.Errorf("failed to get barbar: %s", err)
+	}
+	b := s.ListPrefix("b")
+	if len(b) != 2 || b[0].Key() != "bar" || b[1].Key() != "barbar" {
+		t.Errorf("b-prefix incorrect: %q", b)
+	}
+
+	if err := s.Remove("bar"); err != nil {
+		t.Fatalf("failed to remove: %s", err)
+	}
+	if s.Len() != 2 {
+		t.Error("not len 2 after remove")
+	}
+	s.Clear()
+	if s.Len() != 0 {
+		t.Error("not len 0 after clear")
 	}
 }
