@@ -4,7 +4,8 @@ notifications:
 language: go
 
 go:
-  - 1.6.2
+  - 1.6
+  - 1.7
 
 env:
   - CGO_ENABLED=0
