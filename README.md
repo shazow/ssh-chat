@@ -71,6 +71,10 @@ $ ssh-chat --verbose --bind ":22" --identity ~/.ssh/id_dsa
 To bind on port 22, you'll need to make sure it's free (move any other ssh
 daemons to another port) and run ssh-chat as root (or with sudo).
 
+## Frequently Asked Questions
+
+The FAQs can be found on the project's [Wiki page](https://github.com/shazow/ssh-chat/wiki/FAQ).
+Feel free to submit more questions to be answered and added to the page.
 
 ## License
 
