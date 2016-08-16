@@ -179,8 +179,8 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix:     "/theme",
-		PrefixHelp: "[mono|colors]",
-		Help:       "Set your color theme. (More themes: solarized, hacker)",
+		PrefixHelp: "[colors|...]",
+		Help:       "Set your color theme. (More themes: solarized, mono, hacker)",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			user := msg.From()
 			args := msg.Args()
@@ -245,7 +245,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix:     "/ignore",
 		PrefixHelp: "[USER]",
-		Help:       "Ignore messages from USER, list ignored users without parameters.",
+		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
@@ -282,12 +282,11 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix:     "/unignore",
-		PrefixHelp: "[USER]",
-		Help:       "Stop ignoring USER.",
+		PrefixHelp: "USER",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/unignore"))
 			if id == "" {
-				return errors.New("missing user id")
+				return errors.New("must specify user")
 			}
 
 			err := msg.From().Unignore(id)
