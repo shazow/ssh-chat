@@ -48,11 +48,13 @@ Usage:
 
 Application Options:
   -v, --verbose    Show verbose logging.
+      --version    Print version and exit.
   -i, --identity=  Private key to identify server with. (~/.ssh/id_rsa)
       --bind=      Host and port to listen on. (0.0.0.0:2022)
       --admin=     Fingerprint of pubkey to mark as admin.
       --whitelist= Optional file of pubkey fingerprints that are allowed to connect
       --motd=      Message of the Day file (optional)
+      --log=       Write chat log to this file.
       --pprof=     enable http server for pprof
 
 Help Options:
