@@ -38,3 +38,4 @@ release:
 	GOOS=linux GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
 	GOOS=linux GOARCH=386 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
 	GOOS=darwin GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+	GOOS=freebsd GOARCH=amd64 $(LDFLAGS) ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
