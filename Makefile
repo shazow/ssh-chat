@@ -3,7 +3,7 @@ KEY = host_key
 PORT = 2022
 
 SRCS = %.go
-VERSION := $(shell git describe --tags --dirty --always)
+VERSION := $(shell git describe --tags --dirty --always 2> /dev/null || echo "dev")
 LDFLAGS = LDFLAGS="-X main.Version=$(VERSION)"
 
 SUBPACKAGES := $(shell go list ./... | grep -v /vendor/)
