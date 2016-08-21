@@ -152,7 +152,7 @@ func main() {
 		if err != nil {
 			fail(7, "Failed to load MOTD file: %v\n", err)
 		}
-		motdString := strings.TrimSpace(string(motd))
+		motdString := string(motd)
 		// hack to normalize line endings into \r\n
 		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
 		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
