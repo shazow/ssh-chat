@@ -68,13 +68,7 @@ func TestHostNameCollision(t *testing.T) {
 
 			// Consume the initial buffer
 			scanner.Scan()
-			actual := scanner.Text()
-			if !strings.HasPrefix(actual, "[foo] ") {
-				// FIXME: This is flaky. :/
-				t.Errorf("First client failed to get 'foo' name: %q", actual)
-			}
-
-			actual = stripPrompt(actual)
+			actual := stripPrompt(scanner.Text())
 			expected := " * foo joined. (Connected: 1)"
 			if actual != expected {
 				t.Errorf("Got %q; expected %q", actual, expected)
@@ -84,7 +78,13 @@ func TestHostNameCollision(t *testing.T) {
 			done <- struct{}{}
 
 			scanner.Scan()
-			actual = stripPrompt(scanner.Text())
+			actual = scanner.Text()
+			// This check has to happen second because prompt doesn't always
+			// get set before the first message.
+			if !strings.HasPrefix(actual, "[foo] ") {
+				t.Errorf("First client failed to get 'foo' name: %q", actual)
+			}
+			actual = stripPrompt(actual)
 			expected = " * Guest1 joined. (Connected: 2)"
 			if actual != expected {
 				t.Errorf("Got %q; expected %q", actual, expected)
