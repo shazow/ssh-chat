@@ -11,7 +11,7 @@ func TestMessage(t *testing.T) {
 		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
 	}
 
-	u := NewUser(SimpleId("foo"))
+	u := NewUser(SimpleID("foo"))
 	expected = "foo: hello"
 	actual = NewPublicMsg("hello", u).String()
 	if actual != expected {

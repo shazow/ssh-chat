@@ -100,7 +100,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		r.Members.Each(func(_ string, item set.Item) (err error) {
 			user := item.Value().(*Member).User
 
-			if fromMsg != nil && user.Ignored.In(fromMsg.From().Id()) {
+			if fromMsg != nil && user.Ignored.In(fromMsg.From().ID()) {
 				// Skip because ignored
 				return
 			}
@@ -144,11 +144,11 @@ func (r *Room) History(u *message.User) {
 // Join the room as a user, will announce.
 func (r *Room) Join(u *message.User) (*Member, error) {
 	// TODO: Check if closed
-	if u.Id() == "" {
+	if u.ID() == "" {
 		return nil, ErrInvalidName
 	}
 	member := &Member{u}
-	err := r.Members.Add(set.Itemize(u.Id(), member))
+	err := r.Members.Add(set.Itemize(u.ID(), member))
 	if err != nil {
 		return nil, err
 	}
@@ -160,27 +160,27 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 
 // Leave the room as a user, will announce. Mostly used during setup.
 func (r *Room) Leave(u message.Identifier) error {
-	err := r.Members.Remove(u.Id())
+	err := r.Members.Remove(u.ID())
 	if err != nil {
 		return err
 	}
-	r.Ops.Remove(u.Id())
+	r.Ops.Remove(u.ID())
 	s := fmt.Sprintf("%s left.", u.Name())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }
 
 // Rename member with a new identity. This will not call rename on the member.
-func (r *Room) Rename(oldId string, u message.Identifier) error {
-	if u.Id() == "" {
+func (r *Room) Rename(oldID string, u message.Identifier) error {
+	if u.ID() == "" {
 		return ErrInvalidName
 	}
-	err := r.Members.Replace(oldId, set.Itemize(u.Id(), u))
+	err := r.Members.Replace(oldID, set.Itemize(u.ID(), u))
 	if err != nil {
 		return err
 	}
 
-	s := fmt.Sprintf("%s is now known as %s.", oldId, u.Id())
+	s := fmt.Sprintf("%s is now known as %s.", oldID, u.ID())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }
@@ -188,7 +188,7 @@ func (r *Room) Rename(oldId string, u message.Identifier) error {
 // Member returns a corresponding Member object to a User if the Member is
 // present in this room.
 func (r *Room) Member(u *message.User) (*Member, bool) {
-	m, ok := r.MemberById(u.Id())
+	m, ok := r.MemberByID(u.ID())
 	if !ok {
 		return nil, false
 	}
@@ -199,7 +199,7 @@ func (r *Room) Member(u *message.User) (*Member, bool) {
 	return m, true
 }
 
-func (r *Room) MemberById(id string) (*Member, bool) {
+func (r *Room) MemberByID(id string) (*Member, bool) {
 	m, err := r.Members.Get(id)
 	if err != nil {
 		return nil, false
@@ -209,7 +209,7 @@ func (r *Room) MemberById(id string) (*Member, bool) {
 
 // IsOp returns whether a user is an operator in this room.
 func (r *Room) IsOp(u *message.User) bool {
-	return r.Ops.In(u.Id())
+	return r.Ops.In(u.ID())
 }
 
 // Topic of the room.

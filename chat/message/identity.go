@@ -2,25 +2,25 @@ package message
 
 // Identifier is an interface that can uniquely identify itself.
 type Identifier interface {
-	Id() string
-	SetId(string)
+	ID() string
+	SetID(string)
 	Name() string
 }
 
-// SimpleId is a simple Identifier implementation used for testing.
-type SimpleId string
+// SimpleID is a simple Identifier implementation used for testing.
+type SimpleID string
 
-// Id returns the Id as a string.
-func (i SimpleId) Id() string {
+// ID returns the ID as a string.
+func (i SimpleID) ID() string {
 	return string(i)
 }
 
-// SetId is a no-op
-func (i SimpleId) SetId(s string) {
+// SetID is a no-op
+func (i SimpleID) SetID(s string) {
 	// no-op
 }
 
-// Name returns the Id
-func (i SimpleId) Name() string {
-	return i.Id()
+// Name returns the ID
+func (i SimpleID) Name() string {
+	return i.ID()
 }

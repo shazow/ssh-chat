@@ -122,7 +122,7 @@ type Theme struct {
 	names     *Palette
 }
 
-func (t Theme) Id() string {
+func (t Theme) ID() string {
 	return t.id
 }
 
@@ -233,7 +233,7 @@ func init() {
 }
 
 func printTheme(t Theme) {
-	fmt.Println("Printing theme:", t.Id())
+	fmt.Println("Printing theme:", t.ID())
 	if t.names != nil {
 		for i, color := range t.names.colors {
 			fmt.Printf("%s ", color.Format(fmt.Sprintf("name%d", i)))

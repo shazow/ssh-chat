@@ -127,7 +127,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(set.Itemize(member.Id(), member))
+		h.Room.Ops.Add(set.Itemize(member.ID(), member))
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
@@ -260,7 +260,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 
 // GetUser returns a message.User based on a name.
 func (h *Host) GetUser(name string) (*message.User, bool) {
-	m, ok := h.MemberById(name)
+	m, ok := h.MemberByID(name)
 	if !ok {
 		return nil, false
 	}
@@ -490,11 +490,11 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			member, ok := room.MemberById(args[0])
+			member, ok := room.MemberByID(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
-			room.Ops.Add(set.Itemize(member.Id(), member))
+			room.Ops.Add(set.Itemize(member.ID(), member))
 
 			id := member.Identifier.(*Identity)
 			h.auth.Op(id.PublicKey(), until)

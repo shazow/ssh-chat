@@ -26,16 +26,16 @@ func NewIdentity(conn sshd.Connection) *Identity {
 	}
 }
 
-func (i Identity) Id() string {
+func (i Identity) ID() string {
 	return i.id
 }
 
-func (i *Identity) SetId(id string) {
+func (i *Identity) SetID(id string) {
 	i.id = id
 }
 
 func (i *Identity) SetName(name string) {
-	i.SetId(name)
+	i.SetID(name)
 }
 
 func (i Identity) Name() string {

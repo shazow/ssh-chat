@@ -190,11 +190,11 @@ func TestHostKick(t *testing.T) {
 		// First client
 		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
 			// Make op
-			member, _ := host.Room.MemberById("foo")
+			member, _ := host.Room.MemberByID("foo")
 			if member == nil {
-				return errors.New("failed to load MemberById")
+				return errors.New("failed to load MemberByID")
 			}
-			host.Room.Ops.Add(set.Itemize(member.Id(), member))
+			host.Room.Ops.Add(set.Itemize(member.ID(), member))
 
 			// Block until second client is here
 			connected <- struct{}{}

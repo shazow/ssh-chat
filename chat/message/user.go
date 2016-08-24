@@ -57,8 +57,8 @@ func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 }
 
 // Rename the user with a new Identifier.
-func (u *User) SetId(id string) {
-	u.Identifier.SetId(id)
+func (u *User) SetID(id string) {
+	u.Identifier.SetID(id)
 	u.SetColorIdx(rand.Int())
 }
 
@@ -194,15 +194,15 @@ func (u *User) Ignore(other Identifier) error {
 		return errors.New("user is nil.")
 	}
 
-	if other.Id() == u.Id() {
+	if other.ID() == u.ID() {
 		return errors.New("cannot ignore self.")
 	}
 
-	if u.Ignored.In(other.Id()) {
+	if u.Ignored.In(other.ID()) {
 		return errors.New("user already ignored.")
 	}
 
-	u.Ignored.Add(set.Itemize(other.Id(), other))
+	u.Ignored.Add(set.Itemize(other.ID(), other))
 	return nil
 }
 

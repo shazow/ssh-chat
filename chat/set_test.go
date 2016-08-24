@@ -10,28 +10,28 @@ import (
 func TestSet(t *testing.T) {
 	var err error
 	s := set.New()
-	u := message.NewUser(message.SimpleId("foo"))
+	u := message.NewUser(message.SimpleID("foo"))
 
-	if s.In(u.Id()) {
+	if s.In(u.ID()) {
 		t.Errorf("Set should be empty.")
 	}
 
-	err = s.Add(set.Itemize(u.Id(), u))
+	err = s.Add(set.Itemize(u.ID(), u))
 	if err != nil {
 		t.Error(err)
 	}
 
-	if !s.In(u.Id()) {
+	if !s.In(u.ID()) {
 		t.Errorf("Set should contain user.")
 	}
 
-	u2 := message.NewUser(message.SimpleId("bar"))
-	err = s.Add(set.Itemize(u2.Id(), u2))
+	u2 := message.NewUser(message.SimpleID("bar"))
+	err = s.Add(set.Itemize(u2.ID(), u2))
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = s.Add(set.Itemize(u2.Id(), u2))
+	err = s.Add(set.Itemize(u2.ID(), u2))
 	if err != set.ErrCollision {
 		t.Error(err)
 	}

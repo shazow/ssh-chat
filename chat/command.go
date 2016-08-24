@@ -148,16 +148,16 @@ func InitCommands(c *Commands) {
 			}
 			u := msg.From()
 
-			member, ok := room.MemberById(u.Id())
+			member, ok := room.MemberByID(u.ID())
 			if !ok {
 				return errors.New("failed to find member")
 			}
 
-			oldId := member.Id()
-			member.SetId(SanitizeName(args[0]))
-			err := room.Rename(oldId, member)
+			oldID := member.ID()
+			member.SetID(SanitizeName(args[0]))
+			err := room.Rename(oldID, member)
 			if err != nil {
-				member.SetId(oldId)
+				member.SetID(oldID)
 				return err
 			}
 			return nil
@@ -187,7 +187,7 @@ func InitCommands(c *Commands) {
 			if len(args) == 0 {
 				theme := "plain"
 				if user.Config.Theme != nil {
-					theme = user.Config.Theme.Id()
+					theme = user.Config.Theme.ID()
 				}
 				body := fmt.Sprintf("Current theme: %s", theme)
 				room.Send(message.NewSystemMsg(body, user))
@@ -196,7 +196,7 @@ func InitCommands(c *Commands) {
 
 			id := args[0]
 			for _, t := range message.Themes {
-				if t.Id() == id {
+				if t.ID() == id {
 					user.Config.Theme = &t
 					body := fmt.Sprintf("Set theme: %s", id)
 					room.Send(message.NewSystemMsg(body, user))
@@ -266,7 +266,7 @@ func InitCommands(c *Commands) {
 				return nil
 			}
 
-			target, ok := room.MemberById(id)
+			target, ok := room.MemberByID(id)
 			if !ok {
 				return fmt.Errorf("user %s not found.", id)
 			}
