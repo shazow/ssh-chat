@@ -8,6 +8,23 @@ type Item interface {
 	Value() interface{}
 }
 
+type item struct {
+	key   string
+	value interface{}
+}
+
+func (item *item) Key() string {
+	return item.key
+}
+
+func (item *item) Value() interface{} {
+	return item.value
+}
+
+func Itemize(key string, value interface{}) Item {
+	return &item{key, value}
+}
+
 type StringItem string
 
 func (item StringItem) Key() string {

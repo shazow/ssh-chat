@@ -12,6 +12,7 @@ import (
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -126,7 +127,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(member)
+		h.Room.Ops.Add(set.Itemize(member.Id(), member))
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
@@ -493,7 +494,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if !ok {
 				return errors.New("user not found")
 			}
-			room.Ops.Add(member)
+			room.Ops.Add(set.Itemize(member.Id(), member))
+
 			id := member.Identifier.(*Identity)
 			h.auth.Op(id.PublicKey(), until)
 

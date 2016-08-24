@@ -4,35 +4,35 @@ import (
 	"testing"
 
 	"github.com/shazow/ssh-chat/chat/message"
-	"github.com/shazow/ssh-chat/common"
+	"github.com/shazow/ssh-chat/set"
 )
 
 func TestSet(t *testing.T) {
 	var err error
-	s := common.NewIdSet()
+	s := set.New()
 	u := message.NewUser(message.SimpleId("foo"))
 
-	if s.In(u) {
+	if s.In(u.Id()) {
 		t.Errorf("Set should be empty.")
 	}
 
-	err = s.Add(u)
+	err = s.Add(set.Itemize(u.Id(), u))
 	if err != nil {
 		t.Error(err)
 	}
 
-	if !s.In(u) {
+	if !s.In(u.Id()) {
 		t.Errorf("Set should contain user.")
 	}
 
 	u2 := message.NewUser(message.SimpleId("bar"))
-	err = s.Add(u2)
+	err = s.Add(set.Itemize(u2.Id(), u2))
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = s.Add(u2)
-	if err != common.ErrIdTaken {
+	err = s.Add(set.Itemize(u2.Id(), u2))
+	if err != set.ErrCollision {
 		t.Error(err)
 	}
 

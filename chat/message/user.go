@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shazow/ssh-chat/common"
+	"github.com/shazow/ssh-chat/set"
 )
 
 const messageBuffer = 5
@@ -25,7 +25,7 @@ type User struct {
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
-	Ignored  *common.IdSet
+	Ignored  *set.Set
 
 	screen    io.WriteCloser
 	closeOnce sync.Once
@@ -42,7 +42,7 @@ func NewUser(identity Identifier) *User {
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
-		Ignored:    common.NewIdSet(),
+		Ignored:    set.New(),
 	}
 	u.SetColorIdx(rand.Int())
 
@@ -189,20 +189,20 @@ func (u *User) Send(m Message) error {
 	return nil
 }
 
-func (u *User) Ignore(identified common.Identified) error {
-	if identified == nil {
+func (u *User) Ignore(other Identifier) error {
+	if other == nil {
 		return errors.New("user is nil.")
 	}
 
-	if identified.Id() == u.Id() {
+	if other.Id() == u.Id() {
 		return errors.New("cannot ignore self.")
 	}
 
-	if u.Ignored.In(identified) {
+	if u.Ignored.In(other.Id()) {
 		return errors.New("user already ignored.")
 	}
 
-	u.Ignored.Add(identified)
+	u.Ignored.Add(set.Itemize(other.Id(), other))
 	return nil
 }
 
@@ -211,12 +211,7 @@ func (u *User) Unignore(id string) error {
 		return errors.New("user is nil.")
 	}
 
-	identified, err := u.Ignored.Get(id)
-	if err != nil {
-		return err
-	}
-
-	return u.Ignored.Remove(identified)
+	return u.Ignored.Remove(id)
 }
 
 // Container for per-user configurations.

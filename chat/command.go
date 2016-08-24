@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
-	"github.com/shazow/ssh-chat/common"
+	"github.com/shazow/ssh-chat/set"
 )
 
 // The error returned when an invalid command is issued.
@@ -250,8 +250,9 @@ func InitCommands(c *Commands) {
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
 				var names []string
-				msg.From().Ignored.Each(func(i common.Identified) {
-					names = append(names, i.Id())
+				msg.From().Ignored.Each(func(_ string, item set.Item) error {
+					names = append(names, item.Key())
+					return nil
 				})
 
 				var systemMsg string

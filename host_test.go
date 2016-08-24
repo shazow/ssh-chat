@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
@@ -193,7 +194,7 @@ func TestHostKick(t *testing.T) {
 			if member == nil {
 				return errors.New("failed to load MemberById")
 			}
-			host.Room.Ops.Add(member)
+			host.Room.Ops.Add(set.Itemize(member.Id(), member))
 
 			// Block until second client is here
 			connected <- struct{}{}

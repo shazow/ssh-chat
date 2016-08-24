@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/shazow/ssh-chat/chat/message"
-	"github.com/shazow/ssh-chat/common"
+	"github.com/shazow/ssh-chat/set"
 )
 
 const historyLen = 20
@@ -35,8 +35,8 @@ type Room struct {
 	closed    bool
 	closeOnce sync.Once
 
-	Members *common.IdSet
-	Ops     *common.IdSet
+	Members *set.Set
+	Ops     *set.Set
 }
 
 // NewRoom creates a new room.
@@ -48,8 +48,8 @@ func NewRoom() *Room {
 		history:   message.NewHistory(historyLen),
 		commands:  *defaultCommands,
 
-		Members: common.NewIdSet(),
-		Ops:     common.NewIdSet(),
+		Members: set.New(),
+		Ops:     set.New(),
 	}
 }
 
@@ -62,8 +62,9 @@ func (r *Room) SetCommands(commands Commands) {
 func (r *Room) Close() {
 	r.closeOnce.Do(func() {
 		r.closed = true
-		r.Members.Each(func(m common.Identified) {
-			m.(*Member).Close()
+		r.Members.Each(func(_ string, item set.Item) error {
+			item.Value().(*Member).Close()
+			return nil
 		})
 		r.Members.Clear()
 		close(r.broadcast)
@@ -96,10 +97,10 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 
 		r.history.Add(m)
-		r.Members.Each(func(u common.Identified) {
-			user := u.(*Member).User
+		r.Members.Each(func(_ string, item set.Item) (err error) {
+			user := item.Value().(*Member).User
 
-			if fromMsg != nil && user.Ignored.In(fromMsg.From()) {
+			if fromMsg != nil && user.Ignored.In(fromMsg.From().Id()) {
 				// Skip because ignored
 				return
 			}
@@ -115,6 +116,7 @@ func (r *Room) HandleMsg(m message.Message) {
 				}
 			}
 			user.Send(m)
+			return
 		})
 	}
 }
@@ -145,40 +147,40 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	if u.Id() == "" {
 		return nil, ErrInvalidName
 	}
-	member := Member{u}
-	err := r.Members.Add(&member)
+	member := &Member{u}
+	err := r.Members.Add(set.Itemize(u.Id(), member))
 	if err != nil {
 		return nil, err
 	}
 	r.History(u)
 	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.Members.Len())
 	r.Send(message.NewAnnounceMsg(s))
-	return &member, nil
+	return member, nil
 }
 
 // Leave the room as a user, will announce. Mostly used during setup.
 func (r *Room) Leave(u message.Identifier) error {
-	err := r.Members.Remove(u)
+	err := r.Members.Remove(u.Id())
 	if err != nil {
 		return err
 	}
-	r.Ops.Remove(u)
+	r.Ops.Remove(u.Id())
 	s := fmt.Sprintf("%s left.", u.Name())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }
 
 // Rename member with a new identity. This will not call rename on the member.
-func (r *Room) Rename(oldId string, identity message.Identifier) error {
-	if identity.Id() == "" {
+func (r *Room) Rename(oldId string, u message.Identifier) error {
+	if u.Id() == "" {
 		return ErrInvalidName
 	}
-	err := r.Members.Replace(oldId, identity)
+	err := r.Members.Replace(oldId, set.Itemize(u.Id(), u))
 	if err != nil {
 		return err
 	}
 
-	s := fmt.Sprintf("%s is now known as %s.", oldId, identity.Id())
+	s := fmt.Sprintf("%s is now known as %s.", oldId, u.Id())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }
@@ -202,12 +204,12 @@ func (r *Room) MemberById(id string) (*Member, bool) {
 	if err != nil {
 		return nil, false
 	}
-	return m.(*Member), true
+	return m.Value().(*Member), true
 }
 
 // IsOp returns whether a user is an operator in this room.
 func (r *Room) IsOp(u *message.User) bool {
-	return r.Ops.In(u)
+	return r.Ops.In(u.Id())
 }
 
 // Topic of the room.
@@ -223,10 +225,10 @@ func (r *Room) SetTopic(s string) {
 // NamesPrefix lists all members' names with a given prefix, used to query
 // for autocompletion purposes.
 func (r *Room) NamesPrefix(prefix string) []string {
-	members := r.Members.ListPrefix(prefix)
-	names := make([]string, len(members))
-	for i, u := range members {
-		names[i] = u.(*Member).User.Name()
+	items := r.Members.ListPrefix(prefix)
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.Value().(*Member).User.Name()
 	}
 	return names
 }
