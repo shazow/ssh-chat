@@ -21,11 +21,11 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
+	Ignored  *set.Set
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
 	done     chan struct{}
-	Ignored  *set.Set
 
 	screen    io.WriteCloser
 	closeOnce sync.Once
@@ -178,40 +178,15 @@ func (u *User) HandleMsg(m Message) error {
 // Add message to consume by user
 func (u *User) Send(m Message) error {
 	select {
-	case u.msg <- m:
 	case <-u.done:
 		return ErrUserClosed
+	case u.msg <- m:
 	case <-time.After(messageTimeout):
 		logger.Printf("Message buffer full, closing: %s", u.Name())
 		u.Close()
 		return ErrUserClosed
 	}
 	return nil
-}
-
-func (u *User) Ignore(other Identifier) error {
-	if other == nil {
-		return errors.New("user is nil.")
-	}
-
-	if other.ID() == u.ID() {
-		return errors.New("cannot ignore self.")
-	}
-
-	if u.Ignored.In(other.ID()) {
-		return errors.New("user already ignored.")
-	}
-
-	u.Ignored.Add(set.Itemize(other.ID(), other))
-	return nil
-}
-
-func (u *User) Unignore(id string) error {
-	if id == "" {
-		return errors.New("user is nil.")
-	}
-
-	return u.Ignored.Remove(id)
 }
 
 // Container for per-user configurations.

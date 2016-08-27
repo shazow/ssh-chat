@@ -87,19 +87,19 @@ func TestIgnore(t *testing.T) {
 	if err := sendCommand("/ignore test", ignorer, ch, &buffer); err != nil {
 		t.Fatal(err)
 	}
-	expectOutput(t, buffer, "-> Err: user test not found."+message.Newline)
+	expectOutput(t, buffer, "-> Err: user not found: test"+message.Newline)
 
 	// test ignoring existing user
 	if err := sendCommand("/ignore "+ignored.user.Name(), ignorer, ch, &buffer); err != nil {
 		t.Fatal(err)
 	}
-	expectOutput(t, buffer, "-> "+ignored.user.Name()+" is now being ignored."+message.Newline)
+	expectOutput(t, buffer, "-> Ignoring: "+ignored.user.Name()+message.Newline)
 
 	// ignoring the same user twice returns an error message and doesn't add the user twice
 	if err := sendCommand("/ignore "+ignored.user.Name(), ignorer, ch, &buffer); err != nil {
 		t.Fatal(err)
 	}
-	expectOutput(t, buffer, "-> Err: user already ignored."+message.Newline)
+	expectOutput(t, buffer, "-> Err: user already ignored: user1"+message.Newline)
 	if ignoredList := ignorer.user.Ignored.ListPrefix(""); len(ignoredList) != 1 {
 		t.Fatalf("should have %d ignored users, has %d", 1, len(ignoredList))
 	}
@@ -125,7 +125,7 @@ func TestIgnore(t *testing.T) {
 	if err := sendCommand("/unignore "+ignored.user.Name(), users[0], ch, &buffer); err != nil {
 		t.Fatal(err)
 	}
-	expectOutput(t, buffer, "-> "+ignored.user.Name()+" is not ignored anymore."+message.Newline)
+	expectOutput(t, buffer, "-> No longer ignoring: user1"+message.Newline)
 
 	if err := sendCommand("/ignore", users[0], ch, &buffer); err != nil {
 		t.Fatal(err)

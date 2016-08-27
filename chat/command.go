@@ -249,6 +249,7 @@ func InitCommands(c *Commands) {
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
+				// Print ignored names, if any.
 				var names []string
 				msg.From().Ignored.Each(func(_ string, item set.Item) error {
 					names = append(names, item.Key())
@@ -266,17 +267,22 @@ func InitCommands(c *Commands) {
 				return nil
 			}
 
+			if id == msg.From().ID() {
+				return errors.New("cannot ignore self")
+			}
 			target, ok := room.MemberByID(id)
 			if !ok {
-				return fmt.Errorf("user %s not found.", id)
+				return fmt.Errorf("user not found: %s", id)
 			}
 
-			err := msg.From().Ignore(target)
-			if err != nil {
+			err := msg.From().Ignored.Add(set.Itemize(id, target))
+			if err == set.ErrCollision {
+				return fmt.Errorf("user already ignored: %s", id)
+			} else if err != nil {
 				return err
 			}
 
-			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is now being ignored.", target.Name()), msg.From()))
+			room.Send(message.NewSystemMsg(fmt.Sprintf("Ignoring: %s", target.Name()), msg.From()))
 			return nil
 		},
 	})
@@ -290,12 +296,11 @@ func InitCommands(c *Commands) {
 				return errors.New("must specify user")
 			}
 
-			err := msg.From().Unignore(id)
-			if err != nil {
+			if err := msg.From().Ignored.Remove(id); err != nil {
 				return err
 			}
 
-			room.Send(message.NewSystemMsg(fmt.Sprintf("%s is not ignored anymore.", id), msg.From()))
+			room.Send(message.NewSystemMsg(fmt.Sprintf("No longer ignoring: %s", id), msg.From()))
 			return nil
 		},
 	})
