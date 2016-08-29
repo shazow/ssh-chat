@@ -21,8 +21,9 @@ const maxInputLength int = 1024
 // GetPrompt will render the terminal prompt string based on the user.
 func GetPrompt(user *message.User) string {
 	name := user.Name()
-	if user.Config.Theme != nil {
-		name = user.Config.Theme.ColorName(user)
+	cfg := user.Config()
+	if cfg.Theme != nil {
+		name = cfg.Theme.ColorName(user)
 	}
 	return fmt.Sprintf("[%s] ", name)
 }
@@ -91,7 +92,9 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
-	user.Config.Theme = &h.theme
+	cfg := user.Config()
+	cfg.Theme = &h.theme
+	user.SetConfig(cfg)
 	go user.Consume()
 
 	// Close term once user is closed.

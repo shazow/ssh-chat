@@ -110,7 +110,7 @@ func (r *Room) HandleMsg(m message.Message) {
 				return
 			}
 			if _, ok := m.(*message.AnnounceMsg); ok {
-				if user.Config.Quiet {
+				if user.Config().Quiet {
 					// Skip announcements
 					return
 				}

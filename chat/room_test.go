@@ -213,9 +213,9 @@ func TestRoomJoin(t *testing.T) {
 
 func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 	u := message.NewUser(message.SimpleID("foo"))
-	u.Config = message.UserConfig{
+	u.SetConfig(message.UserConfig{
 		Quiet: true,
-	}
+	})
 
 	ch := NewRoom()
 	defer ch.Close()
@@ -252,9 +252,9 @@ func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 
 func TestRoomQuietToggleBroadcasts(t *testing.T) {
 	u := message.NewUser(message.SimpleID("foo"))
-	u.Config = message.UserConfig{
+	u.SetConfig(message.UserConfig{
 		Quiet: true,
-	}
+	})
 
 	ch := NewRoom()
 	defer ch.Close()
@@ -267,7 +267,9 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 	// Drain the initial Join message
 	<-ch.broadcast
 
-	u.ToggleQuietMode()
+	u.SetConfig(message.UserConfig{
+		Quiet: false,
+	})
 
 	expectedMsg := message.NewAnnounceMsg("Ignored")
 	ch.HandleMsg(expectedMsg)
@@ -276,7 +278,9 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 		t.Errorf("Got: `%T`; Expected: `%T`", msg, expectedMsg)
 	}
 
-	u.ToggleQuietMode()
+	u.SetConfig(message.UserConfig{
+		Quiet: true,
+	})
 
 	ch.HandleMsg(message.NewAnnounceMsg("Ignored"))
 	ch.HandleMsg(message.NewSystemMsg("hello", u))

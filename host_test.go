@@ -35,7 +35,9 @@ func TestHostGetPrompt(t *testing.T) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
-	u.Config.Theme = &message.Themes[0]
+	u.SetConfig(message.UserConfig{
+		Theme: &message.Themes[0],
+	})
 	actual = GetPrompt(u)
 	expected = "[\033[38;05;88mfoo\033[0m] "
 	if actual != expected {

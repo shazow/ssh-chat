@@ -31,14 +31,14 @@ type User struct {
 	closeOnce sync.Once
 
 	mu      sync.Mutex
-	Config  UserConfig
+	config  UserConfig
 	replyTo *User // Set when user gets a /msg, for replying.
 }
 
 func NewUser(identity Identifier) *User {
 	u := User{
 		Identifier: identity,
-		Config:     DefaultUserConfig,
+		config:     DefaultUserConfig,
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
@@ -54,6 +54,18 @@ func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 	u.screen = screen
 
 	return u
+}
+
+func (u *User) Config() UserConfig {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.config
+}
+
+func (u *User) SetConfig(cfg UserConfig) {
+	u.mu.Lock()
+	u.config = cfg
+	u.mu.Unlock()
 }
 
 // Rename the user with a new Identifier.
@@ -76,22 +88,10 @@ func (u *User) SetReplyTo(user *User) {
 	u.replyTo = user
 }
 
-// ToggleQuietMode will toggle whether or not quiet mode is enabled
-func (u *User) ToggleQuietMode() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.Config.Quiet = !u.Config.Quiet
-}
-
 // setColorIdx will set the colorIdx to a specific value, primarily used for
 // testing.
 func (u *User) setColorIdx(idx int) {
 	u.colorIdx = idx
-}
-
-// Block until user is closed
-func (u *User) Wait() {
-	<-u.done
 }
 
 // Disconnect user, stop accepting messages
@@ -144,15 +144,13 @@ func (u *User) SetHighlight(s string) error {
 		return err
 	}
 	u.mu.Lock()
-	u.Config.Highlight = re
+	u.config.Highlight = re
 	u.mu.Unlock()
 	return nil
 }
 
 func (u *User) render(m Message) string {
-	u.mu.Lock()
-	cfg := u.Config
-	u.mu.Unlock()
+	cfg := u.Config()
 	switch m := m.(type) {
 	case PublicMsg:
 		return m.RenderFor(cfg) + Newline

@@ -184,10 +184,11 @@ func InitCommands(c *Commands) {
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			user := msg.From()
 			args := msg.Args()
+			cfg := user.Config()
 			if len(args) == 0 {
 				theme := "plain"
-				if user.Config.Theme != nil {
-					theme = user.Config.Theme.ID()
+				if cfg.Theme != nil {
+					theme = cfg.Theme.ID()
 				}
 				body := fmt.Sprintf("Current theme: %s", theme)
 				room.Send(message.NewSystemMsg(body, user))
@@ -197,7 +198,8 @@ func InitCommands(c *Commands) {
 			id := args[0]
 			for _, t := range message.Themes {
 				if t.ID() == id {
-					user.Config.Theme = &t
+					cfg.Theme = &t
+					user.SetConfig(cfg)
 					body := fmt.Sprintf("Set theme: %s", id)
 					room.Send(message.NewSystemMsg(body, user))
 					return nil
@@ -212,10 +214,12 @@ func InitCommands(c *Commands) {
 		Help:   "Silence room announcements.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
-			u.ToggleQuietMode()
+			cfg := u.Config()
+			cfg.Quiet = !cfg.Quiet
+			u.SetConfig(cfg)
 
 			var body string
-			if u.Config.Quiet {
+			if cfg.Quiet {
 				body = "Quiet mode is toggled ON"
 			} else {
 				body = "Quiet mode is toggled OFF"
