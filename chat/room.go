@@ -106,12 +106,12 @@ func (r *Room) HandleMsg(m message.Message) {
 			}
 
 			if skip && skipUser == user {
-				// Skip
+				// Skip self
 				return
 			}
 			if _, ok := m.(*message.AnnounceMsg); ok {
 				if user.Config.Quiet {
-					// Skip
+					// Skip announcements
 					return
 				}
 			}

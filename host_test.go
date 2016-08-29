@@ -28,7 +28,6 @@ func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
 	u := message.NewUser(&Identity{id: "foo"})
-	u.SetColorIdx(2)
 
 	actual = GetPrompt(u)
 	expected = "[foo] "
@@ -38,7 +37,7 @@ func TestHostGetPrompt(t *testing.T) {
 
 	u.Config.Theme = &message.Themes[0]
 	actual = GetPrompt(u)
-	expected = "[\033[38;05;3mfoo\033[0m] "
+	expected = "[\033[38;05;88mfoo\033[0m] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}

@@ -44,7 +44,7 @@ func NewUser(identity Identifier) *User {
 		done:       make(chan struct{}),
 		Ignored:    set.New(),
 	}
-	u.SetColorIdx(rand.Int())
+	u.setColorIdx(rand.Int())
 
 	return &u
 }
@@ -59,7 +59,7 @@ func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 // Rename the user with a new Identifier.
 func (u *User) SetID(id string) {
 	u.Identifier.SetID(id)
-	u.SetColorIdx(rand.Int())
+	u.setColorIdx(rand.Int())
 }
 
 // ReplyTo returns the last user that messaged this user.
@@ -83,9 +83,9 @@ func (u *User) ToggleQuietMode() {
 	u.Config.Quiet = !u.Config.Quiet
 }
 
-// SetColorIdx will set the colorIdx to a specific value, primarily used for
+// setColorIdx will set the colorIdx to a specific value, primarily used for
 // testing.
-func (u *User) SetColorIdx(idx int) {
+func (u *User) setColorIdx(idx int) {
 	u.colorIdx = idx
 }
 
