@@ -115,6 +115,7 @@ func TestHostNameCollision(t *testing.T) {
 
 		actual := scanner.Text()
 		if !strings.HasPrefix(actual, "[Guest1] ") {
+			// FIXME: Flaky?
 			t.Errorf("Second client did not get Guest1 name: %q", actual)
 		}
 		return nil
@@ -195,7 +196,7 @@ func TestHostKick(t *testing.T) {
 			if member == nil {
 				return errors.New("failed to load MemberByID")
 			}
-			host.Room.Ops.Add(set.Itemize(member.ID(), member))
+			host.Room.Ops.Add(set.Keyize(member.ID()))
 
 			// Block until second client is here
 			connected <- struct{}{}

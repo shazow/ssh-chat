@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"sync"
 	"time"
-
-	"github.com/shazow/ssh-chat/set"
 )
 
 const messageBuffer = 5
@@ -21,7 +19,6 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
-	Ignored  *set.Set
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -42,7 +39,6 @@ func NewUser(identity Identifier) *User {
 		joined:     time.Now(),
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
-		Ignored:    set.New(),
 	}
 	u.setColorIdx(rand.Int())
 
@@ -83,6 +79,7 @@ func (u *User) ReplyTo() *User {
 
 // SetReplyTo sets the last user to message this user.
 func (u *User) SetReplyTo(user *User) {
+	// TODO: Use UserConfig.ReplyTo string
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.replyTo = user
@@ -122,11 +119,13 @@ func (u *User) Consume() {
 }
 
 // Consume one message and stop, mostly for testing
+// TODO: Stop using it and remove it.
 func (u *User) ConsumeOne() Message {
 	return <-u.msg
 }
 
 // Check if there are pending messages, used for testing
+// TODO: Stop using it and remove it.
 func (u *User) HasMessages() bool {
 	select {
 	case msg := <-u.msg:

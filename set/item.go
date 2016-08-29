@@ -25,6 +25,10 @@ func Itemize(key string, value interface{}) Item {
 	return &item{key, value}
 }
 
+func Keyize(key string) Item {
+	return &item{key, struct{}{}}
+}
+
 type StringItem string
 
 func (item StringItem) Key() string {

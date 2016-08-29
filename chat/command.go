@@ -24,6 +24,10 @@ var ErrMissingArg = errors.New("missing argument")
 // The error returned when a command is added without a prefix.
 var ErrMissingPrefix = errors.New("command missing prefix")
 
+// The error returned when we fail to find a corresponding userMember struct
+// for an ID. This should not happen, probably a bug somewhere if encountered.
+var ErrMissingMember = errors.New("failed to find member")
+
 // Command is a definition of a handler for a command.
 type Command struct {
 	// The command's key, such as /foo
@@ -146,11 +150,9 @@ func InitCommands(c *Commands) {
 			if len(args) != 1 {
 				return ErrMissingArg
 			}
-			u := msg.From()
-
-			member, ok := room.MemberByID(u.ID())
+			member, ok := room.MemberByID(msg.From().ID())
 			if !ok {
-				return errors.New("failed to find member")
+				return ErrMissingMember
 			}
 
 			oldID := member.ID()
@@ -251,11 +253,16 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
+			from, ok := room.Member(msg.From())
+			if !ok {
+				return ErrMissingMember
+			}
+
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
 				// Print ignored names, if any.
 				var names []string
-				msg.From().Ignored.Each(func(_ string, item set.Item) error {
+				from.Ignored.Each(func(_ string, item set.Item) error {
 					names = append(names, item.Key())
 					return nil
 				})
@@ -279,7 +286,7 @@ func InitCommands(c *Commands) {
 				return fmt.Errorf("user not found: %s", id)
 			}
 
-			err := msg.From().Ignored.Add(set.Itemize(id, target))
+			err := from.Ignored.Add(set.Itemize(id, target))
 			if err == set.ErrCollision {
 				return fmt.Errorf("user already ignored: %s", id)
 			} else if err != nil {
@@ -295,12 +302,16 @@ func InitCommands(c *Commands) {
 		Prefix:     "/unignore",
 		PrefixHelp: "USER",
 		Handler: func(room *Room, msg message.CommandMsg) error {
+			from, ok := room.Member(msg.From())
+			if !ok {
+				return ErrMissingMember
+			}
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/unignore"))
 			if id == "" {
 				return errors.New("must specify user")
 			}
 
-			if err := msg.From().Ignored.Remove(id); err != nil {
+			if err := from.Ignored.Remove(id); err != nil {
 				return err
 			}
 

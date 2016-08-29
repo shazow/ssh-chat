@@ -2,10 +2,8 @@ package chat
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 )
@@ -48,6 +46,7 @@ type ScreenedUser struct {
 	screen *MockScreen
 }
 
+/*
 func TestIgnore(t *testing.T) {
 	var buffer []byte
 
@@ -151,6 +150,7 @@ func TestIgnore(t *testing.T) {
 	ignorer.screen.Read(&buffer)
 	expectOutput(t, buffer, ignored.user.Name()+": hello again!"+message.Newline)
 }
+*/
 
 func expectOutput(t *testing.T, buffer []byte, expected string) {
 	bytes := []byte(expected)

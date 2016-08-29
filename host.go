@@ -130,7 +130,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(set.Itemize(member.ID(), member))
+		h.Room.Ops.Add(set.Keyize(member.ID()))
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
@@ -273,7 +273,8 @@ func (h *Host) GetUser(name string) (*message.User, bool) {
 	if !ok {
 		return nil, false
 	}
-	return m.User, true
+	u, ok := m.Member.(*message.User)
+	return u, ok
 }
 
 // InitCommands adds host-specific commands to a Commands container. These will
@@ -505,17 +506,16 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			member, ok := room.MemberByID(args[0])
+			user, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
-			room.Ops.Add(set.Itemize(member.ID(), member))
+			room.Ops.Add(set.Keyize(user.ID()))
 
-			id := member.Identifier.(*Identity)
-			h.auth.Op(id.PublicKey(), until)
+			h.auth.Op(user.Identifier.(*Identity).PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
-			room.Send(message.NewSystemMsg(body, member.User))
+			room.Send(message.NewSystemMsg(body, user))
 
 			return nil
 		},
