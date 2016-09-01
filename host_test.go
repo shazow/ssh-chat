@@ -29,7 +29,7 @@ func TestHostGetPrompt(t *testing.T) {
 
 	u := message.NewUser(&identity{id: "foo"})
 
-	actual = getPrompt(u)
+	actual = u.Prompt()
 	expected = "[foo] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
@@ -38,7 +38,7 @@ func TestHostGetPrompt(t *testing.T) {
 	u.SetConfig(message.UserConfig{
 		Theme: &message.Themes[0],
 	})
-	actual = getPrompt(u)
+	actual = u.Prompt()
 	expected = "[\033[38;05;88mfoo\033[0m] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)

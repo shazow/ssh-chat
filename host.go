@@ -18,16 +18,6 @@ import (
 
 const maxInputLength int = 1024
 
-// getPrompt will render the terminal prompt string based on the user.
-func getPrompt(user *message.User) string {
-	name := user.Name()
-	cfg := user.Config()
-	if cfg.Theme != nil {
-		name = cfg.Theme.ColorName(user)
-	}
-	return fmt.Sprintf("[%s] ", name)
-}
-
 // Host is the bridge between sshd and chat modules
 // TODO: Should be easy to add support for multiple rooms, if we want.
 type Host struct {
@@ -124,7 +114,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	// Successfully joined.
-	term.SetPrompt(getPrompt(user))
+	term.SetPrompt(user.Prompt())
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
@@ -172,7 +162,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			//
 			// FIXME: This is hacky, how do we improve the API to allow for
 			// this? Chat module shouldn't know about terminals.
-			term.SetPrompt(getPrompt(user))
+			term.SetPrompt(user.Prompt())
 			user.SetHighlight(user.Name())
 		}
 	}

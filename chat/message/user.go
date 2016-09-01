@@ -186,6 +186,16 @@ func (u *User) Send(m Message) error {
 	return nil
 }
 
+// Prompt renders a theme-colorized prompt string.
+func (u *User) Prompt() string {
+	name := u.Name()
+	cfg := u.Config()
+	if cfg.Theme != nil {
+		name = cfg.Theme.ColorName(u)
+	}
+	return fmt.Sprintf("[%s] ", name)
+}
+
 // Container for per-user configurations.
 type UserConfig struct {
 	Highlight *regexp.Regexp
