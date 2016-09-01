@@ -18,8 +18,8 @@ import (
 
 const maxInputLength int = 1024
 
-// GetPrompt will render the terminal prompt string based on the user.
-func GetPrompt(user *message.User) string {
+// getPrompt will render the terminal prompt string based on the user.
+func getPrompt(user *message.User) string {
 	name := user.Name()
 	cfg := user.Config()
 	if cfg.Theme != nil {
@@ -90,8 +90,8 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
-	id := NewIdentity(term.Conn)
-	user := message.NewUserScreen(id, term)
+	ident := toIdentity(term.Conn)
+	user := message.NewUserScreen(ident, term)
 	cfg := user.Config()
 	cfg.Theme = &h.theme
 	user.SetConfig(cfg)
@@ -115,7 +115,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	member, err := h.Join(user)
 	if err != nil {
 		// Try again...
-		id.SetName(fmt.Sprintf("Guest%d", count))
+		ident.SetName(fmt.Sprintf("Guest%d", count))
 		member, err = h.Join(user)
 	}
 	if err != nil {
@@ -124,7 +124,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	// Successfully joined.
-	term.SetPrompt(GetPrompt(user))
+	term.SetPrompt(getPrompt(user))
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
@@ -172,7 +172,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			//
 			// FIXME: This is hacky, how do we improve the API to allow for
 			// this? Chat module shouldn't know about terminals.
-			term.SetPrompt(GetPrompt(user))
+			term.SetPrompt(getPrompt(user))
 			user.SetHighlight(user.Name())
 		}
 	}
@@ -356,7 +356,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			id := target.Identifier.(*Identity)
+			id := target.Identifier.(*identity)
 			var whois string
 			switch room.IsOp(msg.From()) {
 			case true:
@@ -442,7 +442,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			id := target.Identifier.(*Identity)
+			id := target.Identifier.(*identity)
 			h.auth.Ban(id.PublicKey(), until)
 			h.auth.BanAddr(id.RemoteAddr(), until)
 
@@ -512,7 +512,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 			room.Ops.Add(set.Keyize(user.ID()))
 
-			h.auth.Op(user.Identifier.(*Identity).PublicKey(), until)
+			h.auth.Op(user.Identifier.(*identity).PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
 			room.Send(message.NewSystemMsg(body, user))

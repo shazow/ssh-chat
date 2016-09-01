@@ -11,35 +11,35 @@ import (
 )
 
 // Identity is a container for everything that identifies a client.
-type Identity struct {
+type identity struct {
 	sshd.Connection
 	id      string
 	created time.Time
 }
 
-// NewIdentity returns a new identity object from an sshd.Connection.
-func NewIdentity(conn sshd.Connection) *Identity {
-	return &Identity{
+// Converts an sshd.Connection to an identity.
+func toIdentity(conn sshd.Connection) *identity {
+	return &identity{
 		Connection: conn,
 		id:         chat.SanitizeName(conn.Name()),
 		created:    time.Now(),
 	}
 }
 
-func (i Identity) ID() string {
+func (i identity) ID() string {
 	return i.id
 }
 
-func (i *Identity) SetName(name string) {
+func (i *identity) SetName(name string) {
 	i.id = chat.SanitizeName(name)
 }
 
-func (i Identity) Name() string {
+func (i identity) Name() string {
 	return i.id
 }
 
 // Whois returns a whois description for non-admin users.
-func (i Identity) Whois() string {
+func (i identity) Whois() string {
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
@@ -51,7 +51,7 @@ func (i Identity) Whois() string {
 }
 
 // WhoisAdmin returns a whois description for admin users.
-func (i Identity) WhoisAdmin() string {
+func (i identity) WhoisAdmin() string {
 	ip, _, _ := net.SplitHostPort(i.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
