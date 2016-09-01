@@ -26,6 +26,9 @@ func TestServerInit(t *testing.T) {
 
 func TestServeTerminals(t *testing.T) {
 	signer, err := NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
 	config := MakeNoAuth()
 	config.AddHostKey(signer)
 

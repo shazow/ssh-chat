@@ -21,6 +21,9 @@ func (a RejectAuth) Check(net.Addr, ssh.PublicKey) (bool, error) {
 
 func TestClientReject(t *testing.T) {
 	signer, err := NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
 	config := MakeAuth(RejectAuth{})
 	config.AddHostKey(signer)
 
