@@ -82,7 +82,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		user.Send(m)
 	default:
 		fromMsg, skip := m.(message.MessageFrom)
-		var skipUser *message.User
+		var skipUser Member
 		if skip {
 			skipUser = fromMsg.From()
 		}
@@ -127,28 +127,28 @@ func (r *Room) Send(m message.Message) {
 }
 
 // History feeds the room's recent message history to the user's handler.
-func (r *Room) History(u *message.User) {
-	for _, m := range r.history.Get(historyLen) {
-		u.Send(m)
+func (r *Room) History(m Member) {
+	for _, msg := range r.history.Get(historyLen) {
+		m.Send(msg)
 	}
 }
 
 // Join the room as a user, will announce.
-func (r *Room) Join(u *message.User) (*roomMember, error) {
+func (r *Room) Join(m Member) (*roomMember, error) {
 	// TODO: Check if closed
-	if u.ID() == "" {
+	if m.ID() == "" {
 		return nil, ErrInvalidName
 	}
 	member := &roomMember{
-		Member:  u,
+		Member:  m,
 		Ignored: set.New(),
 	}
-	err := r.Members.Add(set.Itemize(u.ID(), member))
+	err := r.Members.Add(set.Itemize(m.ID(), member))
 	if err != nil {
 		return nil, err
 	}
-	r.History(u)
-	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.Members.Len())
+	r.History(m)
+	s := fmt.Sprintf("%s joined. (Connected: %d)", m.Name(), r.Members.Len())
 	r.Send(message.NewAnnounceMsg(s))
 	return member, nil
 }
