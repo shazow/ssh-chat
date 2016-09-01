@@ -65,8 +65,8 @@ func (u *User) SetConfig(cfg UserConfig) {
 }
 
 // Rename the user with a new Identifier.
-func (u *User) SetID(id string) {
-	u.Identifier.SetID(id)
+func (u *User) SetName(name string) {
+	u.Identifier.SetName(name)
 	u.setColorIdx(rand.Int())
 }
 

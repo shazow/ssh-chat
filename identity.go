@@ -30,12 +30,8 @@ func (i Identity) ID() string {
 	return i.id
 }
 
-func (i *Identity) SetID(id string) {
-	i.id = id
-}
-
 func (i *Identity) SetName(name string) {
-	i.SetID(name)
+	i.id = chat.SanitizeName(name)
 }
 
 func (i Identity) Name() string {

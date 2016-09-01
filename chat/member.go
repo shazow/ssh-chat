@@ -13,9 +13,9 @@ type roomMember struct {
 
 type Member interface {
 	ID() string
-	SetID(string)
 
 	Name() string
+	SetName(string)
 
 	Config() message.UserConfig
 	SetConfig(message.UserConfig)

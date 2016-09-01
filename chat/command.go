@@ -156,10 +156,10 @@ func InitCommands(c *Commands) {
 			}
 
 			oldID := member.ID()
-			member.SetID(SanitizeName(args[0]))
+			member.SetName(args[0])
 			err := room.Rename(oldID, member)
 			if err != nil {
-				member.SetID(oldID)
+				member.SetName(oldID)
 				return err
 			}
 			return nil
