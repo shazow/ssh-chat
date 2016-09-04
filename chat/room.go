@@ -154,7 +154,7 @@ func (r *Room) Join(m Member) (*roomMember, error) {
 }
 
 // Leave the room as a user, will announce. Mostly used during setup.
-func (r *Room) Leave(u message.Identifier) error {
+func (r *Room) Leave(u Member) error {
 	err := r.Members.Remove(u.ID())
 	if err != nil {
 		return err
@@ -166,7 +166,7 @@ func (r *Room) Leave(u message.Identifier) error {
 }
 
 // Rename member with a new identity. This will not call rename on the member.
-func (r *Room) Rename(oldID string, u message.Identifier) error {
+func (r *Room) Rename(oldID string, u Member) error {
 	if u.ID() == "" {
 		return ErrInvalidName
 	}
@@ -182,7 +182,7 @@ func (r *Room) Rename(oldID string, u message.Identifier) error {
 
 // Member returns a corresponding Member object to a User if the Member is
 // present in this room.
-func (r *Room) Member(u message.Identifier) (*roomMember, bool) {
+func (r *Room) Member(u Member) (*roomMember, bool) {
 	m, ok := r.MemberByID(u.ID())
 	if !ok {
 		return nil, false
@@ -203,7 +203,7 @@ func (r *Room) MemberByID(id string) (*roomMember, bool) {
 }
 
 // IsOp returns whether a user is an operator in this room.
-func (r *Room) IsOp(u message.Identifier) bool {
+func (r *Room) IsOp(u Member) bool {
 	return r.Ops.In(u.ID())
 }
 

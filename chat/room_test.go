@@ -58,7 +58,7 @@ func TestIgnore(t *testing.T) {
 	users := make([]ScreenedUser, 3)
 	for i := 0; i < 3; i++ {
 		screen := &MockScreen{}
-		user := message.NewUserScreen(message.SimpleID(fmt.Sprintf("user%d", i)), screen)
+		user := message.NewUserScreen(fmt.Sprintf("user%d", i), screen)
 		users[i] = ScreenedUser{
 			user:   user,
 			screen: screen,
@@ -176,7 +176,7 @@ func TestRoomJoin(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen(message.SimpleID("foo"), s)
+	u := message.NewUserScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -212,7 +212,7 @@ func TestRoomJoin(t *testing.T) {
 }
 
 func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
-	u := message.NewUser(message.SimpleID("foo"))
+	u := message.NewUser("foo")
 	u.SetConfig(message.UserConfig{
 		Quiet: true,
 	})
@@ -251,7 +251,7 @@ func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 }
 
 func TestRoomQuietToggleBroadcasts(t *testing.T) {
-	u := message.NewUser(message.SimpleID("foo"))
+	u := message.NewUser("foo")
 	u.SetConfig(message.UserConfig{
 		Quiet: true,
 	})
@@ -294,7 +294,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen(message.SimpleID("foo"), s)
+	u := message.NewUserScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -335,7 +335,7 @@ func TestRoomNames(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen(message.SimpleID("foo"), s)
+	u := message.NewUserScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()

@@ -18,7 +18,6 @@ var ErrUserClosed = errors.New("user closed")
 
 // User definition, implemented set Item interface and io.Writer
 type User struct {
-	Identifier
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -28,25 +27,26 @@ type User struct {
 	closeOnce sync.Once
 
 	mu      sync.Mutex
+	name    string
 	config  UserConfig
 	replyTo *User // Set when user gets a /msg, for replying.
 }
 
-func NewUser(identity Identifier) *User {
+func NewUser(name string) *User {
 	u := User{
-		Identifier: identity,
-		config:     DefaultUserConfig,
-		joined:     time.Now(),
-		msg:        make(chan Message, messageBuffer),
-		done:       make(chan struct{}),
+		name:   name,
+		config: DefaultUserConfig,
+		joined: time.Now(),
+		msg:    make(chan Message, messageBuffer),
+		done:   make(chan struct{}),
 	}
 	u.setColorIdx(rand.Int())
 
 	return &u
 }
 
-func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
-	u := NewUser(identity)
+func NewUserScreen(name string, screen io.WriteCloser) *User {
+	u := NewUser(name)
 	u.screen = screen
 
 	return u
@@ -64,10 +64,28 @@ func (u *User) SetConfig(cfg UserConfig) {
 	u.mu.Unlock()
 }
 
+func (u *User) ID() string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return SanitizeName(u.name)
+}
+
+func (u *User) Name() string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.name
+}
+
+func (u *User) Joined() time.Time {
+	return u.joined
+}
+
 // Rename the user with a new Identifier.
 func (u *User) SetName(name string) {
-	u.Identifier.SetName(name)
+	u.mu.Lock()
+	u.name = name
 	u.setColorIdx(rand.Int())
+	u.mu.Unlock()
 }
 
 // ReplyTo returns the last user that messaged this user.
