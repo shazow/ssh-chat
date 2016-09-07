@@ -32,9 +32,10 @@ type Host struct {
 	// Default theme
 	theme message.Theme
 
-	mu    sync.Mutex
-	motd  string
-	count int
+	mu      sync.Mutex
+	motd    string
+	count   int
+	clients map[*message.User][]Client
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -45,6 +46,7 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 		listener: listener,
 		commands: chat.Commands{},
 		auth:     auth,
+		clients:  map[*message.User][]Client{},
 	}
 
 	// Make our own commands registry instance.
@@ -70,32 +72,29 @@ func (h *Host) SetMotd(motd string) {
 	h.mu.Unlock()
 }
 
-func (h *Host) isOp(conn sshd.Connection) bool {
-	key := conn.PublicKey()
-	if key == nil {
-		return false
-	}
-	return h.auth.IsOp(key)
-}
-
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	requestedName := term.Conn.Name()
 	user := message.NewUserScreen(requestedName, term)
-	cfg := user.Config()
-	cfg.Theme = &h.theme
-	user.SetConfig(cfg)
-	go user.Consume()
 
-	// Close term once user is closed.
-	defer user.Close()
-	defer term.Close()
+	client := h.addClient(user, term.Conn)
+	defer h.removeClient(user, client)
 
 	h.mu.Lock()
 	motd := h.motd
 	count := h.count
 	h.count++
 	h.mu.Unlock()
+
+	cfg := user.Config()
+	cfg.Theme = &h.theme
+	user.SetConfig(cfg)
+
+	// Close term once user is closed.
+	defer user.Close()
+	defer term.Close()
+
+	go user.Consume()
 
 	// Send MOTD
 	if motd != "" {
@@ -119,11 +118,17 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	user.SetHighlight(user.Name())
 
 	// Should the user be op'd on join?
-	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(set.Keyize(member.ID()))
+	if key := term.Conn.PublicKey(); key != nil {
+		authItem, err := h.auth.ops.Get(newAuthKey(key))
+		if err != nil {
+			err = h.Room.Ops.Add(set.Rename(authItem, member.ID()))
+		}
 	}
-	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
+	if err != nil {
+		logger.Warningf("[%s] Failed to op: %s", term.Conn.RemoteAddr(), err)
+	}
 
+	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
 
 	for {
@@ -173,6 +178,41 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		return
 	}
 	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
+}
+
+func (h *Host) addClient(user *message.User, conn sshd.Connection) *Client {
+	client := Client{
+		user:      user,
+		conn:      conn,
+		timestamp: time.Now(),
+	}
+	h.mu.Lock()
+	h.clients[user] = append(h.clients[user], client)
+	h.mu.Unlock()
+	return &client
+}
+
+func (h *Host) removeClient(user *message.User, client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	clients := h.clients[user]
+	for i, c := range clients {
+		// Find the user
+		if &c != client {
+			continue
+		}
+		// Delete corresponding client
+		clients[i] = clients[len(clients)-1]
+		clients = clients[:len(clients)-1]
+		break
+	}
+}
+
+func (h *Host) findClients(user *message.User) []Client {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.clients[user]
 }
 
 // Serve our chat room onto the listener
@@ -331,37 +371,35 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		},
 	})
 
-	// XXX: Temporarily disable whois
-	/*
-		c.Add(chat.Command{
-			Prefix:     "/whois",
-			PrefixHelp: "USER",
-			Help:       "Information about USER.",
-			Handler: func(room *chat.Room, msg message.CommandMsg) error {
-				args := msg.Args()
-				if len(args) == 0 {
-					return errors.New("must specify user")
-				}
+	c.Add(chat.Command{
+		Prefix:     "/whois",
+		PrefixHelp: "USER",
+		Help:       "Information about USER.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
 
-				target, ok := h.GetUser(args[0])
-				if !ok {
-					return errors.New("user not found")
-				}
+			target, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
 
-				id := target.Identifier.(*identity)
-				var whois string
-				switch room.IsOp(msg.From()) {
-				case true:
-					whois = id.WhoisAdmin()
-				case false:
-					whois = id.Whois()
-				}
-				room.Send(message.NewSystemMsg(whois, msg.From()))
+			// FIXME: Handle many clients
+			clients := h.findClients(target)
+			var whois string
+			switch room.IsOp(msg.From()) {
+			case true:
+				whois = whoisAdmin(clients)
+			case false:
+				whois = whoisPublic(clients)
+			}
+			room.Send(message.NewSystemMsg(whois, msg.From()))
 
-				return nil
-			},
-		})
-	*/
+			return nil
+		},
+	})
 
 	// Hidden commands
 	c.Add(chat.Command{
@@ -381,85 +419,90 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		},
 	})
 
-	// XXX: Temporarily disable op and ban
-	/*
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/op",
+		PrefixHelp: "USER [DURATION]",
+		Help:       "Set USER as admin.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
 
-		c.Add(chat.Command{
-			Op:         true,
-			Prefix:     "/op",
-			PrefixHelp: "USER [DURATION]",
-			Help:       "Set USER as admin.",
-			Handler: func(room *chat.Room, msg message.CommandMsg) error {
-				if !room.IsOp(msg.From()) {
-					return errors.New("must be op")
-				}
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
 
-				args := msg.Args()
-				if len(args) == 0 {
-					return errors.New("must specify user")
-				}
+			var until time.Duration = 0
+			if len(args) > 1 {
+				until, _ = time.ParseDuration(args[1])
+			}
 
-				var until time.Duration = 0
-				if len(args) > 1 {
-					until, _ = time.ParseDuration(args[1])
-				}
-
-				user, ok := h.GetUser(args[0])
-				if !ok {
-					return errors.New("user not found")
-				}
+			user, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+			if until != 0 {
+				room.Ops.Add(set.Expire(set.Keyize(user.ID()), until))
+			} else {
 				room.Ops.Add(set.Keyize(user.ID()))
+			}
 
-				h.auth.Op(user.Identifier.(*identity).PublicKey(), until)
+			for _, client := range h.findClients(user) {
+				h.auth.Op(client.conn.PublicKey(), until)
+			}
 
-				body := fmt.Sprintf("Made op by %s.", msg.From().Name())
-				room.Send(message.NewSystemMsg(body, user))
+			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
+			room.Send(message.NewSystemMsg(body, user))
 
-				return nil
-			},
-		})
+			return nil
+		},
+	})
 
-		// Op commands
-		c.Add(chat.Command{
-			Op:         true,
-			Prefix:     "/ban",
-			PrefixHelp: "USER [DURATION]",
-			Help:       "Ban USER from the server.",
-			Handler: func(room *chat.Room, msg message.CommandMsg) error {
-				// TODO: Would be nice to specify what to ban. Key? Ip? etc.
-				if !room.IsOp(msg.From()) {
-					return errors.New("must be op")
-				}
+	// Op commands
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/ban",
+		PrefixHelp: "USER [DURATION]",
+		Help:       "Ban USER from the server.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
 
-				args := msg.Args()
-				if len(args) == 0 {
-					return errors.New("must specify user")
-				}
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
 
-				target, ok := h.GetUser(args[0])
-				if !ok {
-					return errors.New("user not found")
-				}
+			target, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
 
-				var until time.Duration = 0
-				if len(args) > 1 {
-					until, _ = time.ParseDuration(args[1])
-				}
+			var until time.Duration = 0
+			if len(args) > 1 {
+				until, _ = time.ParseDuration(args[1])
+			}
 
-				id := target.Identifier.(*identity)
-				h.auth.Ban(id.PublicKey(), until)
-				h.auth.BanAddr(id.RemoteAddr(), until)
+			clients := h.findClients(target)
+			for _, client := range clients {
+				h.auth.Ban(client.conn.PublicKey(), until)
+				h.auth.BanAddr(client.conn.RemoteAddr(), until)
+			}
 
-				body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
-				room.Send(message.NewAnnounceMsg(body))
-				target.Close()
+			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
+			room.Send(message.NewAnnounceMsg(body))
+			target.Close()
 
-				logger.Debugf("Banned: \n-> %s", id.Whois())
+			logger.Debugf("Banned: \n-> %s", whoisAdmin(clients))
 
-				return nil
-			},
-		})
-	*/
+			return nil
+		},
+	})
+
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/kick",
