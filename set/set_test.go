@@ -21,9 +21,15 @@ func TestSetExpiring(t *testing.T) {
 		t.Error("not len 1 after set")
 	}
 
-	item := &ExpiringItem{nil, time.Now().Add(-time.Nanosecond * 1)}
+	item := &ExpiringItem{StringItem("expired"), time.Now().Add(-time.Nanosecond * 1)}
 	if !item.Expired() {
 		t.Errorf("ExpiringItem a nanosec ago is not expiring")
+	}
+	if err := s.Add(item); err != nil {
+		t.Fatalf("failed to add item: %s", err)
+	}
+	if s.In("expired") {
+		t.Errorf("expired item is present")
 	}
 
 	item = &ExpiringItem{nil, time.Now().Add(time.Minute * 5)}
