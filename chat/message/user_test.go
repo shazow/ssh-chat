@@ -13,12 +13,15 @@ func TestMakeUser(t *testing.T) {
 	m := NewAnnounceMsg("hello")
 
 	defer u.Close()
-	u.Send(m)
-	u.HandleMsg(u.ConsumeOne())
+	err := u.Send(m)
+	if err != nil {
+		t.Fatalf("failed to send: %s", err)
+	}
+	u.HandleMsg(<-u.msg)
 
 	s.Read(&actual)
 	expected = []byte(m.String() + Newline)
 	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Got: `%s`; Expected: `%s`", actual, expected)
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 }

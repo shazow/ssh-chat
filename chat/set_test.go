@@ -31,9 +31,9 @@ func TestSet(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = s.Add(set.Itemize(u2.ID(), u2))
+	err = s.AddNew(set.Itemize(u2.ID(), u2))
 	if err != set.ErrCollision {
-		t.Error(err)
+		t.Errorf("expected ErrCollision, got: %s", err)
 	}
 
 	size := s.Len()

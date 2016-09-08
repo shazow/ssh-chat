@@ -18,13 +18,13 @@ var ErrUserClosed = errors.New("user closed")
 
 // User definition, implemented set Item interface and io.Writer
 type User struct {
-	colorIdx int
-	joined   time.Time
-	msg      chan Message
-	done     chan struct{}
+	io.WriteCloser
 
-	screen    io.WriteCloser
+	colorIdx  int
+	joined    time.Time
 	closeOnce sync.Once
+	msg       chan Message
+	done      chan struct{}
 
 	mu      sync.Mutex
 	name    string
@@ -47,7 +47,7 @@ func NewUser(name string) *User {
 
 func NewUserScreen(name string, screen io.WriteCloser) *User {
 	u := NewUser(name)
-	u.screen = screen
+	u.WriteCloser = screen
 
 	return u
 }
@@ -112,9 +112,7 @@ func (u *User) setColorIdx(idx int) {
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
 	u.closeOnce.Do(func() {
-		if u.screen != nil {
-			u.screen.Close()
-		}
+		u.WriteCloser.Close()
 		// close(u.msg) TODO: Close?
 		close(u.done)
 	})
@@ -182,7 +180,7 @@ func (u *User) render(m Message) string {
 // HandleMsg will render the message to the screen, blocking.
 func (u *User) HandleMsg(m Message) error {
 	r := u.render(m)
-	_, err := u.screen.Write([]byte(r))
+	_, err := u.Write([]byte(r))
 	if err != nil {
 		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
 		u.Close()
