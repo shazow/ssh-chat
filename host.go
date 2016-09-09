@@ -187,6 +187,9 @@ func (h *Host) addClient(user *message.User, conn sshd.Connection) *Client {
 		timestamp: time.Now(),
 	}
 	h.mu.Lock()
+	if _, ok := h.clients[user]; ok {
+		logger.Warningf("user collision: %q", user)
+	}
 	h.clients[user] = append(h.clients[user], client)
 	h.mu.Unlock()
 	return &client

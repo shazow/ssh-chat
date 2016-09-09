@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -63,6 +64,8 @@ func TestHostNameCollision(t *testing.T) {
 
 	done := make(chan struct{}, 1)
 
+	canary := "canarystring"
+
 	// First client
 	go func() {
 		err := sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
@@ -92,8 +95,10 @@ func TestHostNameCollision(t *testing.T) {
 				t.Errorf("Got %q; expected %q", actual, expected)
 			}
 
+			fmt.Fprintf(w, canary+message.Newline)
+
+			<-done
 			// Wrap it up.
-			close(done)
 			return nil
 		})
 		if err != nil {
@@ -108,16 +113,23 @@ func TestHostNameCollision(t *testing.T) {
 	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 		scanner := bufio.NewScanner(r)
 
-		// Consume the initial buffer
-		scanner.Scan()
-		scanner.Scan()
-		scanner.Scan()
+		// Scan until we see our canarystring
+		for scanner.Scan() {
+			s := scanner.Text()
+			if strings.HasSuffix(s, canary) {
+				break
+			}
+		}
 
+		// Send an empty prompt to allow for a full line scan with EOL.
+		fmt.Fprintf(w, message.Newline)
+
+		scanner.Scan()
 		actual := scanner.Text()
 		if !strings.HasPrefix(actual, "[Guest1] ") {
-			// FIXME: Flaky?
 			t.Errorf("Second client did not get Guest1 name: %q", actual)
 		}
+		close(done)
 		return nil
 	})
 	if err != nil {

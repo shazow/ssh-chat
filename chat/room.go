@@ -143,7 +143,7 @@ func (r *Room) Join(m Member) (*roomMember, error) {
 		Member:  m,
 		Ignored: set.New(),
 	}
-	err := r.Members.Add(set.Itemize(m.ID(), member))
+	err := r.Members.AddNew(set.Itemize(m.ID(), member))
 	if err != nil {
 		return nil, err
 	}
