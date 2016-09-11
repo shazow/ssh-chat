@@ -9,7 +9,8 @@ func TestMakeUser(t *testing.T) {
 	var actual, expected []byte
 
 	s := &MockScreen{}
-	u := NewUserScreen("foo", s)
+	u := PipedScreen("foo", s)
+
 	m := NewAnnounceMsg("hello")
 
 	defer u.Close()
@@ -17,7 +18,6 @@ func TestMakeUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to send: %s", err)
 	}
-	u.HandleMsg(<-u.msg)
 
 	s.Read(&actual)
 	expected = []byte(m.String() + Newline)

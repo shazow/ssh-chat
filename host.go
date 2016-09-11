@@ -75,7 +75,7 @@ func (h *Host) SetMotd(motd string) {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	requestedName := term.Conn.Name()
-	user := message.NewUserScreen(requestedName, term)
+	user := message.NewScreen(requestedName, term)
 
 	client := h.addClient(user, term.Conn)
 	defer h.removeClient(user, client)

@@ -57,7 +57,7 @@ func TestIgnore(t *testing.T) {
 	users := make([]ScreenedUser, 3)
 	for i := 0; i < 3; i++ {
 		screen := &MockScreen{}
-		user := message.NewUserScreen(fmt.Sprintf("user%d", i), screen)
+		user := message.NewScreen(fmt.Sprintf("user%d", i), screen)
 		users[i] = ScreenedUser{
 			user:   user,
 			screen: screen,
@@ -162,7 +162,7 @@ func TestRoomJoin(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen("foo", s)
+	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -173,7 +173,6 @@ func TestRoomJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -181,7 +180,6 @@ func TestRoomJoin(t *testing.T) {
 	}
 
 	ch.Send(message.NewSystemMsg("hello", u))
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte("-> hello" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -189,7 +187,6 @@ func TestRoomJoin(t *testing.T) {
 	}
 
 	ch.Send(message.ParseInput("/me says hello.", u))
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte("** foo says hello." + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -198,7 +195,11 @@ func TestRoomJoin(t *testing.T) {
 }
 
 func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
-	u := message.NewUser("foo")
+	msgs := make(chan message.Message)
+	u := message.HandledScreen("foo", func(m message.Message) error {
+		msgs <- m
+		return nil
+	})
 	u.SetConfig(message.UserConfig{
 		Quiet: true,
 	})
@@ -211,19 +212,12 @@ func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Drain the initial Join message
-	<-ch.broadcast
-
 	go func() {
-		/*
-			for {
-				msg := u.ConsumeChan()
-				if _, ok := msg.(*message.AnnounceMsg); ok {
-					t.Errorf("Got unexpected `%T`", msg)
-				}
+		for msg := range msgs {
+			if _, ok := msg.(*message.AnnounceMsg); ok {
+				t.Errorf("Got unexpected `%T`", msg)
 			}
-		*/
-		// XXX: Fix this
+		}
 	}()
 
 	// Call with an AnnounceMsg and all the other types
@@ -234,10 +228,16 @@ func TestRoomDoesntBroadcastAnnounceMessagesWhenQuiet(t *testing.T) {
 	ch.HandleMsg(message.NewSystemMsg("hello", u))
 	ch.HandleMsg(message.NewPrivateMsg("hello", u, u))
 	ch.HandleMsg(message.NewPublicMsg("hello", u))
+	// Try an ignored one again just in case
+	ch.HandleMsg(message.NewAnnounceMsg("Once more for fun"))
 }
 
 func TestRoomQuietToggleBroadcasts(t *testing.T) {
-	u := message.NewUser("foo")
+	msgs := make(chan message.Message)
+	u := message.HandledScreen("foo", func(m message.Message) error {
+		msgs <- m
+		return nil
+	})
 	u.SetConfig(message.UserConfig{
 		Quiet: true,
 	})
@@ -259,7 +259,7 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 
 	expectedMsg := message.NewAnnounceMsg("Ignored")
 	ch.HandleMsg(expectedMsg)
-	msg := u.ConsumeOne()
+	msg := <-msgs
 	if _, ok := msg.(*message.AnnounceMsg); !ok {
 		t.Errorf("Got: `%T`; Expected: `%T`", msg, expectedMsg)
 	}
@@ -270,7 +270,7 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 
 	ch.HandleMsg(message.NewAnnounceMsg("Ignored"))
 	ch.HandleMsg(message.NewSystemMsg("hello", u))
-	msg = u.ConsumeOne()
+	msg = <-msgs
 	if _, ok := msg.(*message.AnnounceMsg); ok {
 		t.Errorf("Got unexpected `%T`", msg)
 	}
@@ -280,7 +280,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen("foo", s)
+	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -291,7 +291,6 @@ func TestQuietToggleDisplayState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -300,7 +299,6 @@ func TestQuietToggleDisplayState(t *testing.T) {
 
 	ch.Send(message.ParseInput("/quiet", u))
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte("-> Quiet mode is toggled ON" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -309,7 +307,6 @@ func TestQuietToggleDisplayState(t *testing.T) {
 
 	ch.Send(message.ParseInput("/quiet", u))
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte("-> Quiet mode is toggled OFF" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -321,7 +318,7 @@ func TestRoomNames(t *testing.T) {
 	var expected, actual []byte
 
 	s := &MockScreen{}
-	u := message.NewUserScreen("foo", s)
+	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
 	go ch.Serve()
@@ -332,7 +329,6 @@ func TestRoomNames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
@@ -341,7 +337,6 @@ func TestRoomNames(t *testing.T) {
 
 	ch.Send(message.ParseInput("/names", u))
 
-	u.HandleMsg(u.ConsumeOne())
 	expected = []byte("-> 1 connected: foo" + message.Newline)
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {

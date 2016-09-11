@@ -88,7 +88,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 
 		r.history.Add(m)
-		r.Members.Each(func(_ string, item set.Item) (err error) {
+		r.Members.Each(func(k string, item set.Item) (err error) {
 			roomMember := item.Value().(*roomMember)
 			user := roomMember.Member
 			from := fromMsg.From().(Member)
