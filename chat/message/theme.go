@@ -127,12 +127,12 @@ func (t Theme) ID() string {
 }
 
 // Colorize name string given some index
-func (t Theme) ColorName(u *User) string {
+func (t Theme) ColorName(u Author) string {
 	if t.names == nil {
 		return u.Name()
 	}
 
-	return t.names.Get(u.colorIdx).Format(u.Name())
+	return t.names.Get(u.Color()).Format(u.Name())
 }
 
 // Colorize the PM string

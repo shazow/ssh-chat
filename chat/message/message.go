@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type Author interface {
+	Name() string
+	Color() int
+}
+
 // Message is an interface for messages.
 type Message interface {
 	Render(*Theme) string
@@ -16,15 +21,15 @@ type Message interface {
 
 type MessageTo interface {
 	Message
-	To() *User
+	To() Author
 }
 
 type MessageFrom interface {
 	Message
-	From() *User
+	From() Author
 }
 
-func ParseInput(body string, from *User) Message {
+func ParseInput(body string, from Author) Message {
 	m := NewPublicMsg(body, from)
 	cmd, isCmd := m.ParseCommand()
 	if isCmd {
@@ -69,10 +74,10 @@ func (m Msg) Timestamp() time.Time {
 // PublicMsg is any message from a user sent to the room.
 type PublicMsg struct {
 	Msg
-	from *User
+	from Author
 }
 
-func NewPublicMsg(body string, from *User) PublicMsg {
+func NewPublicMsg(body string, from Author) PublicMsg {
 	return PublicMsg{
 		Msg: Msg{
 			body:      body,
@@ -82,7 +87,7 @@ func NewPublicMsg(body string, from *User) PublicMsg {
 	}
 }
 
-func (m PublicMsg) From() *User {
+func (m PublicMsg) From() Author {
 	return m.from
 }
 
@@ -137,10 +142,10 @@ func (m PublicMsg) String() string {
 // sender to see the emote.
 type EmoteMsg struct {
 	Msg
-	from *User
+	from Author
 }
 
-func NewEmoteMsg(body string, from *User) *EmoteMsg {
+func NewEmoteMsg(body string, from Author) *EmoteMsg {
 	return &EmoteMsg{
 		Msg: Msg{
 			body:      body,
@@ -161,17 +166,17 @@ func (m EmoteMsg) String() string {
 // PrivateMsg is a message sent to another user, not shown to anyone else.
 type PrivateMsg struct {
 	PublicMsg
-	to *User
+	to Author
 }
 
-func NewPrivateMsg(body string, from *User, to *User) PrivateMsg {
+func NewPrivateMsg(body string, from Author, to Author) PrivateMsg {
 	return PrivateMsg{
 		PublicMsg: NewPublicMsg(body, from),
 		to:        to,
 	}
 }
 
-func (m PrivateMsg) To() *User {
+func (m PrivateMsg) To() Author {
 	return m.to
 }
 
@@ -191,10 +196,10 @@ func (m PrivateMsg) String() string {
 // to anyone else. Usually in response to something, like /help.
 type SystemMsg struct {
 	Msg
-	to *User
+	to Author
 }
 
-func NewSystemMsg(body string, to *User) *SystemMsg {
+func NewSystemMsg(body string, to Author) *SystemMsg {
 	return &SystemMsg{
 		Msg: Msg{
 			body:      body,
@@ -215,7 +220,7 @@ func (m *SystemMsg) String() string {
 	return fmt.Sprintf("-> %s", m.body)
 }
 
-func (m *SystemMsg) To() *User {
+func (m *SystemMsg) To() Author {
 	return m.to
 }
 

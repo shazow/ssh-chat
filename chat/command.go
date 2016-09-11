@@ -5,6 +5,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
@@ -110,7 +111,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/help",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			op := room.IsOp(msg.From())
+			op := room.IsOp(msg.From().(Member))
 			room.Send(message.NewSystemMsg(room.commands.Help(op), msg.From()))
 			return nil
 		},
@@ -135,8 +136,7 @@ func InitCommands(c *Commands) {
 		Prefix: "/exit",
 		Help:   "Exit the chat.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			msg.From().Close()
-			return nil
+			return msg.From().(io.Closer).Close()
 		},
 	})
 	c.Alias("/exit", "/quit")
@@ -150,7 +150,7 @@ func InitCommands(c *Commands) {
 			if len(args) != 1 {
 				return ErrMissingArg
 			}
-			member, ok := room.MemberByID(msg.From().ID())
+			member, ok := room.MemberByID(msg.From().(Member).ID())
 			if !ok {
 				return ErrMissingMember
 			}
@@ -184,7 +184,7 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[colors|...]",
 		Help:       "Set your color theme. (More themes: solarized, mono, hacker)",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			user := msg.From()
+			user := msg.From().(Member)
 			args := msg.Args()
 			cfg := user.Config()
 			if len(args) == 0 {
@@ -215,7 +215,7 @@ func InitCommands(c *Commands) {
 		Prefix: "/quiet",
 		Help:   "Silence room announcements.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			u := msg.From()
+			u := msg.From().(Member)
 			cfg := u.Config()
 			cfg.Quiet = !cfg.Quiet
 			u.SetConfig(cfg)
@@ -253,7 +253,7 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			from, ok := room.Member(msg.From())
+			from, ok := room.Member(msg.From().(Member))
 			if !ok {
 				return ErrMissingMember
 			}
@@ -278,7 +278,7 @@ func InitCommands(c *Commands) {
 				return nil
 			}
 
-			if id == msg.From().ID() {
+			if id == msg.From().(Member).ID() {
 				return errors.New("cannot ignore self")
 			}
 			target, ok := room.MemberByID(id)
@@ -302,7 +302,7 @@ func InitCommands(c *Commands) {
 		Prefix:     "/unignore",
 		PrefixHelp: "USER",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			from, ok := room.Member(msg.From())
+			from, ok := room.Member(msg.From().(Member))
 			if !ok {
 				return ErrMissingMember
 			}

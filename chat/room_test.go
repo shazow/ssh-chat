@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -42,7 +41,7 @@ func TestRoomServe(t *testing.T) {
 }
 
 type ScreenedUser struct {
-	user   *message.User
+	*message.User
 	screen *MockScreen
 }
 
@@ -157,19 +156,6 @@ func expectOutput(t *testing.T, buffer []byte, expected string) {
 	if !reflect.DeepEqual(buffer, bytes) {
 		t.Errorf("Got: %q; Expected: %q", buffer, expected)
 	}
-}
-
-func sendCommand(cmd string, mock ScreenedUser, room *Room, buffer *[]byte) error {
-	msg, ok := message.NewPublicMsg(cmd, mock.user).ParseCommand()
-	if !ok {
-		return errors.New("cannot parse command message")
-	}
-
-	room.Send(msg)
-	mock.user.HandleMsg(mock.user.ConsumeOne())
-	mock.screen.Read(buffer)
-
-	return nil
 }
 
 func TestRoomJoin(t *testing.T) {

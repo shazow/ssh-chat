@@ -78,21 +78,22 @@ func (r *Room) HandleMsg(m message.Message) {
 			go r.HandleMsg(m)
 		}
 	case message.MessageTo:
-		user := m.To()
+		user := m.To().(Member)
 		user.Send(m)
 	default:
 		fromMsg, skip := m.(message.MessageFrom)
 		var skipUser Member
 		if skip {
-			skipUser = fromMsg.From()
+			skipUser = fromMsg.From().(Member)
 		}
 
 		r.history.Add(m)
 		r.Members.Each(func(_ string, item set.Item) (err error) {
 			roomMember := item.Value().(*roomMember)
 			user := roomMember.Member
+			from := fromMsg.From().(Member)
 
-			if fromMsg != nil && roomMember.Ignored.In(fromMsg.From().ID()) {
+			if fromMsg != nil && roomMember.Ignored.In(from.ID()) {
 				// Skip because ignored
 				return
 			}

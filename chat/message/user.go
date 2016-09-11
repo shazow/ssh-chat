@@ -16,10 +16,53 @@ const reHighlight = `\b(%s)\b`
 
 var ErrUserClosed = errors.New("user closed")
 
+// User container that knows about writing to an IO screen.
+type UserScreen struct {
+	*User
+	io.WriteCloser
+}
+
+func (u *UserScreen) Close() error {
+	u.User.Close()
+	return u.WriteCloser.Close()
+}
+
+// HandleMsg will render the message to the screen, blocking.
+func (u *UserScreen) HandleMsg(m Message) error {
+	r := u.render(m)
+	_, err := u.Write([]byte(r))
+	if err != nil {
+		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
+		u.User.Close()
+		u.WriteCloser.Close()
+	}
+	return err
+}
+
+// Consume message buffer into the handler. Will block, should be called in a
+// goroutine.
+func (u *UserScreen) Consume() {
+	for {
+		select {
+		case <-u.done:
+			return
+		case m, ok := <-u.msg:
+			if !ok {
+				return
+			}
+			u.HandleMsg(m)
+		}
+	}
+}
+
+// Consume one message and stop, mostly for testing
+// TODO: Stop using it and remove it.
+func (u *UserScreen) ConsumeOne() Message {
+	return <-u.msg
+}
+
 // User definition, implemented set Item interface and io.Writer
 type User struct {
-	io.WriteCloser
-
 	colorIdx  int
 	joined    time.Time
 	closeOnce sync.Once
@@ -29,7 +72,7 @@ type User struct {
 	mu      sync.Mutex
 	name    string
 	config  UserConfig
-	replyTo *User // Set when user gets a /msg, for replying.
+	replyTo Author // Set when user gets a /msg, for replying.
 }
 
 func NewUser(name string) *User {
@@ -45,11 +88,11 @@ func NewUser(name string) *User {
 	return &u
 }
 
-func NewUserScreen(name string, screen io.WriteCloser) *User {
-	u := NewUser(name)
-	u.WriteCloser = screen
-
-	return u
+func NewUserScreen(name string, screen io.WriteCloser) *UserScreen {
+	return &UserScreen{
+		User:        NewUser(name),
+		WriteCloser: screen,
+	}
 }
 
 func (u *User) Config() UserConfig {
@@ -68,6 +111,10 @@ func (u *User) ID() string {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return SanitizeName(u.name)
+}
+
+func (u *User) Color() int {
+	return u.colorIdx
 }
 
 func (u *User) Name() string {
@@ -89,14 +136,14 @@ func (u *User) SetName(name string) {
 }
 
 // ReplyTo returns the last user that messaged this user.
-func (u *User) ReplyTo() *User {
+func (u *User) ReplyTo() Author {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.replyTo
 }
 
 // SetReplyTo sets the last user to message this user.
-func (u *User) SetReplyTo(user *User) {
+func (u *User) SetReplyTo(user Author) {
 	// TODO: Use UserConfig.ReplyTo string
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -112,44 +159,9 @@ func (u *User) setColorIdx(idx int) {
 // Disconnect user, stop accepting messages
 func (u *User) Close() {
 	u.closeOnce.Do(func() {
-		u.WriteCloser.Close()
 		// close(u.msg) TODO: Close?
 		close(u.done)
 	})
-}
-
-// Consume message buffer into the handler. Will block, should be called in a
-// goroutine.
-func (u *User) Consume() {
-	for {
-		select {
-		case <-u.done:
-			return
-		case m, ok := <-u.msg:
-			if !ok {
-				return
-			}
-			u.HandleMsg(m)
-		}
-	}
-}
-
-// Consume one message and stop, mostly for testing
-// TODO: Stop using it and remove it.
-func (u *User) ConsumeOne() Message {
-	return <-u.msg
-}
-
-// Check if there are pending messages, used for testing
-// TODO: Stop using it and remove it.
-func (u *User) HasMessages() bool {
-	select {
-	case msg := <-u.msg:
-		u.msg <- msg
-		return true
-	default:
-		return false
-	}
 }
 
 // SetHighlight sets the highlighting regular expression to match string.
@@ -175,17 +187,6 @@ func (u *User) render(m Message) string {
 	default:
 		return m.Render(cfg.Theme) + Newline
 	}
-}
-
-// HandleMsg will render the message to the screen, blocking.
-func (u *User) HandleMsg(m Message) error {
-	r := u.render(m)
-	_, err := u.Write([]byte(r))
-	if err != nil {
-		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
-		u.Close()
-	}
-	return err
 }
 
 // Add message to consume by user

@@ -12,9 +12,9 @@ type roomMember struct {
 }
 
 type Member interface {
-	ID() string
+	message.Author
 
-	Name() string
+	ID() string
 	SetName(string)
 
 	Config() message.UserConfig
