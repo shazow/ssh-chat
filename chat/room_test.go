@@ -34,112 +34,6 @@ func TestRoomServe(t *testing.T) {
 	}
 }
 
-/*
-func TestIgnore(t *testing.T) {
-	var buffer []byte
-
-	ch := NewRoom()
-	go ch.Serve()
-	defer ch.Close()
-
-	// Create 3 users, join the room and clear their screen buffers
-	users := make([]ScreenedUser, 3)
-	for i := 0; i < 3; i++ {
-		screen := &MockScreen{}
-		user := message.NewScreen(fmt.Sprintf("user%d", i), screen)
-		users[i] = ScreenedUser{
-			user:   user,
-			screen: screen,
-		}
-
-		_, err := ch.Join(user)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	for _, u := range users {
-		for i := 0; i < 3; i++ {
-			u.user.HandleMsg(u.user.ConsumeOne())
-			u.screen.Read(&buffer)
-		}
-	}
-
-	// Use some handy variable names for distinguish between roles
-	ignorer := users[0]
-	ignored := users[1]
-	other := users[2]
-
-	// test ignoring unexisting user
-	if err := sendCommand("/ignore test", ignorer, ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> Err: user not found: test"+message.Newline)
-
-	// test ignoring existing user
-	if err := sendCommand("/ignore "+ignored.user.Name(), ignorer, ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> Ignoring: "+ignored.user.Name()+message.Newline)
-
-	// ignoring the same user twice returns an error message and doesn't add the user twice
-	if err := sendCommand("/ignore "+ignored.user.Name(), ignorer, ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> Err: user already ignored: user1"+message.Newline)
-	if ignoredList := ignorer.user.Ignored.ListPrefix(""); len(ignoredList) != 1 {
-		t.Fatalf("should have %d ignored users, has %d", 1, len(ignoredList))
-	}
-
-	// when a message is sent from the ignored user, it is delivered to non-ignoring users
-	ch.Send(message.NewPublicMsg("hello", ignored.user))
-	other.user.HandleMsg(other.user.ConsumeOne())
-	other.screen.Read(&buffer)
-	expectOutput(t, buffer, ignored.user.Name()+": hello"+message.Newline)
-
-	// ensure ignorer doesn't have received any message
-	if ignorer.user.HasMessages() {
-		t.Fatal("should not have messages")
-	}
-
-	// `/ignore` returns a list of ignored users
-	if err := sendCommand("/ignore", ignorer, ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> 1 ignored: "+ignored.user.Name()+message.Newline)
-
-	// `/unignore [USER]` removes the user from ignored ones
-	if err := sendCommand("/unignore "+ignored.user.Name(), users[0], ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> No longer ignoring: user1"+message.Newline)
-
-	if err := sendCommand("/ignore", users[0], ch, &buffer); err != nil {
-		t.Fatal(err)
-	}
-	expectOutput(t, buffer, "-> 0 users ignored."+message.Newline)
-
-	if ignoredList := ignorer.user.Ignored.ListPrefix(""); len(ignoredList) != 0 {
-		t.Fatalf("should have %d ignored users, has %d", 0, len(ignoredList))
-	}
-
-	// after unignoring a user, its messages can be received again
-	ch.Send(message.NewPublicMsg("hello again!", ignored.user))
-
-	// give some time for the channel to get the message
-	time.Sleep(100)
-
-	// ensure ignorer has received the message
-	if !ignorer.user.HasMessages() {
-		// FIXME: This is flaky :/
-		t.Fatal("should have messages")
-	}
-	ignorer.user.HandleMsg(ignorer.user.ConsumeOne())
-	ignorer.screen.Read(&buffer)
-	expectOutput(t, buffer, ignored.user.Name()+": hello again!"+message.Newline)
-}
-*/
-
 func expectOutput(t *testing.T, buffer []byte, expected string) {
 	bytes := []byte(expected)
 	if !reflect.DeepEqual(buffer, bytes) {
@@ -180,6 +74,94 @@ func TestRoomJoin(t *testing.T) {
 	ch.Send(message.ParseInput("/me says hello.", u))
 	expected = []byte("** foo says hello." + message.Newline)
 	actual = <-s.Chan
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+}
+
+func TestIgnore(t *testing.T) {
+	ch := NewRoom()
+	go ch.Serve()
+	defer ch.Close()
+
+	addUser := func(name string) (message.Author, <-chan []byte) {
+		s := &ChannelWriter{
+			Chan: make(chan []byte, 3),
+		}
+		u := message.PipedScreen(name, s)
+		u.SetConfig(message.UserConfig{
+			Quiet: true,
+		})
+		ch.Join(u)
+		return u, s.Chan
+	}
+
+	u_foo, m_foo := addUser("foo")
+	u_bar, m_bar := addUser("bar")
+	u_quux, m_quux := addUser("quux")
+
+	var expected, actual []byte
+
+	// foo ignores bar, quux hears both
+	ch.Send(message.ParseInput("/ignore bar", u_foo))
+	expected = []byte("-> Ignoring: bar" + message.Newline)
+	actual = <-m_foo
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+
+	// bar and quux sends a message, quux hears bar, foo only hears quux
+	ch.Send(message.ParseInput("i am bar", u_bar))
+	ch.Send(message.ParseInput("i am quux", u_quux))
+
+	expected = []byte("bar: i am bar" + message.Newline)
+	actual = <-m_quux
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+
+	expected = []byte("quux: i am quux" + message.Newline)
+	actual = <-m_bar
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+	actual = <-m_foo
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+
+	// foo sends a message, both quux and bar hear it
+	ch.Send(message.ParseInput("i am foo", u_foo))
+	expected = []byte("foo: i am foo" + message.Newline)
+
+	actual = <-m_quux
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+	actual = <-m_bar
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+
+	// Confirm foo's message queue is still empty
+	select {
+	case actual = <-m_foo:
+		t.Errorf("foo's message queue is not empty: %q", actual)
+	default:
+		// Pass.
+	}
+
+	// Unignore and listen to bar again.
+	ch.Send(message.ParseInput("/unignore bar", u_foo))
+	expected = []byte("-> No longer ignoring: bar" + message.Newline)
+	actual = <-m_foo
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+
+	ch.Send(message.ParseInput("i am bar again", u_bar))
+	expected = []byte("bar: i am bar again" + message.Newline)
+	actual = <-m_foo
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
