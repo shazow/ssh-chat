@@ -7,23 +7,17 @@ import (
 	"github.com/shazow/ssh-chat/chat/message"
 )
 
-// Used for testing
-type MockScreen struct {
-	buffer []byte
+type ChannelWriter struct {
+	Chan chan []byte
 }
 
-func (s *MockScreen) Write(data []byte) (n int, err error) {
-	s.buffer = append(s.buffer, data...)
+func (w *ChannelWriter) Write(data []byte) (n int, err error) {
+	w.Chan <- data
 	return len(data), nil
 }
 
-func (s *MockScreen) Read(p *[]byte) (n int, err error) {
-	*p = s.buffer
-	s.buffer = []byte{}
-	return len(*p), nil
-}
-
-func (s *MockScreen) Close() error {
+func (w *ChannelWriter) Close() error {
+	close(w.Chan)
 	return nil
 }
 
@@ -38,11 +32,6 @@ func TestRoomServe(t *testing.T) {
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
-}
-
-type ScreenedUser struct {
-	*message.User
-	screen *MockScreen
 }
 
 /*
@@ -161,7 +150,9 @@ func expectOutput(t *testing.T, buffer []byte, expected string) {
 func TestRoomJoin(t *testing.T) {
 	var expected, actual []byte
 
-	s := &MockScreen{}
+	s := &ChannelWriter{
+		Chan: make(chan []byte),
+	}
 	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
@@ -174,21 +165,21 @@ func TestRoomJoin(t *testing.T) {
 	}
 
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	ch.Send(message.NewSystemMsg("hello", u))
 	expected = []byte("-> hello" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
 
 	ch.Send(message.ParseInput("/me says hello.", u))
 	expected = []byte("** foo says hello." + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -250,15 +241,12 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Drain the initial Join message
-	<-ch.broadcast
-
 	u.SetConfig(message.UserConfig{
 		Quiet: false,
 	})
 
 	expectedMsg := message.NewAnnounceMsg("Ignored")
-	ch.HandleMsg(expectedMsg)
+	go ch.HandleMsg(expectedMsg)
 	msg := <-msgs
 	if _, ok := msg.(*message.AnnounceMsg); !ok {
 		t.Errorf("Got: `%T`; Expected: `%T`", msg, expectedMsg)
@@ -268,8 +256,10 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 		Quiet: true,
 	})
 
-	ch.HandleMsg(message.NewAnnounceMsg("Ignored"))
-	ch.HandleMsg(message.NewSystemMsg("hello", u))
+	go func() {
+		ch.HandleMsg(message.NewAnnounceMsg("Ignored"))
+		ch.HandleMsg(message.NewSystemMsg("hello", u))
+	}()
 	msg = <-msgs
 	if _, ok := msg.(*message.AnnounceMsg); ok {
 		t.Errorf("Got unexpected `%T`", msg)
@@ -279,7 +269,9 @@ func TestRoomQuietToggleBroadcasts(t *testing.T) {
 func TestQuietToggleDisplayState(t *testing.T) {
 	var expected, actual []byte
 
-	s := &MockScreen{}
+	s := &ChannelWriter{
+		Chan: make(chan []byte),
+	}
 	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
@@ -292,7 +284,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	}
 
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -300,7 +292,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	ch.Send(message.ParseInput("/quiet", u))
 
 	expected = []byte("-> Quiet mode is toggled ON" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -308,7 +300,7 @@ func TestQuietToggleDisplayState(t *testing.T) {
 	ch.Send(message.ParseInput("/quiet", u))
 
 	expected = []byte("-> Quiet mode is toggled OFF" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -317,7 +309,9 @@ func TestQuietToggleDisplayState(t *testing.T) {
 func TestRoomNames(t *testing.T) {
 	var expected, actual []byte
 
-	s := &MockScreen{}
+	s := &ChannelWriter{
+		Chan: make(chan []byte),
+	}
 	u := message.PipedScreen("foo", s)
 
 	ch := NewRoom()
@@ -330,7 +324,7 @@ func TestRoomNames(t *testing.T) {
 	}
 
 	expected = []byte(" * foo joined. (Connected: 1)" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -338,7 +332,7 @@ func TestRoomNames(t *testing.T) {
 	ch.Send(message.ParseInput("/names", u))
 
 	expected = []byte("-> 1 connected: foo" + message.Newline)
-	s.Read(&actual)
+	actual = <-s.Chan
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}

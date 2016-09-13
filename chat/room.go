@@ -91,9 +91,8 @@ func (r *Room) HandleMsg(m message.Message) {
 		r.Members.Each(func(k string, item set.Item) (err error) {
 			roomMember := item.Value().(*roomMember)
 			user := roomMember.Member
-			from := fromMsg.From().(Member)
 
-			if fromMsg != nil && roomMember.Ignored.In(from.ID()) {
+			if fromMsg != nil && fromMsg.From() != nil && roomMember.Ignored.In(fromMsg.From().(Member).ID()) {
 				// Skip because ignored
 				return
 			}
