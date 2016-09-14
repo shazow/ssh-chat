@@ -120,7 +120,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	// Should the user be op'd on join?
 	if key := term.Conn.PublicKey(); key != nil {
 		authItem, err := h.auth.ops.Get(newAuthKey(key))
-		if err != nil {
+		if err == nil {
 			err = h.Room.Ops.Add(set.Rename(authItem, member.ID()))
 		}
 	}
