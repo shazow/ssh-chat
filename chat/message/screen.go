@@ -25,19 +25,21 @@ func BufferedScreen(name string, screen io.WriteCloser) *bufferedScreen {
 
 func PipedScreen(name string, screen io.WriteCloser) *pipedScreen {
 	return &pipedScreen{
-		baseScreen: &baseScreen{
-			User: NewUser(name),
-		},
+		baseScreen:  Screen(name),
 		WriteCloser: screen,
 	}
 }
 
 func HandledScreen(name string, handler func(Message) error) *handledScreen {
 	return &handledScreen{
-		baseScreen: &baseScreen{
-			User: NewUser(name),
-		},
-		handler: handler,
+		baseScreen: Screen(name),
+		handler:    handler,
+	}
+}
+
+func Screen(name string) *baseScreen {
+	return &baseScreen{
+		User: NewUser(name),
 	}
 }
 

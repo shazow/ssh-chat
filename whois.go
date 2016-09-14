@@ -2,6 +2,7 @@ package sshchat
 
 import (
 	"net"
+	"time"
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/shazow/ssh-chat/chat/message"
@@ -9,6 +10,10 @@ import (
 )
 
 // Helpers for printing whois messages
+
+type joinTimestamped interface {
+	Joined() time.Time
+}
 
 func whoisPublic(clients []Client) string {
 	// FIXME: Handle many clients
@@ -21,7 +26,7 @@ func whoisPublic(clients []Client) string {
 	return "name: " + u.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + SanitizeData(string(conn.ClientVersion())) + message.Newline +
-		" > joined: " + humanize.Time(u.Joined())
+		" > joined: " + humanize.Time(u.(joinTimestamped).Joined())
 }
 
 func whoisAdmin(clients []Client) string {
@@ -37,5 +42,5 @@ func whoisAdmin(clients []Client) string {
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + SanitizeData(string(conn.ClientVersion())) + message.Newline +
-		" > joined: " + humanize.Time(u.Joined())
+		" > joined: " + humanize.Time(u.(joinTimestamped).Joined())
 }

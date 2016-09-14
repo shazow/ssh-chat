@@ -28,7 +28,7 @@ func stripPrompt(s string) string {
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
-	u := message.NewUser("foo")
+	u := message.Screen("foo")
 
 	actual = u.Prompt()
 	expected = "[foo] "
@@ -40,7 +40,7 @@ func TestHostGetPrompt(t *testing.T) {
 		Theme: &message.Themes[0],
 	})
 	actual = u.Prompt()
-	expected = "[\033[38;05;88mfoo\033[0m] "
+	expected = "[\033[38;05;1mfoo\033[0m] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}

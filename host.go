@@ -35,7 +35,7 @@ type Host struct {
 	mu      sync.Mutex
 	motd    string
 	count   int
-	clients map[*message.User][]Client
+	clients map[chat.Member][]Client
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -46,7 +46,7 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 		listener: listener,
 		commands: chat.Commands{},
 		auth:     auth,
-		clients:  map[*message.User][]Client{},
+		clients:  map[chat.Member][]Client{},
 	}
 
 	// Make our own commands registry instance.
@@ -75,7 +75,7 @@ func (h *Host) SetMotd(motd string) {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	requestedName := term.Conn.Name()
-	user := message.NewScreen(requestedName, term)
+	user := message.BufferedScreen(requestedName, term)
 
 	client := h.addClient(user, term.Conn)
 	defer h.removeClient(user, client)
@@ -180,7 +180,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
 }
 
-func (h *Host) addClient(user *message.User, conn sshd.Connection) *Client {
+func (h *Host) addClient(user chat.Member, conn sshd.Connection) *Client {
 	client := Client{
 		user:      user,
 		conn:      conn,
@@ -195,7 +195,7 @@ func (h *Host) addClient(user *message.User, conn sshd.Connection) *Client {
 	return &client
 }
 
-func (h *Host) removeClient(user *message.User, client *Client) {
+func (h *Host) removeClient(user chat.Member, client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -212,7 +212,7 @@ func (h *Host) removeClient(user *message.User, client *Client) {
 	}
 }
 
-func (h *Host) findClients(user *message.User) []Client {
+func (h *Host) findClients(user chat.Member) []Client {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.clients[user]
@@ -244,7 +244,7 @@ func (h *Host) completeCommand(partial string) string {
 }
 
 // AutoCompleteFunction returns a callback for terminal autocompletion
-func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+func (h *Host) AutoCompleteFunction(u Replier) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	return func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		if key != 9 {
 			return
@@ -301,13 +301,12 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 }
 
 // GetUser returns a message.User based on a name.
-func (h *Host) GetUser(name string) (*message.User, bool) {
+func (h *Host) GetUser(name string) (chat.Member, bool) {
 	m, ok := h.MemberByID(name)
 	if !ok {
 		return nil, false
 	}
-	u, ok := m.Member.(*message.User)
-	return u, ok
+	return m.Member, true
 }
 
 // InitCommands adds host-specific commands to a Commands container. These will
@@ -337,7 +336,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			txt := fmt.Sprintf("[Sent PM to %s]", target.Name())
 			ms := message.NewSystemMsg(txt, msg.From())
 			room.Send(ms)
-			target.SetReplyTo(msg.From())
+			target.(Replier).SetReplyTo(msg.From())
 			return nil
 		},
 	})
@@ -353,7 +352,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify message")
 			}
 
-			target := msg.From().ReplyTo()
+			target := msg.From().(Replier).ReplyTo()
 			if target == nil {
 				return errors.New("no message to reply to")
 			}
@@ -392,7 +391,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			// FIXME: Handle many clients
 			clients := h.findClients(target)
 			var whois string
-			switch room.IsOp(msg.From()) {
+			switch room.IsOp(msg.From().(chat.Member)) {
 			case true:
 				whois = whoisAdmin(clients)
 			case false:
@@ -428,7 +427,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		PrefixHelp: "USER [DURATION]",
 		Help:       "Set USER as admin.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
+			if !room.IsOp(msg.From().(chat.Member)) {
 				return errors.New("must be op")
 			}
 
@@ -471,7 +470,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Help:       "Ban USER from the server.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
-			if !room.IsOp(msg.From()) {
+			if !room.IsOp(msg.From().(chat.Member)) {
 				return errors.New("must be op")
 			}
 
@@ -498,7 +497,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
 			room.Send(message.NewAnnounceMsg(body))
-			target.Close()
+			target.(io.Closer).Close()
 
 			logger.Debugf("Banned: \n-> %s", whoisAdmin(clients))
 
@@ -512,7 +511,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		PrefixHelp: "USER",
 		Help:       "Kick USER from the server.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
+			if !room.IsOp(msg.From().(chat.Member)) {
 				return errors.New("must be op")
 			}
 
@@ -528,7 +527,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			body := fmt.Sprintf("%s was kicked by %s.", target.Name(), msg.From().Name())
 			room.Send(message.NewAnnounceMsg(body))
-			target.Close()
+			target.(io.Closer).Close()
 			return nil
 		},
 	})
@@ -550,7 +549,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				room.Send(message.NewSystemMsg(motd, user))
 				return nil
 			}
-			if !room.IsOp(user) {
+			if !room.IsOp(user.(chat.Member)) {
 				return errors.New("must be OP to modify the MOTD")
 			}
 
