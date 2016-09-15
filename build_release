@@ -37,6 +37,11 @@ build() {
     local bin="$(basename $package)"
     local tarball="${bin}-${GOOS}_${GOARCH}.tgz"
     local outdir="$BUILDDIR/$bin"
+    local tardir="$bin"
+    if [ "$GOOS" == "windows" ]; then
+        bin="$bin.exe"
+    fi
+
 
     if [[ -d "$outdir" ]]; then
         echo "err: outdir already exists: $PWD/$outdir"
@@ -51,7 +56,7 @@ build() {
     fi
 
     # Create tarball
-    tar -C "$BUILDDIR" -czvf "$BUILDDIR/$tarball" "$bin"
+    tar -C "$BUILDDIR" -czvf "$BUILDDIR/$tarball" "$tardir"
 
     # Cleanup
     rm -rf "$outdir"
