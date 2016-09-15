@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/mewbak/gopass"
+	"github.com/howeyc/gopass"
 )
 
 // ReadPrivateKey attempts to read your private key and possibly decrypt it if it
@@ -28,14 +28,15 @@ func ReadPrivateKey(path string) ([]byte, error) {
 		return privateKey, nil
 	}
 
-	passphrase := os.Getenv("IDENTITY_PASSPHRASE")
-	if passphrase == "" {
-		passphrase, err = gopass.GetPass("Enter passphrase: ")
+	passphrase := []byte(os.Getenv("IDENTITY_PASSPHRASE"))
+	if len(passphrase) == 0 {
+		fmt.Print("Enter passphrase: ")
+		passphrase, err = gopass.GetPasswd()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't read passphrase: %v", err)
 		}
 	}
-	der, err := x509.DecryptPEMBlock(block, []byte(passphrase))
+	der, err := x509.DecryptPEMBlock(block, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt failed: %v", err)
 	}

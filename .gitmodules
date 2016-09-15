@@ -6,10 +6,6 @@
 	path = vendor/github.com/jessevdk/go-flags
 	url = https://github.com/jessevdk/go-flags
 	branch = master
-[submodule "vendor/github.com/mewbak/gopass"]
-	path = vendor/github.com/mewbak/gopass
-	url = https://github.com/mewbak/gopass
-	branch = master
 [submodule "vendor/github.com/shazow/rateio"]
 	path = vendor/github.com/shazow/rateio
 	url = https://github.com/shazow/rateio
@@ -18,3 +14,6 @@
 	path = vendor/github.com/dustin/go-humanize
 	url = https://github.com/dustin/go-humanize
 	branch = master
+[submodule "vendor/github.com/howeyc/gopass"]
+	path = vendor/github.com/howeyc/gopass
+	url = https://github.com/howeyc/gopass.git
