@@ -38,3 +38,7 @@ func (u *User) Color() int {
 func (u *User) ID() string {
 	return SanitizeName(u.name)
 }
+
+func (u *User) Joined() time.Time {
+	return u.joined
+}

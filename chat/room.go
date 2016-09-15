@@ -199,7 +199,8 @@ func (r *Room) MemberByID(id string) (*roomMember, bool) {
 	if err != nil {
 		return nil, false
 	}
-	return m.Value().(*roomMember), true
+	rm, ok := m.Value().(*roomMember)
+	return rm, ok
 }
 
 // IsOp returns whether a user is an operator in this room.

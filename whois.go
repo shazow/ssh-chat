@@ -2,7 +2,6 @@ package sshchat
 
 import (
 	"net"
-	"time"
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/shazow/ssh-chat/chat/message"
@@ -11,28 +10,22 @@ import (
 
 // Helpers for printing whois messages
 
-type joinTimestamped interface {
-	Joined() time.Time
-}
-
-func whoisPublic(clients []Client) string {
-	// FIXME: Handle many clients
-	conn, u := clients[0].conn, clients[0].user
-
+func whoisPublic(u User) string {
 	fingerprint := "(no public key)"
+	// FIXME: Use all connections?
+	conn := u.Connections()[0]
 	if conn.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(conn.PublicKey())
 	}
 	return "name: " + u.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + SanitizeData(string(conn.ClientVersion())) + message.Newline +
-		" > joined: " + humanize.Time(u.(joinTimestamped).Joined())
+		" > joined: " + humanize.Time(u.Joined())
 }
 
-func whoisAdmin(clients []Client) string {
-	// FIXME: Handle many clients
-	conn, u := clients[0].conn, clients[0].user
-
+func whoisAdmin(u User) string {
+	// FIXME: Use all connections?
+	conn := u.Connections()[0]
 	ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if conn.PublicKey() != nil {
@@ -42,5 +35,5 @@ func whoisAdmin(clients []Client) string {
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + SanitizeData(string(conn.ClientVersion())) + message.Newline +
-		" > joined: " + humanize.Time(u.(joinTimestamped).Joined())
+		" > joined: " + humanize.Time(u.Joined())
 }

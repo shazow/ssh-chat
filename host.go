@@ -35,7 +35,7 @@ type Host struct {
 	mu      sync.Mutex
 	motd    string
 	count   int
-	clients map[chat.Member][]Client
+	clients map[chat.Member][]client
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -46,7 +46,7 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 		listener: listener,
 		commands: chat.Commands{},
 		auth:     auth,
-		clients:  map[chat.Member][]Client{},
+		clients:  map[chat.Member][]client{},
 	}
 
 	// Make our own commands registry instance.
@@ -75,10 +75,11 @@ func (h *Host) SetMotd(motd string) {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	requestedName := term.Conn.Name()
-	user := message.BufferedScreen(requestedName, term)
-
-	client := h.addClient(user, term.Conn)
-	defer h.removeClient(user, client)
+	screen := message.BufferedScreen(requestedName, term)
+	user := &client{
+		Member: screen,
+		conns:  []sshd.Connection{term.Conn},
+	}
 
 	h.mu.Lock()
 	motd := h.motd
@@ -91,10 +92,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	user.SetConfig(cfg)
 
 	// Close term once user is closed.
-	defer user.Close()
+	defer screen.Close()
 	defer term.Close()
 
-	go user.Consume()
+	go screen.Consume()
 
 	// Send MOTD
 	if motd != "" {
@@ -180,44 +181,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
 }
 
-func (h *Host) addClient(user chat.Member, conn sshd.Connection) *Client {
-	client := Client{
-		user:      user,
-		conn:      conn,
-		timestamp: time.Now(),
-	}
-	h.mu.Lock()
-	if _, ok := h.clients[user]; ok {
-		logger.Warningf("user collision: %q", user)
-	}
-	h.clients[user] = append(h.clients[user], client)
-	h.mu.Unlock()
-	return &client
-}
-
-func (h *Host) removeClient(user chat.Member, client *Client) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	clients := h.clients[user]
-	for i, c := range clients {
-		// Find the user
-		if &c != client {
-			continue
-		}
-		// Delete corresponding client
-		clients[i] = clients[len(clients)-1]
-		clients = clients[:len(clients)-1]
-		break
-	}
-}
-
-func (h *Host) findClients(user chat.Member) []Client {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.clients[user]
-}
-
 // Serve our chat room onto the listener
 func (h *Host) Serve() {
 	h.listener.HandlerFunc = h.Connect
@@ -244,7 +207,7 @@ func (h *Host) completeCommand(partial string) string {
 }
 
 // AutoCompleteFunction returns a callback for terminal autocompletion
-func (h *Host) AutoCompleteFunction(u Replier) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+func (h *Host) AutoCompleteFunction(u User) func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	return func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		if key != 9 {
 			return
@@ -301,12 +264,13 @@ func (h *Host) AutoCompleteFunction(u Replier) func(line string, pos int, key ru
 }
 
 // GetUser returns a message.User based on a name.
-func (h *Host) GetUser(name string) (chat.Member, bool) {
+func (h *Host) GetUser(name string) (User, bool) {
 	m, ok := h.MemberByID(name)
 	if !ok {
 		return nil, false
 	}
-	return m.Member, true
+	u, ok := m.Member.(User)
+	return u, ok
 }
 
 // InitCommands adds host-specific commands to a Commands container. These will
@@ -336,7 +300,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			txt := fmt.Sprintf("[Sent PM to %s]", target.Name())
 			ms := message.NewSystemMsg(txt, msg.From())
 			room.Send(ms)
-			target.(Replier).SetReplyTo(msg.From())
+			target.SetReplyTo(msg.From())
 			return nil
 		},
 	})
@@ -352,7 +316,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify message")
 			}
 
-			target := msg.From().(Replier).ReplyTo()
+			target := msg.From().(chat.Member).ReplyTo()
 			if target == nil {
 				return errors.New("no message to reply to")
 			}
@@ -388,14 +352,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			// FIXME: Handle many clients
-			clients := h.findClients(target)
 			var whois string
 			switch room.IsOp(msg.From().(chat.Member)) {
 			case true:
-				whois = whoisAdmin(clients)
+				whois = whoisAdmin(target)
 			case false:
-				whois = whoisPublic(clients)
+				whois = whoisPublic(target)
 			}
 			room.Send(message.NewSystemMsg(whois, msg.From()))
 
@@ -451,9 +413,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				room.Ops.Add(set.Keyize(user.ID()))
 			}
 
-			for _, client := range h.findClients(user) {
-				h.auth.Op(client.conn.PublicKey(), until)
-			}
+			// TODO: Add pubkeys to op
+			/*
+				for _, conn := range user.Connections() {
+					h.auth.Op(conn.PublicKey(), until)
+				}
+			*/
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
 			room.Send(message.NewSystemMsg(body, user))
@@ -489,17 +454,16 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			clients := h.findClients(target)
-			for _, client := range clients {
-				h.auth.Ban(client.conn.PublicKey(), until)
-				h.auth.BanAddr(client.conn.RemoteAddr(), until)
+			for _, conn := range target.Connections() {
+				h.auth.Ban(conn.PublicKey(), until)
+				h.auth.BanAddr(conn.RemoteAddr(), until)
 			}
 
 			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
 			room.Send(message.NewAnnounceMsg(body))
-			target.(io.Closer).Close()
+			target.Close()
 
-			logger.Debugf("Banned: \n-> %s", whoisAdmin(clients))
+			logger.Debugf("Banned: \n-> %s", whoisAdmin(target))
 
 			return nil
 		},
