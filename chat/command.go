@@ -111,7 +111,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/help",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			op := room.IsOp(msg.From().(Member))
+			op := room.IsOp(msg.From())
 			room.Send(message.NewSystemMsg(room.commands.Help(op), msg.From()))
 			return nil
 		},
@@ -150,7 +150,7 @@ func InitCommands(c *Commands) {
 			if len(args) != 1 {
 				return ErrMissingArg
 			}
-			member, ok := room.MemberByID(msg.From().(Member).ID())
+			member, ok := room.MemberByID(msg.From().ID())
 			if !ok {
 				return ErrMissingMember
 			}
@@ -253,7 +253,7 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			from, ok := room.Member(msg.From().(Member))
+			from, ok := room.Member(msg.From())
 			if !ok {
 				return ErrMissingMember
 			}
@@ -278,7 +278,7 @@ func InitCommands(c *Commands) {
 				return nil
 			}
 
-			if id == msg.From().(Member).ID() {
+			if id == msg.From().ID() {
 				return errors.New("cannot ignore self")
 			}
 			target, ok := room.MemberByID(id)
@@ -302,7 +302,7 @@ func InitCommands(c *Commands) {
 		Prefix:     "/unignore",
 		PrefixHelp: "USER",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			from, ok := room.Member(msg.From().(Member))
+			from, ok := room.Member(msg.From())
 			if !ok {
 				return ErrMissingMember
 			}

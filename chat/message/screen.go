@@ -39,7 +39,7 @@ func HandledScreen(name string, handler func(Message) error) *handledScreen {
 
 func Screen(name string) *baseScreen {
 	return &baseScreen{
-		User: NewUser(name),
+		user: NewUser(name),
 	}
 }
 
@@ -71,7 +71,7 @@ func (u *pipedScreen) Send(m Message) error {
 // User container that knows about writing to an IO screen.
 type baseScreen struct {
 	sync.Mutex
-	*User
+	*user
 }
 
 func (u *baseScreen) Config() UserConfig {

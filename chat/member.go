@@ -16,7 +16,6 @@ type roomMember struct {
 type Member interface {
 	message.Author
 
-	ID() string
 	SetName(string)
 
 	Config() message.UserConfig

@@ -8,7 +8,7 @@ import (
 const reHighlight = `\b(%s)\b`
 
 // User definition, implemented set Item interface and io.Writer
-type User struct {
+type user struct {
 	joined time.Time
 
 	name    string
@@ -16,8 +16,8 @@ type User struct {
 	replyTo Author // Set when user gets a /msg, for replying.
 }
 
-func NewUser(name string) *User {
-	u := User{
+func NewUser(name string) *user {
+	u := user{
 		name:   name,
 		config: DefaultUserConfig,
 		joined: time.Now(),
@@ -27,18 +27,18 @@ func NewUser(name string) *User {
 	return &u
 }
 
-func (u *User) Name() string {
+func (u *user) Name() string {
 	return u.name
 }
 
-func (u *User) Color() int {
+func (u *user) Color() int {
 	return u.config.Seed
 }
 
-func (u *User) ID() string {
+func (u *user) ID() string {
 	return SanitizeName(u.name)
 }
 
-func (u *User) Joined() time.Time {
+func (u *user) Joined() time.Time {
 	return u.joined
 }

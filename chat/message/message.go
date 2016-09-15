@@ -7,6 +7,7 @@ import (
 )
 
 type Author interface {
+	ID() string
 	Name() string
 	Color() int
 }

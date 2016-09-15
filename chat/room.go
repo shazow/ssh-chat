@@ -92,7 +92,7 @@ func (r *Room) HandleMsg(m message.Message) {
 			roomMember := item.Value().(*roomMember)
 			user := roomMember.Member
 
-			if fromMsg != nil && fromMsg.From() != nil && roomMember.Ignored.In(fromMsg.From().(Member).ID()) {
+			if fromMsg != nil && fromMsg.From() != nil && roomMember.Ignored.In(fromMsg.From().ID()) {
 				// Skip because ignored
 				return
 			}
@@ -182,7 +182,7 @@ func (r *Room) Rename(oldID string, u Member) error {
 
 // Member returns a corresponding Member object to a User if the Member is
 // present in this room.
-func (r *Room) Member(u Member) (*roomMember, bool) {
+func (r *Room) Member(u message.Author) (*roomMember, bool) {
 	m, ok := r.MemberByID(u.ID())
 	if !ok {
 		return nil, false
@@ -204,7 +204,7 @@ func (r *Room) MemberByID(id string) (*roomMember, bool) {
 }
 
 // IsOp returns whether a user is an operator in this room.
-func (r *Room) IsOp(u Member) bool {
+func (r *Room) IsOp(u message.Author) bool {
 	return r.Ops.In(u.ID())
 }
 
