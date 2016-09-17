@@ -10,7 +10,7 @@ import (
 )
 
 type client struct {
-	UserMember
+	Member
 	sync.Mutex
 	conns []sshd.Connection
 }
@@ -27,7 +27,7 @@ func (cl *client) Close() error {
 	return nil
 }
 
-type UserMember interface {
+type Member interface {
 	chat.Member
 
 	Joined() time.Time
@@ -38,7 +38,7 @@ type UserMember interface {
 }
 
 type User interface {
-	UserMember
+	Member
 
 	Connections() []sshd.Connection
 	Close() error

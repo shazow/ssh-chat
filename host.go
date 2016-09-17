@@ -77,8 +77,8 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	requestedName := term.Conn.Name()
 	screen := message.BufferedScreen(requestedName, term)
 	user := &client{
-		UserMember: screen,
-		conns:      []sshd.Connection{term.Conn},
+		Member: screen,
+		conns:  []sshd.Connection{term.Conn},
 	}
 
 	h.mu.Lock()
@@ -316,7 +316,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify message")
 			}
 
-			target := msg.From().(UserMember).ReplyTo()
+			target := msg.From().(Member).ReplyTo()
 			if target == nil {
 				return errors.New("no message to reply to")
 			}
