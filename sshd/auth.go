@@ -68,5 +68,5 @@ func MakeNoAuth() *ssh.ServerConfig {
 // See: https://anongit.mindrot.org/openssh.git/commit/?id=56d1c83cdd1ac
 func Fingerprint(k ssh.PublicKey) string {
 	hash := sha256.Sum256(k.Marshal())
-	return base64.StdEncoding.EncodeToString(hash[:])
+	return "SHA256:" + base64.StdEncoding.EncodeToString(hash[:])
 }
