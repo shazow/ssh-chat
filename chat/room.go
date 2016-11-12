@@ -232,3 +232,8 @@ func (r *Room) NamesPrefix(prefix string) []string {
 	}
 	return names
 }
+
+func (r *Room) CompleteName(prefix string) string {
+	name, _ := r.Members.CompleteName(prefix)
+	return name
+}
