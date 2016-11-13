@@ -1,7 +1,6 @@
 package set
 
 import (
-    "fmt"
     "sort"
 )
 
@@ -36,32 +35,13 @@ func (tree *NameTrie) Delete(name string) {
     }
 }
 
-func (tree *NameTrie) ClosestName(prefix string) (name string, ok bool) {
-    fmt.Println(tree, prefix)
-    nameslice := []rune(prefix)
-    node, ok := tree.traverse(nameslice, false)
-    if !ok {
-        return "", false
-    }
-    return node.closestName(prefix)
-}
-
-func (node *NameTrie) closestName(prefix string) (name string, ok bool) {
-    if node.terminates {
-        return prefix, true
-    }
+func (node *NameTrie) OrderedChildren() []rune {
     keys := []string{}
-    for suffix := range(node.children){keys = append(keys, string(suffix))}
+    for suffix := range(node.children){ keys = append(keys, string(suffix)) }
     sort.Strings(keys)
-    fmt.Println(keys)
-    for i := range keys {
-        child := node.children[[]rune(keys[i])[0]]
-        name, ok := child.closestName(prefix + keys[i])
-        if ok{
-            return name, true
-        }
-    }
-    return "", false    
+    sorted_runes := []rune{}
+    for i := range(keys){ sorted_runes = append(sorted_runes, rune(keys[i][0]))}
+    return sorted_runes
 }
 
 func (tree *NameTrie) traverse(remainder []rune, create bool) (nextTree *NameTrie, ok bool) {
@@ -79,5 +59,38 @@ func (tree *NameTrie) traverse(remainder []rune, create bool) (nextTree *NameTri
         return nextTree, true
     } else {
         return nextTree.traverse(remainder[1:], create)
+    }
+}
+
+func (tree *NameTrie) FirstName(name string) (string, bool){
+    nameSlice := []rune(name)
+    node, ok := tree.traverse(nameSlice, false)
+    searchingName, nameFound := "", false
+    if ok {
+        c := make(chan string)
+        go func(){
+            node.AllChildren(name, c)
+            close(c)
+        }()
+        for thisName := range c {
+            if ((len(thisName) < len(searchingName)) || !nameFound) {
+                searchingName = thisName
+                nameFound = true
+            }
+        }
+    }
+    return searchingName, nameFound
+}
+
+func (node *NameTrie) AllChildren(prefix string, c chan string) {
+    if node.terminates {
+        c <- prefix
+    }
+    children := node.OrderedChildren()
+    for i := range children {
+        new_prefix := children[i]
+        child := node.children[new_prefix]
+        final_prefix := prefix + string(new_prefix)
+        child.AllChildren(final_prefix, c)
     }
 }

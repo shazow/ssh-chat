@@ -193,7 +193,7 @@ func (s *Set) ListPrefix(prefix string) []Item {
 }
 
 func (s *Set) CompleteName(name string) (string, bool) {
-	return s.names.ClosestName(name)
+	return s.names.FirstName(name)
 }
 
 func normalize(key string) string {
