@@ -237,7 +237,13 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			if completed == "/reply" {
 				replyTo := u.ReplyTo()
 				if replyTo != nil {
-					completed = "/msg " + replyTo.Name()
+					name := replyTo.Name()
+					_, found := h.GetUser(name)
+					if found {
+						completed = "/msg " + name
+					} else {
+						u.SetReplyTo(nil)
+					}
 				}
 			}
 		} else {
@@ -318,10 +324,16 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("no message to reply to")
 			}
 
+			name := target.Name()
+			_, found := h.GetUser(name)
+			if !found {
+				return errors.New("user not found")
+			}
+
 			m := message.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
 			room.Send(&m)
 
-			txt := fmt.Sprintf("[Sent PM to %s]", target.Name())
+			txt := fmt.Sprintf("[Sent PM to %s]", name)
 			ms := message.NewSystemMsg(txt, msg.From())
 			room.Send(ms)
 			return nil
