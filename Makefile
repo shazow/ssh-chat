@@ -25,7 +25,7 @@ $(KEY):
 	ssh-keygen -f $(KEY) -P ''
 
 run: $(BINARY) $(KEY)
-	./$(BINARY) -i $(KEY) --bind ":$(PORT)" -vv
+	./$(BINARY) -i $(KEY) --bind "127.0.0.1:$(PORT)" -vv
 
 debug: $(BINARY) $(KEY)
 	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv

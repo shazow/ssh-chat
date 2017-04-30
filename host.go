@@ -32,10 +32,9 @@ type Host struct {
 	// Default theme
 	theme message.Theme
 
-	mu      sync.Mutex
-	motd    string
-	count   int
-	clients map[chat.Member][]client
+	mu    sync.Mutex
+	motd  string
+	count int
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -46,7 +45,6 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 		listener: listener,
 		commands: chat.Commands{},
 		auth:     auth,
-		clients:  map[chat.Member][]client{},
 	}
 
 	// Make our own commands registry instance.
@@ -72,14 +70,29 @@ func (h *Host) SetMotd(motd string) {
 	h.mu.Unlock()
 }
 
+var globalUser *client
+
 // Connect a specific Terminal to this host and its room.
-func (h *Host) Connect(term *sshd.Terminal) {
-	requestedName := term.Conn.Name()
-	screen := message.BufferedScreen(requestedName, term)
-	user := &client{
-		Member: screen,
-		conns:  []sshd.Connection{term.Conn},
+func (h *Host) Connect(t *sshd.Terminal) {
+	// XXX: Hack to test multiple users per key
+	if globalUser != nil {
+		globalUser.Add(t)
+		return
 	}
+
+	conn := t.Conn
+	remoteAddr := conn.RemoteAddr()
+	requestedName := conn.Name()
+	term := sshd.MultiTerm(t)
+	screen := message.BufferedScreen(requestedName, term)
+
+	user := &client{
+		Member:    screen,
+		multiTerm: term,
+	}
+	defer user.Close()
+	// XXX: Hack to test multiple users per key
+	globalUser = user
 
 	h.mu.Lock()
 	motd := h.motd
@@ -90,10 +103,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	cfg := user.Config()
 	cfg.Theme = &h.theme
 	user.SetConfig(cfg)
-
-	// Close term once user is closed.
-	defer screen.Close()
-	defer term.Close()
 
 	go screen.Consume()
 
@@ -109,7 +118,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		member, err = h.Join(user)
 	}
 	if err != nil {
-		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
+		logger.Errorf("[%s] Failed to join: %s", conn.RemoteAddr(), err)
 		return
 	}
 
@@ -118,27 +127,29 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
+	// XXX: Mark multiterm as ready?
+
 	// Should the user be op'd on join?
-	if key := term.Conn.PublicKey(); key != nil {
+	if key := conn.PublicKey(); key != nil {
 		authItem, err := h.auth.ops.Get(newAuthKey(key))
 		if err == nil {
 			err = h.Room.Ops.Add(set.Rename(authItem, member.ID()))
 		}
 	}
 	if err != nil {
-		logger.Warningf("[%s] Failed to op: %s", term.Conn.RemoteAddr(), err)
+		logger.Warningf("[%s] Failed to op: %s", remoteAddr, err)
 	}
 
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
-	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
+	logger.Debugf("[%s] Joined: %s", remoteAddr, user.Name())
 
 	for {
-		line, err := term.ReadLine()
+		line, err := user.ReadLine()
 		if err == io.EOF {
 			// Closed
 			break
 		} else if err != nil {
-			logger.Errorf("[%s] Terminal reading error: %s", term.Conn.RemoteAddr(), err)
+			logger.Errorf("[%s] Terminal reading error: %s", remoteAddr, err)
 			break
 		}
 
@@ -175,10 +186,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	err = h.Leave(user)
 	if err != nil {
-		logger.Errorf("[%s] Failed to leave: %s", term.Conn.RemoteAddr(), err)
+		logger.Errorf("[%s] Failed to leave: %s", remoteAddr, err)
 		return
 	}
-	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
+	logger.Debugf("[%s] Leaving: %s", remoteAddr, user.Name())
 }
 
 // Serve our chat room onto the listener

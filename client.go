@@ -1,6 +1,7 @@
 package sshchat
 
 import (
+	"io"
 	"sync"
 	"time"
 
@@ -9,22 +10,17 @@ import (
 	"github.com/shazow/ssh-chat/sshd"
 )
 
+type multiTerm interface {
+	Connections() []sshd.Connection
+	Add(*sshd.Terminal)
+	ReadLine() (string, error)
+	io.WriteCloser
+}
+
 type client struct {
 	Member
 	sync.Mutex
-	conns []sshd.Connection
-}
-
-func (cl *client) Connections() []sshd.Connection {
-	return cl.conns
-}
-
-func (cl *client) Close() error {
-	// TODO: Stack errors?
-	for _, conn := range cl.conns {
-		conn.Close()
-	}
-	return nil
+	multiTerm
 }
 
 type Member interface {
