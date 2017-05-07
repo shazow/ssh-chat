@@ -1,6 +1,7 @@
 package set
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -21,9 +22,15 @@ func TestSetExpiring(t *testing.T) {
 		t.Error("not len 1 after set")
 	}
 
-	item := &ExpiringItem{nil, time.Now().Add(-time.Nanosecond * 1)}
+	item := &ExpiringItem{StringItem("expired"), time.Now().Add(-time.Nanosecond * 1)}
 	if !item.Expired() {
 		t.Errorf("ExpiringItem a nanosec ago is not expiring")
+	}
+	if err := s.Add(item); err != nil {
+		t.Fatalf("failed to add item: %s", err)
+	}
+	if s.In("expired") {
+		t.Errorf("expired item is present")
 	}
 
 	item = &ExpiringItem{nil, time.Now().Add(time.Minute * 5)}
@@ -74,8 +81,13 @@ func TestSetExpiring(t *testing.T) {
 		t.Errorf("failed to get barbar: %s", err)
 	}
 	b := s.ListPrefix("b")
-	if len(b) != 2 || b[0].Key() != "bar" || b[1].Key() != "barbar" {
-		t.Errorf("b-prefix incorrect: %q", b)
+	if len(b) != 2 {
+		t.Errorf("b-prefix incorrect number of results: %d", len(b))
+	}
+	for i, item := range b {
+		if !strings.HasPrefix(item.Key(), "b") {
+			t.Errorf("item %d does not have b prefix: %s", i, item.Key())
+		}
 	}
 
 	if err := s.Remove("bar"); err != nil {

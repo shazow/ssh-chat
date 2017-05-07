@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -27,9 +28,9 @@ func stripPrompt(s string) string {
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
-	u := message.NewUser(&Identity{id: "foo"})
+	u := message.Screen("foo")
 
-	actual = GetPrompt(u)
+	actual = u.Prompt()
 	expected = "[foo] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
@@ -38,8 +39,8 @@ func TestHostGetPrompt(t *testing.T) {
 	u.SetConfig(message.UserConfig{
 		Theme: &message.Themes[0],
 	})
-	actual = GetPrompt(u)
-	expected = "[\033[38;05;88mfoo\033[0m] "
+	actual = u.Prompt()
+	expected = "[\033[38;05;1mfoo\033[0m] "
 	if actual != expected {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
 	}
@@ -62,6 +63,8 @@ func TestHostNameCollision(t *testing.T) {
 	go host.Serve()
 
 	done := make(chan struct{}, 1)
+
+	canary := "canarystring"
 
 	// First client
 	go func() {
@@ -92,8 +95,10 @@ func TestHostNameCollision(t *testing.T) {
 				t.Errorf("Got %q; expected %q", actual, expected)
 			}
 
+			fmt.Fprintf(w, canary+message.Newline)
+
+			<-done
 			// Wrap it up.
-			close(done)
 			return nil
 		})
 		if err != nil {
@@ -108,15 +113,23 @@ func TestHostNameCollision(t *testing.T) {
 	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 		scanner := bufio.NewScanner(r)
 
-		// Consume the initial buffer
-		scanner.Scan()
-		scanner.Scan()
-		scanner.Scan()
+		// Scan until we see our canarystring
+		for scanner.Scan() {
+			s := scanner.Text()
+			if strings.HasSuffix(s, canary) {
+				break
+			}
+		}
 
+		// Send an empty prompt to allow for a full line scan with EOL.
+		fmt.Fprintf(w, message.Newline)
+
+		scanner.Scan()
 		actual := scanner.Text()
 		if !strings.HasPrefix(actual, "[Guest1] ") {
 			t.Errorf("Second client did not get Guest1 name: %q", actual)
 		}
+		close(done)
 		return nil
 	})
 	if err != nil {
@@ -195,7 +208,7 @@ func TestHostKick(t *testing.T) {
 			if member == nil {
 				return errors.New("failed to load MemberByID")
 			}
-			host.Room.Ops.Add(set.Itemize(member.ID(), member))
+			host.Room.Ops.Add(set.Keyize(member.ID()))
 
 			// Block until second client is here
 			connected <- struct{}{}

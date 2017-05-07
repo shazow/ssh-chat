@@ -55,6 +55,7 @@ func (s *Set) In(key string) bool {
 	s.RUnlock()
 	if ok && item.Value() == nil {
 		s.cleanup(key)
+		ok = false
 	}
 	return ok
 }
@@ -66,11 +67,12 @@ func (s *Set) Get(key string) (Item, error) {
 	item, ok := s.lookup[key]
 	s.RUnlock()
 
+	if ok && item.Value() == nil {
+		s.cleanup(key)
+		ok = false
+	}
 	if !ok {
 		return nil, ErrMissing
-	}
-	if item.Value() == nil {
-		s.cleanup(key)
 	}
 
 	return item, nil
@@ -87,10 +89,7 @@ func (s *Set) cleanup(key string) {
 }
 
 // Add item to this set if it does not exist already.
-func (s *Set) Add(item Item) error {
-	if item.Value() == nil {
-		return ErrNil
-	}
+func (s *Set) AddNew(item Item) error {
 	key := s.normalize(item.Key())
 
 	s.Lock()
@@ -101,7 +100,26 @@ func (s *Set) Add(item Item) error {
 		return ErrCollision
 	}
 
-	s.lookup[key] = item
+	if item.Value() == nil {
+		delete(s.lookup, key)
+	} else {
+		s.lookup[key] = item
+	}
+	return nil
+}
+
+// Add to set, replacing if item already exists.
+func (s *Set) Add(item Item) error {
+	key := s.normalize(item.Key())
+
+	s.Lock()
+	defer s.Unlock()
+
+	if item.Value() == nil {
+		delete(s.lookup, key)
+	} else {
+		s.lookup[key] = item
+	}
 	return nil
 }
 
@@ -123,9 +141,6 @@ func (s *Set) Remove(key string) error {
 // Replace oldKey with a new item, which might be a new key.
 // Can be used to rename items.
 func (s *Set) Replace(oldKey string, item Item) error {
-	if item.Value() == nil {
-		return ErrNil
-	}
 	newKey := s.normalize(item.Key())
 	oldKey = s.normalize(oldKey)
 
@@ -140,15 +155,15 @@ func (s *Set) Replace(oldKey string, item Item) error {
 		}
 
 		// Remove oldKey
-		_, found = s.lookup[oldKey]
-		if !found {
-			return ErrMissing
-		}
 		delete(s.lookup, oldKey)
 	}
 
-	// Add new item
-	s.lookup[newKey] = item
+	if item.Value() == nil {
+		delete(s.lookup, newKey)
+	} else {
+		// Add new item
+		s.lookup[newKey] = item
+	}
 
 	return nil
 }

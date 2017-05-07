@@ -25,6 +25,24 @@ func Itemize(key string, value interface{}) Item {
 	return &item{key, value}
 }
 
+func Keyize(key string) Item {
+	return &item{key, struct{}{}}
+}
+
+type renamedItem struct {
+	Item
+	key string
+}
+
+func (item *renamedItem) Key() string {
+	return item.key
+}
+
+// Rename item to a new key, same underlying value.
+func Rename(item Item, key string) Item {
+	return &renamedItem{Item: item, key: key}
+}
+
 type StringItem string
 
 func (item StringItem) Key() string {
