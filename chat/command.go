@@ -256,6 +256,16 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix: "/shrug",
+		Help:   "Raise your arms in the air",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			body := strings.TrimLeft(msg.Body(), "/shrug")
+			room.Send(message.NewPublicMsg(body + "¯\\_(ツ)_/¯", msg.From()))
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Prefix:     "/ignore",
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
