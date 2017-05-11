@@ -4,8 +4,8 @@ notifications:
 language: go
 
 go:
-  - 1.6
-  - 1.7
+  - latest
+  - tip
 
 env:
   - CGO_ENABLED=0
