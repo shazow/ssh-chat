@@ -46,6 +46,8 @@ func TestHostGetPrompt(t *testing.T) {
 }
 
 func TestHostNameCollision(t *testing.T) {
+	t.Skip() // XXX: Disabled temporarily
+
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
