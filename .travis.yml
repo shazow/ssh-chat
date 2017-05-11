@@ -4,7 +4,7 @@ notifications:
 language: go
 
 go:
-  - latest
+  - 1.8.x
   - tip
 
 env:
