@@ -154,8 +154,10 @@ func (u *User) render(m Message) string {
 	switch m := m.(type) {
 	case PublicMsg:
 		return m.RenderFor(cfg) + Newline
-	case PrivateMsg:
-		u.SetReplyTo(m.From())
+	case *PrivateMsg:
+		if cfg.Bell {
+			return m.Render(cfg.Theme) + Bel + Newline
+		}
 		return m.Render(cfg.Theme) + Newline
 	default:
 		return m.Render(cfg.Theme) + Newline
