@@ -192,13 +192,7 @@ func (h *Host) Serve() {
 }
 
 func (h *Host) completeName(partial string) string {
-	names := h.NamesPrefix(partial)
-	if len(names) == 0 {
-		// Didn't find anything
-		return ""
-	}
-
-	return names[len(names)-1]
+	return h.CompleteName(partial)
 }
 
 func (h *Host) completeCommand(partial string) string {

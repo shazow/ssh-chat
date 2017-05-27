@@ -21,6 +21,7 @@ type Set struct {
 	sync.RWMutex
 	lookup    map[string]Item
 	normalize func(string) string
+	names *NameTrie
 }
 
 // New creates a new set with case-insensitive keys
@@ -28,6 +29,7 @@ func New() *Set {
 	return &Set{
 		lookup:    map[string]Item{},
 		normalize: normalize,
+		names: createNameTrie(),
 	}
 }
 
@@ -36,6 +38,7 @@ func (s *Set) Clear() int {
 	s.Lock()
 	n := len(s.lookup)
 	s.lookup = map[string]Item{}
+	s.names = createNameTrie()
 	s.Unlock()
 	return n
 }
@@ -102,6 +105,7 @@ func (s *Set) Add(item Item) error {
 	}
 
 	s.lookup[key] = item
+	s.names.Insert(key)
 	return nil
 }
 
@@ -117,6 +121,7 @@ func (s *Set) Remove(key string) error {
 		return ErrMissing
 	}
 	delete(s.lookup, key)
+	s.names.Delete(key)
 	return nil
 }
 
@@ -185,6 +190,10 @@ func (s *Set) ListPrefix(prefix string) []Item {
 	})
 
 	return r
+}
+
+func (s *Set) CompleteName(name string) (string, bool) {
+	return s.names.FirstName(name)
 }
 
 func normalize(key string) string {
