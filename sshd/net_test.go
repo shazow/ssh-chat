@@ -52,7 +52,7 @@ func TestServeTerminals(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = term.Write([]byte("echo: " + line + "\r\n"))
+		_, err = term.Write([]byte("echo: " + line + "\n"))
 		if err != nil {
 			t.Error(err)
 		}

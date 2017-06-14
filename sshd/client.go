@@ -26,6 +26,7 @@ func NewClientConfig(name string) *ssh.ClientConfig {
 				return
 			}),
 		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 }
 
