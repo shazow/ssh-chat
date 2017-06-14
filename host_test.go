@@ -71,7 +71,7 @@ func TestHostNameCollision(t *testing.T) {
 			// Consume the initial buffer
 			scanner.Scan()
 			actual := stripPrompt(scanner.Text())
-			expected := " * foo joined. (Connected: 1)"
+			expected := " * foo joined. (Connected: 1)\r"
 			if actual != expected {
 				t.Errorf("Got %q; expected %q", actual, expected)
 			}
@@ -87,7 +87,7 @@ func TestHostNameCollision(t *testing.T) {
 				t.Errorf("First client failed to get 'foo' name: %q", actual)
 			}
 			actual = stripPrompt(actual)
-			expected = " * Guest1 joined. (Connected: 2)"
+			expected = " * Guest1 joined. (Connected: 2)\r"
 			if actual != expected {
 				t.Errorf("Got %q; expected %q", actual, expected)
 			}
