@@ -97,6 +97,7 @@ func TestHostNameCollision(t *testing.T) {
 			return nil
 		})
 		if err != nil {
+			done <- struct{}{}
 			t.Fatal(err)
 		}
 	}()
@@ -203,6 +204,7 @@ func TestHostKick(t *testing.T) {
 			return nil
 		})
 		if err != nil {
+			connected <- struct{}{}
 			close(connected)
 			t.Fatal(err)
 		}
@@ -218,6 +220,7 @@ func TestHostKick(t *testing.T) {
 			return nil
 		})
 		if err != nil {
+			close(done)
 			t.Fatal(err)
 		}
 		close(done)
