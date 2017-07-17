@@ -3,6 +3,7 @@ package chat
 import "regexp"
 
 var reStripName = regexp.MustCompile("[^\\w.-]")
+
 const maxLength = 16
 
 // SanitizeName returns a name with only allowed characters and a reasonable length
