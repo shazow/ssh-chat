@@ -15,6 +15,7 @@ install:
   - go get github.com/gordonklaus/ineffassign
 
 script:
+  - diff -u <(echo -n) <(gofmt -d .)
   - ineffassign .
   - go vet $(go list ./... | grep -v /vendor/)
   - go test -v $(go list ./... | grep -v /vendor/)
