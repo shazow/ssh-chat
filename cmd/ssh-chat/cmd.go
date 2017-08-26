@@ -36,6 +36,7 @@ type Options struct {
 	Motd      string `long:"motd" description:"Optional Message of the Day file."`
 	Log       string `long:"log" description:"Write chat log to this file."`
 	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
+	TStamps   bool   `long:"timestamps" description:"Enable"`
 }
 
 var logLevels = []log.Level{
@@ -122,6 +123,7 @@ func main() {
 	host := sshchat.NewHost(s, auth)
 	host.SetTheme(message.Themes[0])
 	host.Version = Version
+	host.SetTimeStamp(options.TStamps)
 
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)

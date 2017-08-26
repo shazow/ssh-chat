@@ -108,7 +108,9 @@ func (m PublicMsg) Render(t *Theme) string {
 	if t == nil {
 		return m.String()
 	}
-
+	if (m.From().GetTimeStampVisible()) {
+		return fmt.Sprintf("[%s] %s: %s", time.Now().Format("15:04:05"), t.ColorName(m.from), m.body)
+	}
 	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
 }
 
@@ -125,10 +127,16 @@ func (m PublicMsg) RenderFor(cfg UserConfig) string {
 	if cfg.Bell {
 		body += Bel
 	}
+	if (m.From().GetTimeStampVisible()) {
+		return fmt.Sprintf("[%s] %s: %s", time.Now().Format("15:04:05"), cfg.Theme.ColorName(m.from), m.body)
+	}
 	return fmt.Sprintf("%s: %s", cfg.Theme.ColorName(m.from), body)
 }
 
 func (m PublicMsg) String() string {
+	if (m.From().GetTimeStampVisible()) {
+		return fmt.Sprintf("[%s] %s: %s", time.Now().Format("15:04:05"), m.from.Name(), m.body)
+	}
 	return fmt.Sprintf("%s: %s", m.from.Name(), m.body)
 }
 
@@ -151,6 +159,9 @@ func NewEmoteMsg(body string, from *User) *EmoteMsg {
 }
 
 func (m EmoteMsg) Render(t *Theme) string {
+	if (m.from.GetTimeStampVisible()) {
+		return fmt.Sprintf("[%s] ** %s %s", time.Now().Format("15:04:05"), m.from.Name(), m.body)
+	}
 	return fmt.Sprintf("** %s %s", m.from.Name(), m.body)
 }
 
@@ -177,6 +188,9 @@ func (m PrivateMsg) To() *User {
 
 func (m PrivateMsg) Render(t *Theme) string {
 	s := fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.body)
+	if (m.from.GetTimeStampVisible()) {
+		s = fmt.Sprintf("[%s][PM from %s] %s", time.Now().Format("15:04:05"), m.from.Name(), m.body)
+	}
 	if t == nil {
 		return s
 	}
