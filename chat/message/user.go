@@ -33,6 +33,7 @@ type User struct {
 	mu      sync.Mutex
 	config  UserConfig
 	replyTo *User // Set when user gets a /msg, for replying.
+	TimeStamp bool
 }
 
 func NewUser(identity Identifier) *User {
@@ -43,6 +44,7 @@ func NewUser(identity Identifier) *User {
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
 		Ignored:    set.New(),
+		TimeStamp:  false,
 	}
 	u.setColorIdx(rand.Int())
 
@@ -72,6 +74,20 @@ func (u *User) SetConfig(cfg UserConfig) {
 func (u *User) SetID(id string) {
 	u.Identifier.SetID(id)
 	u.setColorIdx(rand.Int())
+}
+
+// Sets visiblity of timestamp.
+func (u *User) SetTimeStampVisible(TSvis bool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()	
+	u.TimeStamp = TSvis
+}
+
+// Gets visibility status of timestamp.
+func (u *User) GetTimeStampVisible() bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.TimeStamp
 }
 
 // ReplyTo returns the last user that messaged this user.

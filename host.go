@@ -25,6 +25,12 @@ func GetPrompt(user *message.User) string {
 	if cfg.Theme != nil {
 		name = cfg.Theme.ColorName(user)
 	}
+
+	// user timestamp visibility prompt format
+	if (user.GetTimeStampVisible()) {
+		return fmt.Sprintf("[%s][%s] ", time.Now().Format("15:04:05"), name)
+	}
+
 	return fmt.Sprintf("[%s] ", name)
 }
 
@@ -45,6 +51,7 @@ type Host struct {
 	mu    sync.Mutex
 	motd  string
 	count int
+	tstamp bool
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -65,6 +72,13 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 	go room.Serve()
 	return &h
 }
+
+// SetTimeStamp sets the visibility of the timestamp globally in messages.
+func (h *Host) SetTimeStamp(vis bool) {
+	h.mu.Lock()
+	h.tstamp = vis
+	h.mu.Unlock()
+} 
 
 // SetTheme sets the default theme for the host.
 func (h *Host) SetTheme(theme message.Theme) {
@@ -121,6 +135,12 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	if err != nil {
 		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
 		return
+	}
+
+	// Set global timestamp visibility in messages if the option was 
+	// specified on the command line.
+	if (h.tstamp) {
+		user.SetTimeStampVisible(true)
 	}
 
 	// Successfully joined.
