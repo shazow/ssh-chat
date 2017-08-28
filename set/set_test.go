@@ -74,7 +74,7 @@ func TestSetExpiring(t *testing.T) {
 		t.Errorf("failed to get barbar: %s", err)
 	}
 	b := s.ListPrefix("b")
-	if len(b) != 2 || b[0].Key() != "bar" || b[1].Key() != "barbar" {
+	if len(b) != 2 || !anyItemPresentWithKey(b, "bar") || !anyItemPresentWithKey(b, "barbar") {
 		t.Errorf("b-prefix incorrect: %q", b)
 	}
 
@@ -88,4 +88,14 @@ func TestSetExpiring(t *testing.T) {
 	if s.Len() != 0 {
 		t.Error("not len 0 after clear")
 	}
+}
+
+func anyItemPresentWithKey(items []Item, key string) bool {
+	for _, item := range items {
+		if item.Key() == key {
+			return true
+		}
+	}
+
+	return false
 }
