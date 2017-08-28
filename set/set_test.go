@@ -90,7 +90,7 @@ func TestSetExpiring(t *testing.T) {
 	}
 }
 
-func anyItemPresentWithKey(items []Item, key string ) bool {
+func anyItemPresentWithKey(items []Item, key string) bool {
 	for _, item := range items {
 		if item.Key() == key {
 			return true
