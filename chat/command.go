@@ -173,9 +173,25 @@ func InitCommands(c *Commands) {
 		Prefix: "/names",
 		Help:   "List users who are connected.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			// TODO: colorize
-			names := room.NamesPrefix("")
-			body := fmt.Sprintf("%d connected: %s", len(names), strings.Join(names, ", "))
+			theme := msg.From().Config().Theme
+
+			colorize := func(u *message.User) string {
+				return theme.ColorName(u)
+			}
+
+			if theme == nil {
+				colorize = func(u *message.User) string {
+					return u.Name()
+				}
+			}
+
+			names := room.Members.ListPrefix("")
+			colNames := make([]string, len(names))
+			for i, uname := range names {
+				colNames[i] = colorize(uname.Value().(*Member).User)
+			}
+
+			body := fmt.Sprintf("%d connected: %s", len(colNames), strings.Join(colNames, ", "))
 			room.Send(message.NewSystemMsg(body, msg.From()))
 			return nil
 		},
