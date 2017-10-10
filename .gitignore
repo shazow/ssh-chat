@@ -4,3 +4,5 @@ host_key.pub
 ssh-chat
 *.log
 .*
+vendor/
+*.lock
