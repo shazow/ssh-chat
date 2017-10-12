@@ -5,4 +5,3 @@ ssh-chat
 *.log
 .*
 vendor/
-*.lock
