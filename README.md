@@ -30,7 +30,7 @@ amd64, and ARM6 for your RaspberryPi).
 ## Compiling / Developing
 
 You can compile ssh-chat by using `make build`. The resulting binary is portable and
-can be run on any system with a similar OS and CPU arch. Go 1.3 or higher is required to compile.
+can be run on any system with a similar OS and CPU arch. Go 1.8 or higher is required to compile.
 
 If you're developing on this repo, there is a handy Makefile that should set
 things up with `make run`.

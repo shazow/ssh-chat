@@ -4,14 +4,15 @@ notifications:
 language: go
 
 go:
-  - 1.6
-  - 1.7
+  - 1.8
+  - 1.9
 
 env:
   - CGO_ENABLED=0
 
 install:
   - go get -t ./...
+  - go get -u github.com/golang/dep
   - go get github.com/gordonklaus/ineffassign
 
 script:
