@@ -17,7 +17,7 @@ func SanitizeName(s string) string {
 	return s
 }
 
-var reStripData = regexp.MustCompile("[^[:ascii:]]")
+var reStripData = regexp.MustCompile("[^[:ascii:]]|[[:cntrl:]]")
 
 // SanitizeData returns a string with only allowed characters for client-provided metadata inputs.
 func SanitizeData(s string) string {
