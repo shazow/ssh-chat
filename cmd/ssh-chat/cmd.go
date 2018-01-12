@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
+	"github.com/fsnotify/fsnotify"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
 
@@ -31,7 +32,8 @@ type Options struct {
 	Version   bool   `long:"version" description:"Print version and exit."`
 	Identity  string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
 	Bind      string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
-	Admin     string `long:"admin" description:"File of public keys who are admins."`
+	Mods      string `long:"moderators" description:"File of public keys who are moderators."`
+	Admins    string `long:"admins" description:"File of public keys who are admins."`
 	Whitelist string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
 	Motd      string `long:"motd" description:"Optional Message of the Day file."`
 	Log       string `long:"log" description:"Write chat log to this file."`
@@ -123,7 +125,18 @@ func main() {
 	host.SetTheme(message.Themes[0])
 	host.Version = Version
 
-	err = fromFile(options.Admin, func(line []byte) error {
+	err = fromFile(options.Admins, func(line []byte) error {
+		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
+		if err != nil {
+			return err
+		}
+		auth.Master(key, 0)
+		return nil
+	})
+	if err != nil {
+		fail(5, "Failed to load admins: %v\n", err)
+	}
+	err = fromFile(options.Mods, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
 		if err != nil {
 			return err
@@ -132,7 +145,7 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		fail(5, "Failed to load admins: %v\n", err)
+		fail(5, "Failed to load mods: %v\n", err)
 	}
 
 	err = fromFile(options.Whitelist, func(line []byte) error {
@@ -169,7 +182,45 @@ func main() {
 		host.SetLogging(fp)
 	}
 
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		panic(err)
+	}
+	defer watcher.Close()
+
 	go host.Serve()
+	go func() {
+		for event := range watcher.Events {
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				if event.Name == options.Admins {
+					err = fromFile(options.Admins, func(line []byte) error {
+						key, _, _, _, err := ssh.ParseAuthorizedKey(line)
+						if err != nil {
+							return err
+						}
+						auth.Master(key, 0)
+						return nil
+					})
+				}
+				if event.Name == options.Mods {
+					err = fromFile(options.Mods, func(line []byte) error {
+						key, _, _, _, err := ssh.ParseAuthorizedKey(line)
+						if err != nil {
+							return err
+						}
+						auth.Op(key, 0)
+						return nil
+					})
+				}
+			}
+		}
+	}()
+	if len(options.Admins) > 0 {
+		watcher.Add(options.Admins)
+	}
+	if len(options.Mods) > 0 {
+		watcher.Add(options.Mods)
+	}
 
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
@@ -177,7 +228,6 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
-	os.Exit(0)
 }
 
 func fromFile(path string, handler func(line []byte) error) error {

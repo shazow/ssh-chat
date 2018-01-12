@@ -88,7 +88,7 @@ func (m PublicMsg) From() *User {
 
 func (m PublicMsg) ParseCommand() (*CommandMsg, bool) {
 	// Check if the message is a command
-	if !strings.HasPrefix(m.body, "/") {
+	if !strings.HasPrefix(m.body, "/") && !strings.HasPrefix(m.body, ":") {
 		return nil, false
 	}
 

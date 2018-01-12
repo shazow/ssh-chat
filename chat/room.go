@@ -10,8 +10,8 @@ import (
 	"github.com/shazow/ssh-chat/set"
 )
 
-const historyLen = 20
-const roomBuffer = 10
+const historyLen = 5
+const roomBuffer = 250
 
 // The error returned when a message is sent to a room that is already
 // closed.
@@ -37,6 +37,7 @@ type Room struct {
 
 	Members *set.Set
 	Ops     *set.Set
+	Masters *set.Set
 }
 
 // NewRoom creates a new room.
@@ -50,6 +51,7 @@ func NewRoom() *Room {
 
 		Members: set.New(),
 		Ops:     set.New(),
+		Masters: set.New(),
 	}
 }
 
@@ -165,6 +167,7 @@ func (r *Room) Leave(u message.Identifier) error {
 		return err
 	}
 	r.Ops.Remove(u.ID())
+	r.Masters.Remove(u.ID())
 	s := fmt.Sprintf("%s left.", u.Name())
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
@@ -210,6 +213,11 @@ func (r *Room) MemberByID(id string) (*Member, bool) {
 // IsOp returns whether a user is an operator in this room.
 func (r *Room) IsOp(u *message.User) bool {
 	return r.Ops.In(u.ID())
+}
+
+// IsMaster returns whether a user is an admin master in this room.
+func (r *Room) IsMaster(u *message.User) bool {
+	return r.Masters.In(u.ID())
 }
 
 // Topic of the room.

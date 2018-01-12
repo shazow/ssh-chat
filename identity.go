@@ -14,6 +14,7 @@ import (
 type Identity struct {
 	sshd.Connection
 	id      string
+	chat    string
 	created time.Time
 }
 
@@ -42,8 +43,22 @@ func (i Identity) Name() string {
 	return i.id
 }
 
+func (i Identity) Chat() string {
+	return i.chat
+}
+
+func (i *Identity) SetChat(c string) {
+	i.chat = c
+}
+
 // Whois returns a whois description for non-admin users.
 func (i Identity) Whois() string {
+	return "name: " + i.Name() + message.Newline +
+		" > joined: " + humanize.Time(i.created)
+}
+
+// WhoisAdmin returns a whois description for admin users.
+func (i Identity) WhoisAdmin() string {
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
@@ -54,8 +69,7 @@ func (i Identity) Whois() string {
 		" > joined: " + humanize.Time(i.created)
 }
 
-// WhoisAdmin returns a whois description for admin users.
-func (i Identity) WhoisAdmin() string {
+func (i Identity) WhoisMaster() string {
 	ip, _, _ := net.SplitHostPort(i.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
