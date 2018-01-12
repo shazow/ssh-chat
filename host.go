@@ -25,7 +25,7 @@ func GetPrompt(user *message.User) string {
 	if cfg.Theme != nil {
 		name = cfg.Theme.ColorName(user)
 	}
-	return fmt.Sprintf("[%s] ", name)
+	return fmt.Sprintf("[%s:%s] ", name, user.Chat())
 }
 
 // Host is the bridge between sshd and chat modules
@@ -42,8 +42,11 @@ type Host struct {
 	// Default theme
 	theme message.Theme
 
-	mu    sync.Mutex
-	motd  string
+	mu   sync.Mutex
+	motd string
+	// start private mode
+	private map[string]*message.User
+
 	count int
 }
 
@@ -88,6 +91,14 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 	return h.auth.IsOp(key)
 }
 
+func (h *Host) isMaster(conn sshd.Connection) bool {
+	key := conn.PublicKey()
+	if key == nil {
+		return false
+	}
+	return h.auth.IsMaster(key)
+}
+
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
@@ -124,6 +135,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	// Successfully joined.
+	user.SetChat("general")
 	term.SetPrompt(GetPrompt(user))
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
@@ -132,10 +144,15 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	if h.isOp(term.Conn) {
 		h.Room.Ops.Add(set.Itemize(member.ID(), member))
 	}
+	if h.isMaster(term.Conn) {
+		h.Room.Masters.Add(set.Itemize(member.ID(), member))
+	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
 	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
 
+	var args []string
+	h.private = make(map[string]*message.User)
 	for {
 		line, err := term.ReadLine()
 		if err == io.EOF {
@@ -162,19 +179,35 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 		m := message.ParseInput(line, user)
 
-		// FIXME: Any reason to use h.room.Send(m) instead?
-		h.HandleMsg(m)
+		switch c := m.(type) {
+		case *message.CommandMsg:
+			args = c.Args()
+			h.HandleMsg(m)
+		default:
+			to, ok := h.private[user.Name()]
+			if ok {
+				m = message.NewPrivateMsg(
+					m.String(), user, to,
+				)
+			}
+			h.HandleMsg(m)
+		}
 
-		cmd := m.Command()
-		if cmd == "/nick" || cmd == "/theme" {
-			// Hijack /nick command to update terminal synchronously. Wouldn't
-			// work if we use h.room.Send(m) above.
-			//
-			// FIXME: This is hacky, how do we improve the API to allow for
-			// this? Chat module shouldn't know about terminals.
+		if cmd := m.Command(); len(cmd) > 0 {
+			switch cmd[1:] {
+			case "private":
+				if len(args) > 0 {
+					user.SetChat(args[0])
+				}
+			case "endprivate":
+				user.SetChat("general")
+			case "nick":
+			case "theme":
+			}
 			term.SetPrompt(GetPrompt(user))
 			user.SetHighlight(user.Name())
 		}
+		args = nil
 	}
 
 	err = h.Leave(user)
@@ -280,7 +313,7 @@ func (h *Host) GetUser(name string) (*message.User, bool) {
 // override any existing commands.
 func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
-		Prefix:     "/msg",
+		Prefix:     "msg",
 		PrefixHelp: "USER MESSAGE",
 		Help:       "Send MESSAGE to USER.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
@@ -309,7 +342,59 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
-		Prefix:     "/reply",
+		Prefix:     "private",
+		PrefixHelp: "USER",
+		Help:       "Start private chat with USER",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			target, ok := h.GetUser(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			h.private[msg.From().Name()] = target
+
+			txt := fmt.Sprintf("[Private mode started with %s]", target.Name())
+			ms := message.NewSystemMsg(txt, msg.From())
+			room.Send(ms)
+			target.SetReplyTo(msg.From())
+			return nil
+		},
+	})
+	c.Alias("p", "private")
+
+	c.Add(chat.Command{
+		Admin:  true,
+		Prefix: "welcome",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsMaster(msg.From()) {
+				return errors.New("must be admin")
+			}
+
+			room.Send(message.NewMsg(h.motd))
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Prefix: "endprivate",
+		Help:   "Stop private chat",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			delete(h.private, msg.From().Name())
+
+			txt := "[Private mode ended]"
+			ms := message.NewSystemMsg(txt, msg.From())
+			room.Send(ms)
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Prefix:     "reply",
 		PrefixHelp: "MESSAGE",
 		Help:       "Reply with MESSAGE to the previous private message.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
@@ -341,7 +426,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
-		Prefix:     "/whois",
+		Prefix:     "whois",
 		PrefixHelp: "USER",
 		Help:       "Information about USER.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
@@ -357,11 +442,15 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			id := target.Identifier.(*Identity)
 			var whois string
-			switch room.IsOp(msg.From()) {
+			switch room.IsMaster(msg.From()) {
 			case true:
-				whois = id.WhoisAdmin()
+				whois = id.WhoisMaster()
 			case false:
-				whois = id.Whois()
+				if room.IsOp(msg.From()) {
+					whois = id.WhoisAdmin()
+				} else {
+					whois = id.Whois()
+				}
 			}
 			room.Send(message.NewSystemMsg(whois, msg.From()))
 
@@ -371,7 +460,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 	// Hidden commands
 	c.Add(chat.Command{
-		Prefix: "/version",
+		Prefix: "version",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			room.Send(message.NewSystemMsg(h.Version, msg.From()))
 			return nil
@@ -380,7 +469,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 	timeStarted := time.Now()
 	c.Add(chat.Command{
-		Prefix: "/uptime",
+		Prefix: "uptime",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			room.Send(message.NewSystemMsg(humanize.Time(timeStarted), msg.From()))
 			return nil
@@ -390,11 +479,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	// Op commands
 	c.Add(chat.Command{
 		Op:         true,
-		Prefix:     "/kick",
+		Admin:      true,
+		Prefix:     "kick",
 		PrefixHelp: "USER",
 		Help:       "Kick USER from the server.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
+			if !room.IsOp(msg.From()) && !room.IsMaster(msg.From()) {
 				return errors.New("must be op")
 			}
 
@@ -406,6 +496,10 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			target, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
+			}
+
+			if room.IsMaster(target) {
+				return errors.New("you cannot kick master")
 			}
 
 			body := fmt.Sprintf("%s was kicked by %s.", target.Name(), msg.From().Name())
@@ -416,13 +510,14 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
+		Admin:      true,
 		Op:         true,
-		Prefix:     "/ban",
+		Prefix:     "ban",
 		PrefixHelp: "USER [DURATION]",
 		Help:       "Ban USER from the server.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
-			if !room.IsOp(msg.From()) {
+			if !room.IsMaster(msg.From()) {
 				return errors.New("must be op")
 			}
 
@@ -434,6 +529,10 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			target, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
+			}
+
+			if room.IsMaster(target) {
+				return errors.New("you cannot ban master.")
 			}
 
 			var until time.Duration = 0
@@ -456,13 +555,18 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
+		Admin:      true,
 		Op:         true,
-		Prefix:     "/motd",
+		Prefix:     "motd",
 		PrefixHelp: "[MESSAGE]",
 		Help:       "Set a new MESSAGE of the day, print the current motd without parameters.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			args := msg.Args()
 			user := msg.From()
+			if !room.IsMaster(user) && !room.IsOp(user) {
+				return errors.New("must be OP to modify the MOTD")
+			}
+
+			args := msg.Args()
 
 			h.mu.Lock()
 			motd := h.motd
@@ -471,9 +575,6 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if len(args) == 0 {
 				room.Send(message.NewSystemMsg(motd, user))
 				return nil
-			}
-			if !room.IsOp(user) {
-				return errors.New("must be OP to modify the MOTD")
 			}
 
 			motd = strings.Join(args, " ")
@@ -486,13 +587,13 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
-		Op:         true,
-		Prefix:     "/op",
+		Admin:      true,
+		Prefix:     "op",
 		PrefixHelp: "USER [DURATION]",
 		Help:       "Set USER as admin.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()) {
-				return errors.New("must be op")
+			if !room.IsMaster(msg.From()) {
+				return errors.New("must be admin")
 			}
 
 			args := msg.Args()
@@ -515,6 +616,37 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			h.auth.Op(id.PublicKey(), until)
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
+			room.Send(message.NewSystemMsg(body, member.User))
+
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Admin:      true,
+		Prefix:     "delop",
+		PrefixHelp: "USER",
+		Help:       "Remove USER as admin.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsMaster(msg.From()) {
+				return errors.New("must be master")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			member, ok := room.MemberByID(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+			err := room.Ops.Remove(args[0])
+			if err != nil {
+				return err
+			}
+
+			body := fmt.Sprintf("Deleted op by %s.", msg.From().Name())
 			room.Send(message.NewSystemMsg(body, member.User))
 
 			return nil

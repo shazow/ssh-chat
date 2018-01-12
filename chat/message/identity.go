@@ -5,6 +5,8 @@ type Identifier interface {
 	ID() string
 	SetID(string)
 	Name() string
+	Chat() string
+	SetChat(string)
 }
 
 // SimpleID is a simple Identifier implementation used for testing.
@@ -23,4 +25,13 @@ func (i SimpleID) SetID(s string) {
 // Name returns the ID
 func (i SimpleID) Name() string {
 	return i.ID()
+}
+
+// Chat returns the chat name
+func (i SimpleID) Chat() string {
+	return i.Chat()
+}
+
+func (i SimpleID) SetChat(s string) {
+
 }
