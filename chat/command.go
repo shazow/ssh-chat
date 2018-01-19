@@ -276,6 +276,26 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix: "/timestamp",
+		Help:   "Timestamps after 30min of inactivity.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			u := msg.From()
+			cfg := u.Config()
+			cfg.Timestamp = !cfg.Timestamp
+			u.SetConfig(cfg)
+
+			var body string
+			if cfg.Timestamp {
+				body = "Timestamp is toggled ON"
+			} else {
+				body = "Timestamp is toggled OFF"
+			}
+			room.Send(message.NewSystemMsg(body, u))
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Prefix:     "/ignore",
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",

@@ -15,6 +15,8 @@ import (
 const messageBuffer = 5
 const messageTimeout = 5 * time.Second
 const reHighlight = `\b(%s)\b`
+const timestampTimeout = 30 * time.Minute
+const timestampLayout = "2006-01-02 15:04:05 UTC"
 
 var ErrUserClosed = errors.New("user closed")
 
@@ -32,7 +34,8 @@ type User struct {
 
 	mu      sync.Mutex
 	config  UserConfig
-	replyTo *User // Set when user gets a /msg, for replying.
+	replyTo *User     // Set when user gets a /msg, for replying.
+	lastMsg time.Time // When the last message was rendered
 }
 
 func NewUser(identity Identifier) *User {
@@ -164,8 +167,9 @@ func (u *User) render(m Message) string {
 	}
 }
 
-// HandleMsg will render the message to the screen, blocking.
-func (u *User) HandleMsg(m Message) error {
+// writeMsg renders the message and attempts to write it, will Close the user
+// if it fails.
+func (u *User) writeMsg(m Message) error {
 	r := u.render(m)
 	_, err := u.screen.Write([]byte(r))
 	if err != nil {
@@ -173,6 +177,26 @@ func (u *User) HandleMsg(m Message) error {
 		u.Close()
 	}
 	return err
+}
+
+// HandleMsg will render the message to the screen, blocking.
+func (u *User) HandleMsg(m Message) error {
+	u.mu.Lock()
+	cfg := u.config
+	lastMsg := u.lastMsg
+	u.lastMsg = m.Timestamp()
+	injectTimestamp := !lastMsg.IsZero() && cfg.Timestamp && u.lastMsg.Sub(lastMsg) > timestampTimeout
+	u.mu.Unlock()
+
+	if injectTimestamp {
+		// Inject a timestamp at most once every timestampTimeout between message intervals
+		ts := NewSystemMsg(fmt.Sprintf("Timestamp: %s", m.Timestamp().UTC().Format(timestampLayout)), u)
+		if err := u.writeMsg(ts); err != nil {
+			return err
+		}
+	}
+
+	return u.writeMsg(m)
 }
 
 // Add message to consume by user
@@ -194,6 +218,7 @@ type UserConfig struct {
 	Highlight *regexp.Regexp
 	Bell      bool
 	Quiet     bool
+	Timestamp bool
 	Theme     *Theme
 }
 
@@ -202,8 +227,9 @@ var DefaultUserConfig UserConfig
 
 func init() {
 	DefaultUserConfig = UserConfig{
-		Bell:  true,
-		Quiet: false,
+		Bell:      true,
+		Quiet:     false,
+		Timestamp: false,
 	}
 
 	// TODO: Seed random?
