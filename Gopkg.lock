@@ -9,12 +9,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/dustin/go-humanize"
-  packages = ["."]
-  revision = "bb3d318650d48840a39aa21a027c6630e198e626"
-
-[[projects]]
-  branch = "master"
   name = "github.com/howeyc/gopass"
   packages = ["."]
   revision = "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
@@ -46,6 +40,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "36fa3b8ab2269908ef899a2f5b7320cb792d3a1039cb68afc8b51becde57f850"
+  inputs-digest = "48a7f7477a28e61efdd4256fe7f426bfaf93df53b5731e905088c0e9c2f10d3b"
   solver-name = "gps-cdcl"
   solver-version = 1
