@@ -26,6 +26,8 @@ amd64, and ARM6 for your RaspberryPi).
 
 **[Grab the latest release here](https://github.com/shazow/ssh-chat/releases/)**.
 
+Play around with it. Additional [deploy examples are here](https://github.com/shazow/ssh-chat/wiki/Deployment).
+
 
 ## Compiling / Developing
 
