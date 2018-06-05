@@ -38,12 +38,11 @@ type Host struct {
 	// Version string to print on /version
 	Version string
 
-	// Default theme
-	theme message.Theme
-
 	mu    sync.Mutex
 	motd  string
 	count int
+
+	oneScreen *multiScreen
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -65,13 +64,6 @@ func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
 	return &h
 }
 
-// SetTheme sets the default theme for the host.
-func (h *Host) SetTheme(theme message.Theme) {
-	h.mu.Lock()
-	h.theme = theme
-	h.mu.Unlock()
-}
-
 // SetMotd sets the host's message of the day.
 func (h *Host) SetMotd(motd string) {
 	h.mu.Lock()
@@ -87,54 +79,31 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 	return h.auth.IsOp(key)
 }
 
-// Connect a specific Terminal to this host and its room.
-func (h *Host) Connect(term *sshd.Terminal) {
+func (h *Host) getScreen(term *sshd.Terminal) (screen *multiScreen, isNew bool) {
+	if h.oneScreen != nil {
+		h.oneScreen.add(term)
+		return h.oneScreen, false
+	}
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
+
+	// TODO: Skip this if TERM is set to something dumb?
 	cfg := user.Config()
-	cfg.Theme = &h.theme
+	cfg.Theme = message.DefaultTheme
 	user.SetConfig(cfg)
-	go user.Consume()
 
-	// Close term once user is closed.
-	defer user.Close()
-	defer term.Close()
-
-	h.mu.Lock()
-	motd := h.motd
-	count := h.count
-	h.count++
-	h.mu.Unlock()
-
-	// Send MOTD
-	if motd != "" {
-		user.Send(message.NewAnnounceMsg(motd))
+	h.oneScreen = &multiScreen{
+		User: user,
 	}
 
-	member, err := h.Join(user)
-	if err != nil {
-		// Try again...
-		id.SetName(fmt.Sprintf("Guest%d", count))
-		member, err = h.Join(user)
-	}
-	if err != nil {
-		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
-		return
-	}
+	return h.oneScreen, true
+}
 
-	// Successfully joined.
+func (h *Host) consumeScreen(term *sshd.Terminal, user *message.User) {
 	term.SetPrompt(GetPrompt(user))
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
-	user.SetHighlight(user.Name())
 
-	// Should the user be op'd on join?
-	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(set.Itemize(member.ID(), member))
-	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
-
-	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
-
 	for {
 		line, err := term.ReadLine()
 		if err == io.EOF {
@@ -175,7 +144,57 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			user.SetHighlight(user.Name())
 		}
 	}
+}
 
+// Connect a specific Terminal to this host and its room.
+func (h *Host) Connect(term *sshd.Terminal) {
+	screen, isNew := h.getScreen(term)
+	user := screen.User
+	go user.Consume()
+
+	defer term.Close()
+
+	if !isNew {
+		h.consumeScreen(term, user)
+		return
+	}
+
+	// XXX:	defer user.Close()
+
+	h.mu.Lock()
+	motd := h.motd
+	count := h.count
+	h.count++
+	h.mu.Unlock()
+
+	// Send MOTD
+	if motd != "" {
+		user.Send(message.NewAnnounceMsg(motd))
+	}
+
+	member, err := h.Join(user)
+	if err != nil {
+		// Try again...
+		user.SetID(fmt.Sprintf("Guest%d", count))
+		member, err = h.Join(user)
+	}
+	if err != nil {
+		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
+		return
+	}
+
+	// Successfully joined.
+	user.SetHighlight(user.Name())
+
+	// Should the user be op'd on join?
+	if h.isOp(term.Conn) {
+		h.Room.Ops.Add(set.Itemize(member.ID(), member))
+	}
+	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
+
+	h.consumeScreen(term, user)
+
+	// XXX: Move this into a user close thing
 	err = h.Leave(user)
 	if err != nil {
 		logger.Errorf("[%s] Failed to leave: %s", term.Conn.RemoteAddr(), err)
@@ -267,12 +286,13 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 }
 
 // GetUser returns a message.User based on a name.
-func (h *Host) GetUser(name string) (*message.User, bool) {
+func (h *Host) GetUser(name string) (User, bool) {
 	m, ok := h.MemberByID(name)
 	if !ok {
 		return nil, false
 	}
-	return m.User, true
+	u, ok := m.Member.(User)
+	return u, ok
 }
 
 // InitCommands adds host-specific commands to a Commands container. These will
@@ -318,7 +338,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify message")
 			}
 
-			target := msg.From().ReplyTo()
+			target := msg.From().(Member).ReplyTo()
 			if target == nil {
 				return errors.New("no message to reply to")
 			}
@@ -354,13 +374,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			id := target.Identifier.(*Identity)
 			var whois string
-			switch room.IsOp(msg.From()) {
+			switch h.IsOp(msg.From()) {
 			case true:
-				whois = id.WhoisAdmin()
+				whois = whoisAdmin(target)
 			case false:
-				whois = id.Whois()
+				whois = whoisPublic(target)
 			}
 			room.Send(message.NewSystemMsg(whois, msg.From()))
 
@@ -440,15 +459,16 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			id := target.Identifier.(*Identity)
-			h.auth.Ban(id.PublicKey(), until)
-			h.auth.BanAddr(id.RemoteAddr(), until)
+			for _, conn := range target.Connections() {
+				h.auth.Ban(conn.PublicKey(), until)
+				h.auth.BanAddr(conn.RemoteAddr(), until)
+			}
 
 			body := fmt.Sprintf("%s was banned by %s.", target.Name(), msg.From().Name())
 			room.Send(message.NewAnnounceMsg(body))
 			target.Close()
 
-			logger.Debugf("Banned: \n-> %s", id.Whois())
+			logger.Debugf("Banned: \n-> %s", whoisAdmin(target))
 
 			return nil
 		},
@@ -504,17 +524,18 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				until, _ = time.ParseDuration(args[1])
 			}
 
-			member, ok := room.MemberByID(args[0])
+			user, ok := h.GetUser(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
-			room.Ops.Add(set.Itemize(member.ID(), member))
+			room.Ops.Add(set.Itemize(user.ID(), user))
 
-			id := member.Identifier.(*Identity)
-			h.auth.Op(id.PublicKey(), until)
+			for _, conn := range user.Connections() {
+				h.auth.Op(conn.PublicKey(), until)
+			}
 
 			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
-			room.Send(message.NewSystemMsg(body, member.User))
+			room.Send(message.NewSystemMsg(body, user))
 
 			return nil
 		},

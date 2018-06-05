@@ -126,13 +126,18 @@ func (t Theme) ID() string {
 	return t.id
 }
 
+type coloredName interface {
+	Name() string
+	Color() int
+}
+
 // Colorize name string given some index
-func (t Theme) ColorName(u *User) string {
+func (t Theme) ColorName(n coloredName) string {
 	if t.names == nil {
-		return u.Name()
+		return n.Name()
 	}
 
-	return t.names.Get(u.colorIdx).Format(u.Name())
+	return t.names.Get(n.Color()).Format(n.Name())
 }
 
 // Colorize the PM string

@@ -120,7 +120,6 @@ func main() {
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
 	host := sshchat.NewHost(s, auth)
-	host.SetTheme(message.Themes[0])
 	host.Version = Version
 
 	err = fromFile(options.Admin, func(line []byte) error {

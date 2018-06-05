@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
@@ -24,6 +25,10 @@ var ErrMissingArg = errors.New("missing argument")
 
 // The error returned when a command is added without a prefix.
 var ErrMissingPrefix = errors.New("command missing prefix")
+
+// The error returned when we fail to find a corresponding userMember struct
+// for an ID. This should not happen, probably a bug somewhere if encountered.
+var ErrMissingMember = errors.New("failed to find member")
 
 // Command is a definition of a handler for a command.
 type Command struct {
@@ -132,8 +137,7 @@ func InitCommands(c *Commands) {
 		Prefix: "/exit",
 		Help:   "Exit the chat.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			msg.From().Close()
-			return nil
+			return msg.From().(io.Closer).Close()
 		},
 	})
 	c.Alias("/exit", "/quit")
@@ -173,14 +177,14 @@ func InitCommands(c *Commands) {
 		Prefix: "/names",
 		Help:   "List users who are connected.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			theme := msg.From().Config().Theme
+			theme := msg.From().(Member).Config().Theme
 
-			colorize := func(u *message.User) string {
+			colorize := func(u Member) string {
 				return theme.ColorName(u)
 			}
 
 			if theme == nil {
-				colorize = func(u *message.User) string {
+				colorize = func(u Member) string {
 					return u.Name()
 				}
 			}
@@ -188,7 +192,7 @@ func InitCommands(c *Commands) {
 			names := room.Members.ListPrefix("")
 			colNames := make([]string, len(names))
 			for i, uname := range names {
-				colNames[i] = colorize(uname.Value().(*Member).User)
+				colNames[i] = colorize(uname.Value().(Member))
 			}
 
 			body := fmt.Sprintf("%d connected: %s", len(colNames), strings.Join(colNames, ", "))
@@ -203,7 +207,7 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[colors|...]",
 		Help:       "Set your color theme.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			user := msg.From()
+			user := msg.From().(Member)
 			args := msg.Args()
 			cfg := user.Config()
 			if len(args) == 0 {
@@ -242,7 +246,7 @@ func InitCommands(c *Commands) {
 		Prefix: "/quiet",
 		Help:   "Silence room announcements.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			u := msg.From()
+			u := msg.From().(Member)
 			cfg := u.Config()
 			cfg.Quiet = !cfg.Quiet
 			u.SetConfig(cfg)
@@ -293,7 +297,7 @@ func InitCommands(c *Commands) {
 		Prefix: "/timestamp",
 		Help:   "Timestamps after 30min of inactivity.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			u := msg.From()
+			u := msg.From().(Member)
 			cfg := u.Config()
 			cfg.Timestamp = !cfg.Timestamp
 			u.SetConfig(cfg)
@@ -314,11 +318,15 @@ func InitCommands(c *Commands) {
 		PrefixHelp: "[USER]",
 		Help:       "Hide messages from USER, /unignore USER to stop hiding.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
+			from, ok := room.Member(msg.From())
+			if !ok {
+				return ErrMissingMember
+			}
 			id := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/ignore"))
 			if id == "" {
 				// Print ignored names, if any.
 				var names []string
-				msg.From().Ignored.Each(func(_ string, item set.Item) error {
+				from.Ignored.Each(func(_ string, item set.Item) error {
 					names = append(names, item.Key())
 					return nil
 				})
@@ -342,7 +350,7 @@ func InitCommands(c *Commands) {
 				return fmt.Errorf("user not found: %s", id)
 			}
 
-			err := msg.From().Ignored.Add(set.Itemize(id, target))
+			err := from.Ignored.Add(set.Itemize(id, target))
 			if err == set.ErrCollision {
 				return fmt.Errorf("user already ignored: %s", id)
 			} else if err != nil {
@@ -363,7 +371,12 @@ func InitCommands(c *Commands) {
 				return errors.New("must specify user")
 			}
 
-			if err := msg.From().Ignored.Remove(id); err != nil {
+			from, ok := room.Member(msg.From())
+			if !ok {
+				return ErrMissingMember
+			}
+
+			if err := from.Ignored.Remove(id); err != nil {
 				return err
 			}
 

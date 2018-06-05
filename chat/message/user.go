@@ -71,6 +71,10 @@ func (u *User) SetConfig(cfg UserConfig) {
 	u.mu.Unlock()
 }
 
+func (u *User) Color() int {
+	return u.colorIdx
+}
+
 // Rename the user with a new Identifier.
 func (u *User) SetID(id string) {
 	u.Identifier.SetID(id)

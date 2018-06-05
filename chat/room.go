@@ -21,11 +21,6 @@ var ErrRoomClosed = errors.New("room closed")
 // as empty string.
 var ErrInvalidName = errors.New("invalid name")
 
-// Member is a User with per-Room metadata attached to it.
-type Member struct {
-	*message.User
-}
-
 // Room definition, also a Set of User Items
 type Room struct {
 	topic     string
@@ -63,7 +58,7 @@ func (r *Room) Close() {
 	r.closeOnce.Do(func() {
 		r.closed = true
 		r.Members.Each(func(_ string, item set.Item) error {
-			item.Value().(*Member).Close()
+			item.Value().(Member).Close()
 			return nil
 		})
 		r.Members.Clear()
@@ -87,25 +82,28 @@ func (r *Room) HandleMsg(m message.Message) {
 			go r.HandleMsg(m)
 		}
 	case message.MessageTo:
-		user := m.To()
-		user.Send(m)
+		if user, ok := r.Member(m.To()); ok {
+			user.Send(m)
+		} else {
+			// Todo: Handle error?
+		}
 	default:
 		fromMsg, skip := m.(message.MessageFrom)
-		var skipUser *message.User
+		var skipAuthor message.Author
 		if skip {
-			skipUser = fromMsg.From()
+			skipAuthor = fromMsg.From()
 		}
 
 		r.history.Add(m)
 		r.Members.Each(func(_ string, item set.Item) (err error) {
-			user := item.Value().(*Member).User
+			user := item.Value().(*roomMember)
 
 			if fromMsg != nil && user.Ignored.In(fromMsg.From().ID()) {
 				// Skip because ignored
 				return
 			}
 
-			if skip && skipUser == user {
+			if skip && skipAuthor == user.Member.(message.Author) {
 				// Skip self
 				return
 			}
@@ -135,19 +133,22 @@ func (r *Room) Send(m message.Message) {
 }
 
 // History feeds the room's recent message history to the user's handler.
-func (r *Room) History(u *message.User) {
+func (r *Room) History(u Member) {
 	for _, m := range r.history.Get(historyLen) {
 		u.Send(m)
 	}
 }
 
 // Join the room as a user, will announce.
-func (r *Room) Join(u *message.User) (*Member, error) {
+func (r *Room) Join(u Member) (*roomMember, error) {
 	// TODO: Check if closed
 	if u.ID() == "" {
 		return nil, ErrInvalidName
 	}
-	member := &Member{u}
+	member := &roomMember{
+		Member:  u,
+		Ignored: set.New(),
+	}
 	err := r.Members.Add(set.Itemize(u.ID(), member))
 	if err != nil {
 		return nil, err
@@ -187,28 +188,29 @@ func (r *Room) Rename(oldID string, u message.Identifier) error {
 
 // Member returns a corresponding Member object to a User if the Member is
 // present in this room.
-func (r *Room) Member(u *message.User) (*Member, bool) {
+func (r *Room) Member(u message.Author) (*roomMember, bool) {
 	m, ok := r.MemberByID(u.ID())
 	if !ok {
 		return nil, false
 	}
 	// Check that it's the same user
-	if m.User != u {
+	if m.Member != u {
 		return nil, false
 	}
 	return m, true
 }
 
-func (r *Room) MemberByID(id string) (*Member, bool) {
+func (r *Room) MemberByID(id string) (*roomMember, bool) {
 	m, err := r.Members.Get(id)
 	if err != nil {
 		return nil, false
 	}
-	return m.Value().(*Member), true
+	rm, ok := m.Value().(*roomMember)
+	return rm, ok
 }
 
 // IsOp returns whether a user is an operator in this room.
-func (r *Room) IsOp(u *message.User) bool {
+func (r *Room) IsOp(u message.Author) bool {
 	return r.Ops.In(u.ID())
 }
 
@@ -228,7 +230,7 @@ func (r *Room) NamesPrefix(prefix string) []string {
 	items := r.Members.ListPrefix(prefix)
 	names := make([]string, len(items))
 	for i, item := range items {
-		names[i] = item.Value().(*Member).User.Name()
+		names[i] = item.Value().(*roomMember).Name()
 	}
 	return names
 }
