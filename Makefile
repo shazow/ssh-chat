@@ -14,7 +14,7 @@ $(BINARY): deps **/**/*.go **/*.go *.go
 	go build $(BUILDFLAGS) ./cmd/ssh-chat
 
 deps:
-	dep ensure
+	go mod download
 
 build: $(BINARY)
 
