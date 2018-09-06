@@ -278,13 +278,7 @@ func InitCommands(c *Commands) {
 	c.Add(Command{
 		Prefix: "/shrug",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			var me string
-			args := msg.Args()
-			if len(args) == 0 {
-				me = `¯\_(ツ)_/¯`
-			}
-
-			room.Send(message.NewEmoteMsg(me, msg.From()))
+			room.Send(message.NewEmoteMsg(`¯\_(ツ)_/¯`, msg.From()))
 			return nil
 		},
 	})
