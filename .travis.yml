@@ -7,8 +7,7 @@ go:
   - 1.11
 
 env:
-  - CGO_ENABLED=0
-  - GO111MODULE=on
+  - CGO_ENABLED=0 GO111MODULE=on
 
 install:
   - go get -t ./...
