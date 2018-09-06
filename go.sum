@@ -1,0 +1,12 @@
+github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58 h1:MkpmYfld/S8kXqTYI68DfL8/hHXjHogL120Dy00TIxc=
+github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58/go.mod h1:YNfsMyWSs+h+PaYkxGeMVmVCX75Zj/pqdjbu12ciCYE=
+github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c h1:kQWxfPIHVLbgLzphqk3QUflDy9QdksZR4ygR807bpy0=
+github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c/go.mod h1:lADxMC39cJJqL93Duh1xhAs4I2Zs8mKS89XWXFGp9cs=
+github.com/jessevdk/go-flags v1.3.0 h1:QmKsgik/Z5fJ11ZtlcA8F+XW9dNybBNFQ1rngF3MmdU=
+github.com/jessevdk/go-flags v1.3.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
+github.com/shazow/rateio v0.0.0-20150116013248-e8e00881e5c1 h1:Lx3BlDGFElJt4u/zKc9A3BuGYbQAGlEFyPuUA3jeMD0=
+github.com/shazow/rateio v0.0.0-20150116013248-e8e00881e5c1/go.mod h1:vt2jWY/3Qw1bIzle5thrJWucsLuuX9iUNnp20CqCciI=
+golang.org/x/crypto v0.0.0-20180119074636-ee41a25c63fb h1:kKl6FEVxIb8jK+8DM5N225ACdo3ftHG5AGmay9F3Yc8=
+golang.org/x/crypto v0.0.0-20180119074636-ee41a25c63fb/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
+golang.org/x/sys v0.0.0-20180117170059-2c42eef0765b h1:mxo/dXmtEd5rXc/ZzMKg0qDhMT+51+LvV65S9dP6nh4=
+golang.org/x/sys v0.0.0-20180117170059-2c42eef0765b/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
