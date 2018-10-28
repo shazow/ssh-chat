@@ -4,7 +4,7 @@ notifications:
 language: go
 
 go:
-  - 1.11
+  - 1.x
 
 env:
   - CGO_ENABLED=0 GO111MODULE=on
