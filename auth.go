@@ -78,7 +78,8 @@ func (a *Auth) Check(addr net.Addr, key ssh.PublicKey) (bool, error) {
 	if !banned {
 		banned = a.bannedAddr.In(newAuthAddr(addr))
 	}
-	if banned {
+	// Ops can bypass bans, just in case we ban ourselves.
+	if banned && !a.IsOp(key) {
 		return false, ErrBanned
 	}
 
@@ -96,7 +97,7 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.ops.Add(authItem)
 	}
-	logger.Debugf("Added to ops: %s (for %s)", authItem.Key(), d)
+	logger.Debugf("Added to ops: %q (for %s)", authItem.Key(), d)
 }
 
 // IsOp checks if a public key is an op.
@@ -119,7 +120,7 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.whitelist.Add(authItem)
 	}
-	logger.Debugf("Added to whitelist: %s (for %s)", authItem.Key(), d)
+	logger.Debugf("Added to whitelist: %q (for %s)", authItem.Key(), d)
 }
 
 // Ban will set a public key as banned.
@@ -138,16 +139,16 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 	} else {
 		a.banned.Add(authItem)
 	}
-	logger.Debugf("Added to banned: %s (for %s)", authItem.Key(), d)
+	logger.Debugf("Added to banned: %q (for %s)", authItem.Key(), d)
 }
 
 // Ban will set an IP address as banned.
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
-	authItem := set.StringItem(addr.String())
+	authItem := set.StringItem(newAuthAddr(addr))
 	if d != 0 {
 		a.bannedAddr.Add(set.Expire(authItem, d))
 	} else {
 		a.bannedAddr.Add(authItem)
 	}
-	logger.Debugf("Added to bannedAddr: %s (for %s)", authItem.Key(), d)
+	logger.Debugf("Added to bannedAddr: %q (for %s)", authItem.Key(), d)
 }

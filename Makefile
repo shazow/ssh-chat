@@ -10,11 +10,8 @@ SUBPACKAGES := $(shell go list ./... | grep -v /vendor/)
 
 all: $(BINARY)
 
-$(BINARY): deps **/**/*.go **/*.go *.go
+$(BINARY): **/**/*.go **/*.go *.go
 	go build $(BUILDFLAGS) ./cmd/ssh-chat
-
-deps:
-	dep ensure
 
 build: $(BINARY)
 
