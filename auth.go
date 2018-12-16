@@ -142,6 +142,17 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 	logger.Debugf("Added to banned: %q (for %s)", authItem.Key(), d)
 }
 
+func (a *Auth) Banned() []string {
+	r := []string{}
+	iterGet := func(key string, _ set.Item) error {
+		r = append(r, key)
+		return nil
+	}
+	a.banned.Each(iterGet)
+	a.bannedAddr.Each(iterGet)
+	return r
+}
+
 // Ban will set an IP address as banned.
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
 	authItem := set.StringItem(newAuthAddr(addr))

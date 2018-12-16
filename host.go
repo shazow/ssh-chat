@@ -1,6 +1,7 @@
 package sshchat
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -449,6 +450,29 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			target.Close()
 
 			logger.Debugf("Banned: \n-> %s", id.Whois())
+
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Op:     true,
+		Prefix: "/banned",
+		Help:   "List the current ban conditions.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			banned := h.auth.Banned()
+
+			buf := bytes.Buffer{}
+			fmt.Fprintf(&buf, "Banned:\n")
+			for _, key := range banned {
+				fmt.Fprintf(&buf, "   %s\n", key)
+			}
+
+			room.Send(message.NewSystemMsg(buf.String(), msg.From()))
 
 			return nil
 		},
