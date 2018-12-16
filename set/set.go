@@ -156,19 +156,21 @@ func (s *Set) Replace(oldKey string, item Item) error {
 // Each loops over every item while holding a read lock and applies fn to each
 // element.
 func (s *Set) Each(fn IterFunc) error {
+	var err error
 	s.RLock()
-	defer s.RUnlock()
 	for key, item := range s.lookup {
 		if item.Value() == nil {
+			// Expired
 			defer s.cleanup(key)
 			continue
 		}
-		if err := fn(key, item); err != nil {
+		if err = fn(key, item); err != nil {
 			// Abort early
-			return err
+			break
 		}
 	}
-	return nil
+	s.RUnlock()
+	return err
 }
 
 // ListPrefix returns a list of items with a prefix, normalized.
