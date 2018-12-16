@@ -2,7 +2,9 @@ package sshchat
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/shazow/ssh-chat/set"
@@ -133,6 +135,7 @@ func (a *Auth) Ban(key ssh.PublicKey, d time.Duration) {
 
 // BanFingerprint will set a public key fingerprint as banned.
 func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
+	// FIXME: This is a case insensitive key, which isn't great...
 	authItem := set.StringItem(authkey)
 	if d != 0 {
 		a.banned.Add(set.Expire(authItem, d))
@@ -142,15 +145,17 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 	logger.Debugf("Added to banned: %q (for %s)", authItem.Key(), d)
 }
 
-func (a *Auth) Banned() []string {
-	r := []string{}
-	iterGet := func(key string, _ set.Item) error {
-		r = append(r, key)
+// Banned returns the list of banned keys.
+func (a *Auth) Banned() (ip []string, fingerprint []string) {
+	a.banned.Each(func(key string, _ set.Item) error {
+		fingerprint = append(fingerprint, key)
 		return nil
-	}
-	a.banned.Each(iterGet)
-	a.bannedAddr.Each(iterGet)
-	return r
+	})
+	a.bannedAddr.Each(func(key string, _ set.Item) error {
+		ip = append(ip, key)
+		return nil
+	})
+	return
 }
 
 // Ban will set an IP address as banned.
@@ -162,4 +167,26 @@ func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
 		a.bannedAddr.Add(authItem)
 	}
 	logger.Debugf("Added to bannedAddr: %q (for %s)", authItem.Key(), d)
+}
+
+func (a *Auth) BanQuery(q string, d time.Duration) error {
+	parts := strings.SplitN(q, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid query: %q", q)
+	}
+	field, value := parts[0], parts[1]
+	switch field {
+	case "fingerprint":
+		// TODO: Add a validity check?
+		a.BanFingerprint(value, d)
+	case "ip":
+		ip := net.ParseIP(value)
+		if ip.String() == "" {
+			return fmt.Errorf("invalid ip value: %q", ip)
+		}
+		a.BanAddr(&net.TCPAddr{IP: ip}, d)
+	default:
+		return fmt.Errorf("unknown query field: %q", field)
+	}
+	return nil
 }

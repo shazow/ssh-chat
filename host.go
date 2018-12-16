@@ -431,14 +431,18 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify user")
 			}
 
-			target, ok := h.GetUser(args[0])
-			if !ok {
-				return errors.New("user not found")
-			}
-
 			var until time.Duration = 0
 			if len(args) > 1 {
 				until, _ = time.ParseDuration(args[1])
+			}
+
+			query := args[0]
+			target, ok := h.GetUser(query)
+			if !ok {
+				if strings.Contains(query, "=") {
+					return h.auth.BanQuery(query, until)
+				}
+				return errors.New("user not found")
 			}
 
 			id := target.Identifier.(*Identity)
@@ -464,12 +468,15 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must be op")
 			}
 
-			banned := h.auth.Banned()
+			bannedIPs, bannedFingerprints := h.auth.Banned()
 
 			buf := bytes.Buffer{}
-			fmt.Fprintf(&buf, "Banned:\n")
-			for _, key := range banned {
-				fmt.Fprintf(&buf, "   %s\n", key)
+			fmt.Fprintf(&buf, "Banned:")
+			for _, key := range bannedIPs {
+				fmt.Fprintf(&buf, "\n   ip=%s", key)
+			}
+			for _, key := range bannedFingerprints {
+				fmt.Fprintf(&buf, "\n   fingerprint=%s", key)
 			}
 
 			room.Send(message.NewSystemMsg(buf.String(), msg.From()))
