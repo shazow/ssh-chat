@@ -1,6 +1,7 @@
 package sshchat
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"net"
@@ -42,19 +43,21 @@ func newAuthAddr(addr net.Addr) string {
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 type Auth struct {
-	bannedAddr *set.Set
-	banned     *set.Set
-	whitelist  *set.Set
-	ops        *set.Set
+	bannedAddr   *set.Set
+	bannedClient *set.Set
+	banned       *set.Set
+	whitelist    *set.Set
+	ops          *set.Set
 }
 
 // NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
-		bannedAddr: set.New(),
-		banned:     set.New(),
-		whitelist:  set.New(),
-		ops:        set.New(),
+		bannedAddr:   set.New(),
+		bannedClient: set.New(),
+		banned:       set.New(),
+		whitelist:    set.New(),
+		ops:          set.New(),
 	}
 }
 
@@ -64,28 +67,34 @@ func (a *Auth) AllowAnonymous() bool {
 }
 
 // Check determines if a pubkey fingerprint is permitted.
-func (a *Auth) Check(addr net.Addr, key ssh.PublicKey) (bool, error) {
+func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
 	authkey := newAuthKey(key)
 
 	if a.whitelist.Len() != 0 {
 		// Only check whitelist if there is something in it, otherwise it's disabled.
 		whitelisted := a.whitelist.In(authkey)
 		if !whitelisted {
-			return false, ErrNotWhitelisted
+			return ErrNotWhitelisted
 		}
-		return true, nil
+		return nil
 	}
 
-	banned := a.banned.In(authkey)
+	var banned bool
+	if authkey != "" {
+		banned = a.banned.In(authkey)
+	}
 	if !banned {
 		banned = a.bannedAddr.In(newAuthAddr(addr))
 	}
+	if !banned {
+		banned = a.bannedClient.In(clientVersion)
+	}
 	// Ops can bypass bans, just in case we ban ourselves.
 	if banned && !a.IsOp(key) {
-		return false, ErrBanned
+		return ErrBanned
 	}
 
-	return true, nil
+	return nil
 }
 
 // Op sets a public key as a known operator.
@@ -95,9 +104,9 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	}
 	authItem := newAuthItem(key)
 	if d != 0 {
-		a.ops.Add(set.Expire(authItem, d))
+		a.ops.Set(set.Expire(authItem, d))
 	} else {
-		a.ops.Add(authItem)
+		a.ops.Set(authItem)
 	}
 	logger.Debugf("Added to ops: %q (for %s)", authItem.Key(), d)
 }
@@ -118,9 +127,9 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	}
 	authItem := newAuthItem(key)
 	if d != 0 {
-		a.whitelist.Add(set.Expire(authItem, d))
+		a.whitelist.Set(set.Expire(authItem, d))
 	} else {
-		a.whitelist.Add(authItem)
+		a.whitelist.Set(authItem)
 	}
 	logger.Debugf("Added to whitelist: %q (for %s)", authItem.Key(), d)
 }
@@ -138,21 +147,36 @@ func (a *Auth) BanFingerprint(authkey string, d time.Duration) {
 	// FIXME: This is a case insensitive key, which isn't great...
 	authItem := set.StringItem(authkey)
 	if d != 0 {
-		a.banned.Add(set.Expire(authItem, d))
+		a.banned.Set(set.Expire(authItem, d))
 	} else {
-		a.banned.Add(authItem)
+		a.banned.Set(authItem)
 	}
 	logger.Debugf("Added to banned: %q (for %s)", authItem.Key(), d)
 }
 
+// BanClient will set client version as banned. Useful for misbehaving bots.
+func (a *Auth) BanClient(client string, d time.Duration) {
+	item := set.StringItem(client)
+	if d != 0 {
+		a.bannedClient.Set(set.Expire(item, d))
+	} else {
+		a.bannedClient.Set(item)
+	}
+	logger.Debugf("Added to banned: %q (for %s)", item.Key(), d)
+}
+
 // Banned returns the list of banned keys.
-func (a *Auth) Banned() (ip []string, fingerprint []string) {
+func (a *Auth) Banned() (ip []string, fingerprint []string, client []string) {
 	a.banned.Each(func(key string, _ set.Item) error {
 		fingerprint = append(fingerprint, key)
 		return nil
 	})
 	a.bannedAddr.Each(func(key string, _ set.Item) error {
 		ip = append(ip, key)
+		return nil
+	})
+	a.bannedClient.Each(func(key string, _ set.Item) error {
+		client = append(client, key)
 		return nil
 	})
 	return
@@ -162,31 +186,55 @@ func (a *Auth) Banned() (ip []string, fingerprint []string) {
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
 	authItem := set.StringItem(newAuthAddr(addr))
 	if d != 0 {
-		a.bannedAddr.Add(set.Expire(authItem, d))
+		a.bannedAddr.Set(set.Expire(authItem, d))
 	} else {
-		a.bannedAddr.Add(authItem)
+		a.bannedAddr.Set(authItem)
 	}
 	logger.Debugf("Added to bannedAddr: %q (for %s)", authItem.Key(), d)
 }
 
-func (a *Auth) BanQuery(q string, d time.Duration) error {
-	parts := strings.SplitN(q, "=", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid query: %q", q)
+// BanQuery takes space-separated key="value" pairs to ban, including ip, fingerprint, client.
+// Fields without an = will be treated as a duration, applied to the next field.
+// For example: 5s client=foo 10min ip=1.1.1.1
+// Will ban client foo for 5 seconds, and ip 1.1.1.1 for 10min.
+func (a *Auth) BanQuery(q string) error {
+	r := csv.NewReader(strings.NewReader(q))
+	r.Comma = ' '
+	fields, err := r.Read()
+	if err != nil {
+		return err
 	}
-	field, value := parts[0], parts[1]
-	switch field {
-	case "fingerprint":
-		// TODO: Add a validity check?
-		a.BanFingerprint(value, d)
-	case "ip":
-		ip := net.ParseIP(value)
-		if ip.String() == "" {
-			return fmt.Errorf("invalid ip value: %q", ip)
+
+	var d time.Duration
+	if last := fields[len(fields)-1]; !strings.Contains(last, "=") {
+		d, err = time.ParseDuration(last)
+		if err != nil {
+			return err
 		}
-		a.BanAddr(&net.TCPAddr{IP: ip}, d)
-	default:
-		return fmt.Errorf("unknown query field: %q", field)
+		fields = fields[:len(fields)-1]
 	}
+	for _, field := range fields {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid query: %q", q)
+		}
+		key, value := parts[0], parts[1]
+		switch key {
+		case "client":
+			a.BanClient(value, d)
+		case "fingerprint":
+			// TODO: Add a validity check?
+			a.BanFingerprint(value, d)
+		case "ip":
+			ip := net.ParseIP(value)
+			if ip.String() == "" {
+				return fmt.Errorf("invalid ip value: %q", ip)
+			}
+			a.BanAddr(&net.TCPAddr{IP: ip}, d)
+		default:
+			return fmt.Errorf("unknown query field: %q", field)
+		}
+	}
+
 	return nil
 }
