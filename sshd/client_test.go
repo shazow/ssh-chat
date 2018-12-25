@@ -15,8 +15,8 @@ type RejectAuth struct{}
 func (a RejectAuth) AllowAnonymous() bool {
 	return false
 }
-func (a RejectAuth) Check(net.Addr, ssh.PublicKey) (bool, error) {
-	return false, errRejectAuth
+func (a RejectAuth) Check(net.Addr, ssh.PublicKey, string) error {
+	return errRejectAuth
 }
 
 func TestClientReject(t *testing.T) {
