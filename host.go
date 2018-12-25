@@ -418,8 +418,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/ban",
-		PrefixHelp: "USER [DURATION]",
-		Help:       "Ban USER from the server.",
+		PrefixHelp: "QUERY [DURATION]",
+		Help:       "Ban from the server. QUERY can be a username to ban the fingerprint and ip, or quoted \"key=value\" pairs with keys like ip, fingerprint, client.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			// TODO: Would be nice to specify what to ban. Key? Ip? etc.
 			if !room.IsOp(msg.From()) {
@@ -431,8 +431,13 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify user")
 			}
 
-			target, ok := h.GetUser(args[0])
+			query := args[0]
+			target, ok := h.GetUser(query)
 			if !ok {
+				query = strings.Join(args, " ")
+				if strings.Contains(query, "=") {
+					return h.auth.BanQuery(query)
+				}
 				return errors.New("user not found")
 			}
 
@@ -464,12 +469,18 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must be op")
 			}
 
-			banned := h.auth.Banned()
+			bannedIPs, bannedFingerprints, bannedClients := h.auth.Banned()
 
 			buf := bytes.Buffer{}
-			fmt.Fprintf(&buf, "Banned:\n")
-			for _, key := range banned {
-				fmt.Fprintf(&buf, "   %s\n", key)
+			fmt.Fprintf(&buf, "Banned:")
+			for _, key := range bannedIPs {
+				fmt.Fprintf(&buf, "\n   \"ip=%s\"", key)
+			}
+			for _, key := range bannedFingerprints {
+				fmt.Fprintf(&buf, "\n   \"fingerprint=%s\"", key)
+			}
+			for _, key := range bannedClients {
+				fmt.Fprintf(&buf, "\n   \"client=%s\"", key)
 			}
 
 			room.Send(message.NewSystemMsg(buf.String(), msg.From()))

@@ -55,6 +55,7 @@ func (s *Set) In(key string) bool {
 	s.RUnlock()
 	if ok && item.Value() == nil {
 		s.cleanup(key)
+		ok = false
 	}
 	return ok
 }
@@ -101,6 +102,19 @@ func (s *Set) Add(item Item) error {
 		return ErrCollision
 	}
 
+	s.lookup[key] = item
+	return nil
+}
+
+// Set item to this set, even if it already exists.
+func (s *Set) Set(item Item) error {
+	if item.Value() == nil {
+		return ErrNil
+	}
+	key := s.normalize(item.Key())
+
+	s.Lock()
+	defer s.Unlock()
 	s.lookup[key] = item
 	return nil
 }

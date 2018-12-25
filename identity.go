@@ -4,8 +4,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -20,7 +20,7 @@ type Identity struct {
 func NewIdentity(conn sshd.Connection) *Identity {
 	return &Identity{
 		Connection: conn,
-		id:         chat.SanitizeName(conn.Name()),
+		id:         sanitize.Name(conn.Name()),
 		created:    time.Now(),
 	}
 }
@@ -49,7 +49,7 @@ func (i Identity) Whois() string {
 	}
 	return "name: " + i.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
-		" > client: " + chat.SanitizeData(string(i.ClientVersion())) + message.Newline +
+		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
 		" > joined: " + humanSince(time.Since(i.created)) + " ago"
 }
 
@@ -63,6 +63,6 @@ func (i Identity) WhoisAdmin() string {
 	return "name: " + i.Name() + message.Newline +
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
-		" > client: " + chat.SanitizeData(string(i.ClientVersion())) + message.Newline +
+		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
 		" > joined: " + humanSince(time.Since(i.created)) + " ago"
 }

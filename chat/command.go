@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/set"
 )
 
@@ -155,7 +156,7 @@ func InitCommands(c *Commands) {
 			}
 
 			oldID := member.ID()
-			newID := SanitizeName(args[0])
+			newID := sanitize.Name(args[0])
 			if newID == oldID {
 				return errors.New("new name is the same as the original")
 			}
