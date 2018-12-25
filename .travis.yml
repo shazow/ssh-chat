@@ -10,7 +10,6 @@ env:
   - CGO_ENABLED=0 GO111MODULE=on
 
 install:
-  - go get -t ./...
   - go get github.com/gordonklaus/ineffassign
 
 script:
