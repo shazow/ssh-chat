@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/sshd"
 )
@@ -50,7 +51,7 @@ func (i Identity) Whois() string {
 	return "name: " + i.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humanSince(time.Since(i.created)) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago"
 }
 
 // WhoisAdmin returns a whois description for admin users.
@@ -64,5 +65,5 @@ func (i Identity) WhoisAdmin() string {
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humanSince(time.Since(i.created)) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago"
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 )
@@ -382,7 +383,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Prefix: "/uptime",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			room.Send(message.NewSystemMsg(humanSince(time.Since(timeStarted)), msg.From()))
+			room.Send(message.NewSystemMsg(humantime.Since(timeStarted), msg.From()))
 			return nil
 		},
 	})
