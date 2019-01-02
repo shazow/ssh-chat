@@ -7,7 +7,7 @@ import (
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/sshd"
-	"github.com/shazow/ssh-chat/util/humantime"
+	"github.com/shazow/ssh-chat/internal/humantime"
 )
 
 // Identity is a container for everything that identifies a client.

@@ -8,7 +8,7 @@ import (
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/set"
-	"github.com/shazow/ssh-chat/util/humantime"
+	"github.com/shazow/ssh-chat/internal/humantime"
 )
 
 const historyLen = 20
