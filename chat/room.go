@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/set"
@@ -167,7 +166,7 @@ func (r *Room) Leave(u *message.User) error {
 		return err
 	}
 	r.Ops.Remove(u.ID())
-	s := fmt.Sprintf("%s left. (Connected %s)", u.Name(), humantime.HumanSince(time.Since(u.Joined())))
+	s := fmt.Sprintf("%s left. (Connected %s)", u.Name(), humantime.Since(u.Joined()))
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }

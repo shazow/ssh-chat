@@ -6,7 +6,8 @@ import (
 )
 
 // humanSince returns a human-friendly relative time string
-func humanSince(d time.Duration) string {
+func Since(t time.Time) string {
+	d := time.Since(t)
 	switch {
 	case d < time.Second*2:
 		//e.g. "516.971µs", "535.412009ms", "1.880689686s"
@@ -21,7 +22,4 @@ func humanSince(d time.Duration) string {
 	return fmt.Sprintf("%0.f days", d.Hours()/24)
 }
 
-func HumanSince(d time.Duration) string {
-	return humanSince(d)
-}
 

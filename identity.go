@@ -51,7 +51,7 @@ func (i Identity) Whois() string {
 	return "name: " + i.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.HumanSince(time.Since(i.created)) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago"
 }
 
 // WhoisAdmin returns a whois description for admin users.
@@ -65,5 +65,5 @@ func (i Identity) WhoisAdmin() string {
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.HumanSince(time.Since(i.created)) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago"
 }
