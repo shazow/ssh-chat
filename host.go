@@ -14,6 +14,7 @@ import (
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
+	"github.com/shazow/ssh-chat/util/humantime"
 )
 
 const maxInputLength int = 1024
@@ -382,7 +383,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Prefix: "/uptime",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			room.Send(message.NewSystemMsg(humanSince(time.Since(timeStarted)), msg.From()))
+			room.Send(message.NewSystemMsg(humantime.HumanSince(time.Since(timeStarted)), msg.From()))
 			return nil
 		},
 	})

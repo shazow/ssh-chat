@@ -1,4 +1,4 @@
-package sshchat
+package humantime
 
 import (
 	"testing"

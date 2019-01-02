@@ -1,4 +1,4 @@
-package sshchat
+package humantime
 
 import (
 	"fmt"
@@ -17,3 +17,8 @@ func humanSince(d time.Duration) string {
 	}
 	return fmt.Sprintf("%0.f days", d.Hours()/24)
 }
+
+func HumanSince(d time.Duration) string {
+	return humanSince(d)
+}
+

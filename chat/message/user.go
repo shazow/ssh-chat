@@ -59,6 +59,10 @@ func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 	return u
 }
 
+func (u *User) Joined() time.Time {
+	return u.joined
+}
+
 func (u *User) Config() UserConfig {
 	u.mu.Lock()
 	defer u.mu.Unlock()

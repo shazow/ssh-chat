@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/set"
+	"github.com/shazow/ssh-chat/util/humantime"
 )
 
 const historyLen = 20
@@ -159,13 +161,13 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 }
 
 // Leave the room as a user, will announce. Mostly used during setup.
-func (r *Room) Leave(u message.Identifier) error {
+func (r *Room) Leave(u *message.User) error {
 	err := r.Members.Remove(u.ID())
 	if err != nil {
 		return err
 	}
 	r.Ops.Remove(u.ID())
-	s := fmt.Sprintf("%s left.", u.Name())
+	s := fmt.Sprintf("%s left. (Connected %s)", u.Name(), humantime.HumanSince(time.Since(u.Joined())))
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }
