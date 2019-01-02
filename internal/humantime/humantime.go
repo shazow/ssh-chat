@@ -21,5 +21,3 @@ func Since(t time.Time) string {
 	}
 	return fmt.Sprintf("%0.f days", d.Hours()/24)
 }
-
-

@@ -33,7 +33,7 @@ func TestHumanSince(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		absolute := time.Now().Add(test.input*-1)
+		absolute := time.Now().Add(test.input * -1)
 		if actual, expected := Since(absolute), test.expected; actual != expected {
 			t.Errorf("Got: %q; Expected: %q", actual, expected)
 		}
