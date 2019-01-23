@@ -1,7 +1,7 @@
 package sshchat
 
 import (
-	"bytes"
+	"io/ioutil"
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
@@ -15,6 +15,5 @@ func SetLogger(l *golog.Logger) {
 
 func init() {
 	// Set a default null logger
-	var b bytes.Buffer
-	SetLogger(golog.New(&b, log.Debug))
+	SetLogger(golog.New(ioutil.Discard, log.Debug))
 }
