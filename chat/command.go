@@ -3,7 +3,6 @@ package chat
 // FIXME: Would be sweet if we could piggyback on a cli parser or something.
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -210,16 +209,17 @@ func InitCommands(c *Commands) {
 				if cfg.Theme != nil {
 					theme = cfg.Theme.ID()
 				}
-				var output bytes.Buffer
-				fmt.Fprintf(&output, "Current theme: %s%s", theme, message.Newline)
-				fmt.Fprintf(&output, "   Themes available: ")
+				var output string
+				output += fmt.Sprintf("Current theme: %s%s", theme, message.Newline)
+				output += "   Themes available: "
+
 				for i, t := range message.Themes {
-					fmt.Fprintf(&output, t.ID())
+					output += t.ID()
 					if i < len(message.Themes)-1 {
-						fmt.Fprintf(&output, ", ")
+						output += ", "
 					}
 				}
-				room.Send(message.NewSystemMsg(output.String(), user))
+				room.Send(message.NewSystemMsg(output, user))
 				return nil
 			}
 
