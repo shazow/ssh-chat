@@ -6,8 +6,6 @@ SRCS = %.go
 VERSION := $(shell git describe --tags --dirty --always 2> /dev/null || echo "dev")
 LDFLAGS = LDFLAGS="-X main.Version=$(VERSION)"
 
-SUBPACKAGES := $(shell go list ./... | grep -v /vendor/)
-
 all: $(BINARY)
 
 $(BINARY): **/**/*.go **/*.go *.go
