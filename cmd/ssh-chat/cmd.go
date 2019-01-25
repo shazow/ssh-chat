@@ -12,10 +12,10 @@ import (
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
-	"github.com/jessevdk/go-flags"
+	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/shazow/ssh-chat"
+	sshchat "github.com/shazow/ssh-chat"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
