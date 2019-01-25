@@ -14,7 +14,10 @@ import (
 var keepaliveInterval = time.Second * 30
 var keepaliveRequest = "keepalive@ssh-chat"
 
+// ErrNoSessionChannel is returned when there is no session channel.
 var ErrNoSessionChannel = errors.New("no session channel")
+
+// ErrNotSessionChannel is returned when a channel is not a session channel.
 var ErrNotSessionChannel = errors.New("terminal requires session channel")
 
 // Connection is an interface with fields necessary to operate an sshd host.
