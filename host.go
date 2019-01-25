@@ -442,7 +442,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			var until time.Duration = 0
+			var until time.Duration
 			if len(args) > 1 {
 				until, _ = time.ParseDuration(args[1])
 			}
@@ -535,7 +535,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify user")
 			}
 
-			var until time.Duration = 0
+			var until time.Duration
 			if len(args) > 1 {
 				until, _ = time.ParseDuration(args[1])
 			}
