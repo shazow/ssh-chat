@@ -14,12 +14,12 @@ import (
 const historyLen = 20
 const roomBuffer = 10
 
-// The error returned when a message is sent to a room that is already
+// ErrRoomClosed is the error returned when a message is sent to a room that is already
 // closed.
 var ErrRoomClosed = errors.New("room closed")
 
-// The error returned when a user attempts to join with an invalid name, such
-// as empty string.
+// ErrInvalidName is the error returned when a user attempts to join with an invalid name,
+// such as empty string.
 var ErrInvalidName = errors.New("invalid name")
 
 // Member is a User with per-Room metadata attached to it.
@@ -200,6 +200,7 @@ func (r *Room) Member(u *message.User) (*Member, bool) {
 	return m, true
 }
 
+// MemberByID Gets a member by an id / name
 func (r *Room) MemberByID(id string) (*Member, bool) {
 	m, err := r.Members.Get(id)
 	if err != nil {
