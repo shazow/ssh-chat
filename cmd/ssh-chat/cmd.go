@@ -57,7 +57,6 @@ func main() {
 		if p == nil {
 			fmt.Print(err)
 		}
-		os.Exit(1)
 		return
 	}
 
@@ -69,7 +68,7 @@ func main() {
 
 	if options.Version {
 		fmt.Println(Version)
-		os.Exit(0)
+		return
 	}
 
 	// Figure out the log level
@@ -177,7 +176,6 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
-	os.Exit(0)
 }
 
 func fromFile(path string, handler func(line []byte) error) error {
