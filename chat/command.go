@@ -13,30 +13,28 @@ import (
 	"github.com/shazow/ssh-chat/set"
 )
 
-// The error returned when an invalid command is issued.
+// ErrInvalidCommand is the error returned when an invalid command is issued.
 var ErrInvalidCommand = errors.New("invalid command")
 
-// The error returned when a command is given without an owner.
+// ErrNoOwner is the error returned when a command is given without an owner.
 var ErrNoOwner = errors.New("command without owner")
 
-// The error returned when a command is performed without the necessary number
-// of arguments.
+// ErrMissingArg is the error returned when a command is performed without the necessary
+// number of arguments.
 var ErrMissingArg = errors.New("missing argument")
 
-// The error returned when a command is added without a prefix.
+// ErrMissingPrefix is the error returned when a command is added without a prefix.
 var ErrMissingPrefix = errors.New("command missing prefix")
 
 // Command is a definition of a handler for a command.
 type Command struct {
-	// The command's key, such as /foo
-	Prefix string
-	// Extra help regarding arguments
-	PrefixHelp string
-	// If omitted, command is hidden from /help
-	Help    string
+	Prefix     string // The command's key, such as /foo
+	PrefixHelp string // Extra help regarding arguments
+	Help       string // help text, if omitted, command is hidden from /help
+	Op         bool   // does the command require Op permissions?
+
+	// Handler for the command
 	Handler func(*Room, message.CommandMsg) error
-	// Command requires Op permissions
-	Op bool
 }
 
 // Commands is a registry of available commands.
