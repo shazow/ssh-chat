@@ -12,10 +12,10 @@ import (
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
-	"github.com/jessevdk/go-flags"
+	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/shazow/ssh-chat"
+	sshchat "github.com/shazow/ssh-chat"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
@@ -57,7 +57,6 @@ func main() {
 		if p == nil {
 			fmt.Print(err)
 		}
-		os.Exit(1)
 		return
 	}
 
@@ -69,7 +68,7 @@ func main() {
 
 	if options.Version {
 		fmt.Println(Version)
-		os.Exit(0)
+		return
 	}
 
 	// Figure out the log level
@@ -177,7 +176,6 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
-	os.Exit(0)
 }
 
 func fromFile(path string, handler func(line []byte) error) error {
