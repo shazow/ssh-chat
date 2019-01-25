@@ -9,6 +9,7 @@ import (
 
 var logger *golog.Logger
 
+// SetLogger sets the package logging to use l.
 func SetLogger(l *golog.Logger) {
 	logger = l
 }

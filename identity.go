@@ -26,18 +26,22 @@ func NewIdentity(conn sshd.Connection) *Identity {
 	}
 }
 
+// ID returns the name for the Identity
 func (i Identity) ID() string {
 	return i.id
 }
 
+// SetID Changes the Identity's name
 func (i *Identity) SetID(id string) {
 	i.id = id
 }
 
+// SetName Changes the Identity's name
 func (i *Identity) SetName(name string) {
 	i.SetID(name)
 }
 
+// Name returns the name for the Identity
 func (i Identity) Name() string {
 	return i.id
 }

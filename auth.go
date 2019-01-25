@@ -13,10 +13,11 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// The error returned a key is checked that is not whitelisted, with whitelisting required.
+// ErrNotWhitelisted Is the error returned when a key is checked that is not whitelisted,
+// when whitelisting is enabled.
 var ErrNotWhitelisted = errors.New("not whitelisted")
 
-// The error returned a key is checked that is banned.
+// ErrBanned is the error returned when a key is checked that is banned.
 var ErrBanned = errors.New("banned")
 
 // newAuthKey returns string from an ssh.PublicKey used to index the key in our lookup.
@@ -182,7 +183,7 @@ func (a *Auth) Banned() (ip []string, fingerprint []string, client []string) {
 	return
 }
 
-// Ban will set an IP address as banned.
+// BanAddr will set an IP address as banned.
 func (a *Auth) BanAddr(addr net.Addr, d time.Duration) {
 	authItem := set.StringItem(newAuthAddr(addr))
 	if d != 0 {
