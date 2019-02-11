@@ -108,6 +108,7 @@ func main() {
 	auth := sshchat.NewAuth()
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(signer)
+	config.ServerVersion = "SSH-2.0-Go ssh-chat"
 
 	s, err := sshd.ListenSSH(options.Bind, config)
 	if err != nil {
