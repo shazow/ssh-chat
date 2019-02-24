@@ -209,17 +209,17 @@ func InitCommands(c *Commands) {
 				if cfg.Theme != nil {
 					theme = cfg.Theme.ID()
 				}
-				var output string
-				output += fmt.Sprintf("Current theme: %s%s", theme, message.Newline)
-				output += "   Themes available: "
+				var output *strings.Builder
+				fmt.Fprintf(output, "Current theme: %s%s", theme, message.Newline)
+				fmt.Fprintf(output, "   Themes available: ")
 
 				for i, t := range message.Themes {
-					output += t.ID()
+					output.WriteString(t.ID())
 					if i < len(message.Themes)-1 {
-						output += ", "
+						output.WriteString(", ")
 					}
 				}
-				room.Send(message.NewSystemMsg(output, user))
+				room.Send(message.NewSystemMsg(output.String(), user))
 				return nil
 			}
 
