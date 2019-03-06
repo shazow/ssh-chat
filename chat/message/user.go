@@ -158,17 +158,22 @@ func (u *User) SetHighlight(s string) error {
 
 func (u *User) render(m Message) string {
 	cfg := u.Config()
+	var out string
 	switch m := m.(type) {
 	case PublicMsg:
-		return m.RenderFor(cfg) + Newline
+		out += m.RenderFor(cfg)
 	case *PrivateMsg:
+		out += m.Render(cfg.Theme)
 		if cfg.Bell {
-			return m.Render(cfg.Theme) + Bel + Newline
+			out += Bel
 		}
-		return m.Render(cfg.Theme) + Newline
 	default:
-		return m.Render(cfg.Theme) + Newline
+		out += m.Render(cfg.Theme)
 	}
+	if cfg.Timestamp {
+		return cfg.Theme.Timestamp(m.Timestamp()) + "  " + out + Newline
+	}
+	return out + Newline
 }
 
 // writeMsg renders the message and attempts to write it, will Close the user
