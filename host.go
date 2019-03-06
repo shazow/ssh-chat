@@ -25,6 +25,10 @@ func GetPrompt(user *message.User) string {
 	if cfg.Theme != nil {
 		name = cfg.Theme.ColorName(user)
 	}
+	if cfg.Timestamp && cfg.Theme != nil {
+		ts := cfg.Theme.Timestamp(time.Now())
+		return fmt.Sprintf("%s  [%s] ", ts, name)
+	}
 	return fmt.Sprintf("[%s] ", name)
 }
 
@@ -128,6 +132,12 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
 	user.SetHighlight(user.Name())
 
+	// Update prompt once per minute
+	stopUpdater := make(chan struct{}, 1)
+	defer func() { stopUpdater <- struct{}{} }()
+	// FIXME: Would be nice to unify this into a single goroutine rather than one per user.
+	go h.promptUpdater(term, user, stopUpdater)
+
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
 		member.IsOp = true
@@ -166,7 +176,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		h.HandleMsg(m)
 
 		cmd := m.Command()
-		if cmd == "/nick" || cmd == "/theme" {
+		if cmd == "/nick" || cmd == "/theme" || cmd == "/timestamp" {
 			// Hijack /nick command to update terminal synchronously. Wouldn't
 			// work if we use h.room.Send(m) above.
 			//
@@ -183,6 +193,31 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		return
 	}
 	logger.Debugf("[%s] Leaving: %s", term.Conn.RemoteAddr(), user.Name())
+}
+
+func (h *Host) promptUpdater(term *sshd.Terminal, user *message.User, stopper <-chan struct{}) {
+	now := time.Now()
+	interval := time.Second * 60
+	nextMinute := time.Duration(60-now.Second()) * time.Second
+	setupWait := time.After(nextMinute)
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-setupWait:
+			// Wait until we're at :00 seconds so that minute-resolution
+			// timestamps happen on the minute change. This only happens once.
+			timer.Reset(interval)
+			term.SetPrompt(GetPrompt(user))
+			term.Write([]byte{}) // Empty write to re-render the prompt
+		case <-timer.C:
+			term.SetPrompt(GetPrompt(user))
+			term.Write([]byte{}) // Empty write to re-render the prompt
+		case <-stopper:
+			return
+		}
+	}
 }
 
 // Serve our chat room onto the listener
