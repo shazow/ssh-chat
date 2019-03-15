@@ -195,20 +195,8 @@ func (u *User) writeMsg(m Message) error {
 // HandleMsg will render the message to the screen, blocking.
 func (u *User) HandleMsg(m Message) error {
 	u.mu.Lock()
-	cfg := u.config
-	lastMsg := u.lastMsg
 	u.lastMsg = m.Timestamp()
-	injectTimestamp := !lastMsg.IsZero() && cfg.Timestamp && u.lastMsg.Sub(lastMsg) > timestampTimeout
 	u.mu.Unlock()
-
-	if injectTimestamp {
-		// Inject a timestamp at most once every timestampTimeout between message intervals
-		ts := NewSystemMsg(fmt.Sprintf("Timestamp: %s", m.Timestamp().UTC().Format(timestampLayout)), u)
-		if err := u.writeMsg(ts); err != nil {
-			return err
-		}
-	}
-
 	return u.writeMsg(m)
 }
 

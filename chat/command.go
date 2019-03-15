@@ -284,7 +284,7 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix: "/timestamp",
-		Help:   "Timestamps after 30min of inactivity.",
+		Help:   "Prefix messages with a timestamp.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
 			cfg := u.Config()
