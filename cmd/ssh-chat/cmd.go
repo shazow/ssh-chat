@@ -126,6 +126,9 @@ func main() {
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
 		if err != nil {
+			if err.Error() == "ssh: no key found" {
+				return nil // Skip line
+			}
 			return err
 		}
 		auth.Op(key, 0)
@@ -138,6 +141,9 @@ func main() {
 	err = fromFile(options.Whitelist, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
 		if err != nil {
+			if err.Error() == "ssh: no key found" {
+				return nil // Skip line
+			}
 			return err
 		}
 		auth.Whitelist(key, 0)
