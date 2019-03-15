@@ -161,7 +161,11 @@ func (u *User) render(m Message) string {
 	var out string
 	switch m := m.(type) {
 	case PublicMsg:
-		out += m.RenderFor(cfg)
+		if u == m.From() {
+			out += m.RenderSelf(cfg)
+		} else {
+			out += m.RenderFor(cfg)
+		}
 	case *PrivateMsg:
 		out += m.Render(cfg.Theme)
 		if cfg.Bell {
