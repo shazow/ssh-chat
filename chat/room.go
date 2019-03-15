@@ -25,6 +25,7 @@ var ErrInvalidName = errors.New("invalid name")
 // Member is a User with per-Room metadata attached to it.
 type Member struct {
 	*message.User
+	IsOp bool
 }
 
 // Room definition, also a Set of User Items
@@ -37,7 +38,6 @@ type Room struct {
 	closeOnce sync.Once
 
 	Members *set.Set
-	Ops     *set.Set
 }
 
 // NewRoom creates a new room.
@@ -50,7 +50,6 @@ func NewRoom() *Room {
 		commands:  *defaultCommands,
 
 		Members: set.New(),
-		Ops:     set.New(),
 	}
 }
 
@@ -148,7 +147,7 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	if u.ID() == "" {
 		return nil, ErrInvalidName
 	}
-	member := &Member{u}
+	member := &Member{User: u}
 	err := r.Members.Add(set.Itemize(u.ID(), member))
 	if err != nil {
 		return nil, err
@@ -165,7 +164,6 @@ func (r *Room) Leave(u *message.User) error {
 	if err != nil {
 		return err
 	}
-	r.Ops.Remove(u.ID())
 	s := fmt.Sprintf("%s left. (Connected %s)", u.Name(), humantime.Since(u.Joined()))
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
@@ -211,7 +209,11 @@ func (r *Room) MemberByID(id string) (*Member, bool) {
 
 // IsOp returns whether a user is an operator in this room.
 func (r *Room) IsOp(u *message.User) bool {
-	return r.Ops.In(u.ID())
+	m, ok := r.Member(u)
+	if !ok {
+		return false
+	}
+	return m.IsOp
 }
 
 // Topic of the room.

@@ -13,7 +13,6 @@ import (
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
-	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -131,7 +130,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
-		h.Room.Ops.Add(set.Itemize(member.ID(), member))
+		member.IsOp = true
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
@@ -523,8 +522,8 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	c.Add(chat.Command{
 		Op:         true,
 		Prefix:     "/op",
-		PrefixHelp: "USER [DURATION]",
-		Help:       "Set USER as admin.",
+		PrefixHelp: "USER [DURATION|remove]",
+		Help:       "Set USER as admin. Duration only applies to pubkey reconnects.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
@@ -535,21 +534,33 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must specify user")
 			}
 
+			opValue := true
 			var until time.Duration
 			if len(args) > 1 {
-				until, _ = time.ParseDuration(args[1])
+				if args[1] == "remove" {
+					// Expire instantly
+					until = time.Duration(1)
+					opValue = false
+				} else {
+					until, _ = time.ParseDuration(args[1])
+				}
 			}
 
 			member, ok := room.MemberByID(args[0])
 			if !ok {
 				return errors.New("user not found")
 			}
-			room.Ops.Add(set.Itemize(member.ID(), member))
+			member.IsOp = opValue
 
 			id := member.Identifier.(*Identity)
 			h.auth.Op(id.PublicKey(), until)
 
-			body := fmt.Sprintf("Made op by %s.", msg.From().Name())
+			var body string
+			if opValue {
+				body = fmt.Sprintf("Made op by %s.", msg.From().Name())
+			} else {
+				body = fmt.Sprintf("Removed op by %s.", msg.From().Name())
+			}
 			room.Send(message.NewSystemMsg(body, member.User))
 
 			return nil

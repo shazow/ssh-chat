@@ -6,12 +6,10 @@ import (
 	"crypto/rsa"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 
 	"github.com/shazow/ssh-chat/chat/message"
-	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
@@ -186,21 +184,43 @@ func TestHostKick(t *testing.T) {
 	go host.Serve()
 
 	connected := make(chan struct{})
+	kicked := make(chan struct{})
 	done := make(chan struct{})
 
 	go func() {
 		// First client
 		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
+			scanner := bufio.NewScanner(r)
+
+			// Consume the initial buffer
+			scanner.Scan()
+
 			// Make op
 			member, _ := host.Room.MemberByID("foo")
 			if member == nil {
 				return errors.New("failed to load MemberByID")
 			}
-			host.Room.Ops.Add(set.Itemize(member.ID(), member))
+			member.IsOp = true
+
+			// Change nicks, make sure op sticks
+			w.Write([]byte("/nick quux\r\n"))
+			scanner.Scan() // Prompt
+			scanner.Scan() // Nick change response
 
 			// Block until second client is here
 			connected <- struct{}{}
+			scanner.Scan() // Connected message
+
 			w.Write([]byte("/kick bar\r\n"))
+			scanner.Scan() // Prompt
+
+			scanner.Scan()
+			if actual, expected := stripPrompt(scanner.Text()), " * bar was kicked by quux.\r"; actual != expected {
+				t.Errorf("Got %q; expected %q", actual, expected)
+			}
+
+			kicked <- struct{}{}
+
 			return nil
 		})
 		if err != nil {
@@ -213,11 +233,14 @@ func TestHostKick(t *testing.T) {
 	go func() {
 		// Second client
 		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
+			scanner := bufio.NewScanner(r)
 			<-connected
+			scanner.Scan()
 
-			// Consume while we're connected. Should break when kicked.
-			ioutil.ReadAll(r)
-			return nil
+			<-kicked
+
+			scanner.Scan()
+			return scanner.Err()
 		})
 		if err != nil {
 			close(done)
