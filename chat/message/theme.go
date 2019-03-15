@@ -167,7 +167,7 @@ func (theme Theme) Highlight(s string) string {
 // Timestamp formats and colorizes the timestamp.
 func (theme Theme) Timestamp(t time.Time) string {
 	// TODO: Change this per-theme? Or config?
-	return theme.sys.Format(t.Format("2006-01-02 15:04 UTC"))
+	return theme.sys.Format(t.Format("2006-01-02 15:04:05 UTC"))
 }
 
 // List of initialzied themes
