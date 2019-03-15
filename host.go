@@ -175,6 +175,15 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			term.SetPrompt(GetPrompt(user))
 			user.SetHighlight(user.Name())
 		}
+
+		// Gross hack to override line echo in golang.org/x/crypto/ssh/terminal
+		term.Write([]byte{
+			27,       // keyEscape
+			'[', 'A', // Up
+			27,            // keyEscape
+			'[', '2', 'K', // Clear line
+		})
+		// May the gods have mercy on our souls.
 	}
 
 	err = h.Leave(user)
