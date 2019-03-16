@@ -16,7 +16,6 @@ const messageBuffer = 5
 const messageTimeout = 5 * time.Second
 const reHighlight = `\b(%s)\b`
 const timestampTimeout = 30 * time.Minute
-const timestampLayout = "2006-01-02 15:04:05 UTC"
 
 var ErrUserClosed = errors.New("user closed")
 
@@ -175,7 +174,13 @@ func (u *User) render(m Message) string {
 		out += m.Render(cfg.Theme)
 	}
 	if cfg.Timestamp {
-		return cfg.Theme.Timestamp(m.Timestamp()) + "  " + out + Newline
+		ts := m.Timestamp()
+		if cfg.Timezone != nil {
+			ts = ts.In(cfg.Timezone)
+		} else {
+			ts = ts.UTC()
+		}
+		return cfg.Theme.Timestamp(ts) + "  " + out + Newline
 	}
 	return out + Newline
 }
@@ -220,6 +225,7 @@ type UserConfig struct {
 	Bell      bool
 	Quiet     bool
 	Timestamp bool
+	Timezone  *time.Location
 	Theme     *Theme
 }
 
