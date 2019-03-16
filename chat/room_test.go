@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
+	"github.com/shazow/ssh-chat/set"
 )
 
 // Used for testing
@@ -360,5 +361,46 @@ func TestRoomNames(t *testing.T) {
 	s.Read(&actual)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Got: %q; Expected: %q", actual, expected)
+	}
+}
+
+func TestRoomNamesPrefix(t *testing.T) {
+	r := NewRoom()
+
+	s := &MockScreen{}
+	members := []*Member{
+		&Member{User: message.NewUserScreen(message.SimpleID("aaa"), s)},
+		&Member{User: message.NewUserScreen(message.SimpleID("aab"), s)},
+		&Member{User: message.NewUserScreen(message.SimpleID("aac"), s)},
+		&Member{User: message.NewUserScreen(message.SimpleID("foo"), s)},
+	}
+
+	for _, m := range members {
+		if err := r.Members.Add(set.Itemize(m.ID(), m)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Inject some activity
+	members[2].HandleMsg(message.NewMsg("hi")) // aac
+	members[0].HandleMsg(message.NewMsg("hi")) // aaa
+	members[3].HandleMsg(message.NewMsg("hi")) // foo
+	members[1].HandleMsg(message.NewMsg("hi")) // aab
+
+	if got, want := r.NamesPrefix("a"), []string{"aab", "aaa", "aac"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got: %q; want: %q", got, want)
+	}
+
+	members[2].HandleMsg(message.NewMsg("hi")) // aac
+	if got, want := r.NamesPrefix("a"), []string{"aac", "aab", "aaa"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got: %q; want: %q", got, want)
+	}
+
+	if got, want := r.NamesPrefix("f"), []string{"foo"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got: %q; want: %q", got, want)
+	}
+
+	if got, want := r.NamesPrefix("bar"), []string{}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got: %q; want: %q", got, want)
 	}
 }

@@ -238,3 +238,16 @@ func init() {
 
 	// TODO: Seed random?
 }
+
+// RecentActiveUsers is a slice of *Users that knows how to be sorted by the time of the last message.
+type RecentActiveUsers []*User
+
+func (a RecentActiveUsers) Len() int      { return len(a) }
+func (a RecentActiveUsers) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a RecentActiveUsers) Less(i, j int) bool {
+	a[i].mu.Lock()
+	defer a[i].mu.Unlock()
+	a[j].mu.Lock()
+	defer a[j].mu.Unlock()
+	return a[i].lastMsg.After(a[j].lastMsg)
+}

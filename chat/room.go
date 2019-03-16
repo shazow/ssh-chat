@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 
 	"github.com/shazow/ssh-chat/chat/message"
@@ -227,12 +228,21 @@ func (r *Room) SetTopic(s string) {
 }
 
 // NamesPrefix lists all members' names with a given prefix, used to query
-// for autocompletion purposes.
+// for autocompletion purposes. Sorted by which user was last active.
 func (r *Room) NamesPrefix(prefix string) []string {
 	items := r.Members.ListPrefix(prefix)
-	names := make([]string, len(items))
-	for i, item := range items {
-		names[i] = item.Value().(*Member).User.Name()
+
+	// Sort results by recently active
+	users := make([]*message.User, 0, len(items))
+	for _, item := range items {
+		users = append(users, item.Value().(*Member).User)
+	}
+	sort.Sort(message.RecentActiveUsers(users))
+
+	// Pull out names
+	names := make([]string, 0, len(items))
+	for _, user := range users {
+		names = append(names, user.Name())
 	}
 	return names
 }
