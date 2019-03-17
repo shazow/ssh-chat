@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"io"
+	mathRand "math/rand"
 	"strings"
 	"testing"
 
@@ -15,22 +16,53 @@ import (
 )
 
 func stripPrompt(s string) string {
-	pos := strings.LastIndex(s, "\033[K")
-	if pos < 0 {
-		return s
+	// FIXME: Is there a better way to do this?
+	if endPos := strings.Index(s, "\x1b[K "); endPos > 0 {
+		return s[endPos+3:]
 	}
-	return s[pos+3:]
+	if endPos := strings.Index(s, "\x1b[2K "); endPos > 0 {
+		return s[endPos+4:]
+	}
+	if endPos := strings.Index(s, "] "); endPos > 0 {
+		return s[endPos+2:]
+	}
+	return s
+}
+
+func TestStripPrompt(t *testing.T) {
+	tests := []struct {
+		Input string
+		Want  string
+	}{
+		{
+			Input: "\x1b[A\x1b[2K[quux] hello",
+			Want:  "hello",
+		},
+		{
+			Input: "[foo] \x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[K * Guest1 joined. (Connected: 2)\r",
+			Want:  " * Guest1 joined. (Connected: 2)\r",
+		},
+	}
+
+	for i, tc := range tests {
+		if got, want := stripPrompt(tc.Input), tc.Want; got != want {
+			t.Errorf("case #%d:\n got: %q\nwant: %q", i, got, want)
+		}
+	}
 }
 
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
+
+	// Make the random colors consistent across tests
+	mathRand.Seed(1)
 
 	u := message.NewUser(&Identity{id: "foo"})
 
 	actual = GetPrompt(u)
 	expected = "[foo] "
 	if actual != expected {
-		t.Errorf("Got: %q; Expected: %q", actual, expected)
+		t.Errorf("Invalid host prompt:\n Got: %q;\nWant: %q", actual, expected)
 	}
 
 	u.SetConfig(message.UserConfig{
@@ -39,7 +71,7 @@ func TestHostGetPrompt(t *testing.T) {
 	actual = GetPrompt(u)
 	expected = "[\033[38;05;88mfoo\033[0m] "
 	if actual != expected {
-		t.Errorf("Got: %q; Expected: %q", actual, expected)
+		t.Errorf("Invalid host prompt:\n Got: %q;\nWant: %q", actual, expected)
 	}
 }
 
@@ -205,7 +237,11 @@ func TestHostKick(t *testing.T) {
 			// Change nicks, make sure op sticks
 			w.Write([]byte("/nick quux\r\n"))
 			scanner.Scan() // Prompt
+			scanner.Scan() // Prompt echo
 			scanner.Scan() // Nick change response
+
+			// Signal for the second client to connect
+			connected <- struct{}{}
 
 			// Block until second client is here
 			connected <- struct{}{}
@@ -213,10 +249,11 @@ func TestHostKick(t *testing.T) {
 
 			w.Write([]byte("/kick bar\r\n"))
 			scanner.Scan() // Prompt
+			scanner.Scan() // Prompt echo
 
-			scanner.Scan()
+			scanner.Scan() // Kick result
 			if actual, expected := stripPrompt(scanner.Text()), " * bar was kicked by quux.\r"; actual != expected {
-				t.Errorf("Got %q; expected %q", actual, expected)
+				t.Errorf("Failed to detect kick:\n Got: %q;\nWant: %q", actual, expected)
 			}
 
 			kicked <- struct{}{}
@@ -231,6 +268,8 @@ func TestHostKick(t *testing.T) {
 	}()
 
 	go func() {
+		<-connected
+
 		// Second client
 		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)

@@ -170,6 +170,8 @@ func (u *User) render(m Message) string {
 		if cfg.Bell {
 			out += Bel
 		}
+	case *CommandMsg:
+		out += m.RenderSelf(cfg)
 	default:
 		out += m.Render(cfg.Theme)
 	}
