@@ -44,6 +44,11 @@ type Terminal struct {
 	// and the new cursor position.
 	AutoCompleteCallback func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
+	// ClearLine will clear the input line on enter, instead of printing a new
+	// line after the input. It's useful for replacing the input with something
+	// else without echoing it.
+	ClearLine bool
+
 	// Escape contains a pointer to the escape codes for this terminal.
 	// It's always a valid pointer, although the escape codes themselves
 	// may be empty if the terminal doesn't support them.
@@ -507,8 +512,16 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 		}
 	case keyEnter:
 		t.moveCursorToPos(len(t.line))
-		t.queue([]rune("\r\n"))
 		line = string(t.line)
+
+		if t.ClearLine {
+			// Clear line on enter instead of starting a new line
+			t.eraseNPreviousChars(t.pos)
+			ok = true
+			return
+		}
+
+		t.queue([]rune("\r\n"))
 		ok = true
 		t.line = t.line[:0]
 		t.pos = 0
