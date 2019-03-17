@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shazow/ssh-chat/sshd/terminal"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var keepaliveInterval = time.Second * 30
@@ -81,6 +81,7 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 
 		done: make(chan struct{}),
 	}
+	term.Terminal.ClearLine = true
 
 	go term.listen(requests)
 

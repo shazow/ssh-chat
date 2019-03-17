@@ -146,14 +146,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			break
 		}
 
-		// Gross hack to override line echo in golang.org/x/crypto/ssh/terminal
-		// It needs to live before we render any responses.
-		term.Write([]byte{
-			27, '[', 'A', // Up
-			27, '[', '2', 'K', // Clear line
-		})
-		// May the gods have mercy on our souls.
-
 		err = ratelimit.Count(1)
 		if err != nil {
 			user.Send(message.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
