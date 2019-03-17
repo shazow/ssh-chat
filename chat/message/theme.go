@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const timestampLayout = "2006-01-02 15:04:05 MST"
+const timestampLayout = "2006-01-02 15:04:05"
 
 const (
 	// Reset resets the color
