@@ -156,7 +156,7 @@ func (r *Room) Leave(u *message.User) error {
 	if err != nil {
 		return err
 	}
-	s := fmt.Sprintf("%s left. (Connected %s)", u.Name(), humantime.Since(u.Joined()))
+	s := fmt.Sprintf("%s left. (After %s)", u.Name(), humantime.Since(u.Joined()))
 	r.Send(message.NewAnnounceMsg(s))
 	return nil
 }

@@ -19,16 +19,16 @@ func TestHumanSince(t *testing.T) {
 			"5 minutes",
 		},
 		{
-			time.Hour * 3,
-			"3 hours",
+			time.Minute * 185,
+			"3.1 hours",
 		},
 		{
 			time.Hour * 49,
-			"2 days",
+			"2.0 days",
 		},
 		{
-			time.Hour * 24 * 900,
-			"900 days",
+			time.Hour * (24*900 + 12),
+			"900.5 days",
 		},
 	}
 
