@@ -112,6 +112,7 @@ func (m PublicMsg) Render(t *Theme) string {
 	return fmt.Sprintf("%s: %s", t.ColorName(m.from), m.body)
 }
 
+// RenderFor renders the message for other users to see.
 func (m PublicMsg) RenderFor(cfg UserConfig) string {
 	if cfg.Highlight == nil || cfg.Theme == nil {
 		return m.Render(cfg.Theme)
@@ -126,6 +127,11 @@ func (m PublicMsg) RenderFor(cfg UserConfig) string {
 		body += Bel
 	}
 	return fmt.Sprintf("%s: %s", cfg.Theme.ColorName(m.from), body)
+}
+
+// RenderSelf renders the message for when it's echoing your own message.
+func (m PublicMsg) RenderSelf(cfg UserConfig) string {
+	return fmt.Sprintf("[%s] %s", cfg.Theme.ColorName(m.from), m.body)
 }
 
 func (m PublicMsg) String() string {

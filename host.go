@@ -162,6 +162,20 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 		m := message.ParseInput(line, user)
 
+		// Gross hack to override line echo in golang.org/x/crypto/ssh/terminal
+		// It needs to live before we render the resulting message.
+		term.Write([]byte{
+			27, '[', 'A', // Up
+			27, '[', '2', 'K', // Clear line
+		})
+		// May the gods have mercy on our souls.
+
+		if m, ok := m.(*message.CommandMsg); ok {
+			// Other messages render themselves by the room, commands we'll
+			// have to re-echo ourselves manually.
+			user.HandleMsg(m)
+		}
+
 		// FIXME: Any reason to use h.room.Send(m) instead?
 		h.HandleMsg(m)
 

@@ -90,12 +90,7 @@ func (r *Room) HandleMsg(m message.Message) {
 		user := m.To()
 		user.Send(m)
 	default:
-		fromMsg, skip := m.(message.MessageFrom)
-		var skipUser *message.User
-		if skip {
-			skipUser = fromMsg.From()
-		}
-
+		fromMsg, _ := m.(message.MessageFrom)
 		r.history.Add(m)
 		r.Members.Each(func(_ string, item set.Item) (err error) {
 			user := item.Value().(*Member).User
@@ -105,10 +100,6 @@ func (r *Room) HandleMsg(m message.Message) {
 				return
 			}
 
-			if skip && skipUser == user {
-				// Skip self
-				return
-			}
 			if _, ok := m.(*message.AnnounceMsg); ok {
 				if user.Config().Quiet {
 					// Skip announcements

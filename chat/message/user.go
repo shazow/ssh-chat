@@ -16,7 +16,6 @@ const messageBuffer = 5
 const messageTimeout = 5 * time.Second
 const reHighlight = `\b(%s)\b`
 const timestampTimeout = 30 * time.Minute
-const timestampLayout = "2006-01-02 15:04:05 UTC"
 
 var ErrUserClosed = errors.New("user closed")
 
@@ -158,17 +157,34 @@ func (u *User) SetHighlight(s string) error {
 
 func (u *User) render(m Message) string {
 	cfg := u.Config()
+	var out string
 	switch m := m.(type) {
 	case PublicMsg:
-		return m.RenderFor(cfg) + Newline
-	case *PrivateMsg:
-		if cfg.Bell {
-			return m.Render(cfg.Theme) + Bel + Newline
+		if u == m.From() {
+			out += m.RenderSelf(cfg)
+		} else {
+			out += m.RenderFor(cfg)
 		}
-		return m.Render(cfg.Theme) + Newline
+	case *PrivateMsg:
+		out += m.Render(cfg.Theme)
+		if cfg.Bell {
+			out += Bel
+		}
+	case *CommandMsg:
+		out += m.RenderSelf(cfg)
 	default:
-		return m.Render(cfg.Theme) + Newline
+		out += m.Render(cfg.Theme)
 	}
+	if cfg.Timestamp {
+		ts := m.Timestamp()
+		if cfg.Timezone != nil {
+			ts = ts.In(cfg.Timezone)
+		} else {
+			ts = ts.UTC()
+		}
+		return cfg.Theme.Timestamp(ts) + "  " + out + Newline
+	}
+	return out + Newline
 }
 
 // writeMsg renders the message and attempts to write it, will Close the user
@@ -186,20 +202,8 @@ func (u *User) writeMsg(m Message) error {
 // HandleMsg will render the message to the screen, blocking.
 func (u *User) HandleMsg(m Message) error {
 	u.mu.Lock()
-	cfg := u.config
-	lastMsg := u.lastMsg
 	u.lastMsg = m.Timestamp()
-	injectTimestamp := !lastMsg.IsZero() && cfg.Timestamp && u.lastMsg.Sub(lastMsg) > timestampTimeout
 	u.mu.Unlock()
-
-	if injectTimestamp {
-		// Inject a timestamp at most once every timestampTimeout between message intervals
-		ts := NewSystemMsg(fmt.Sprintf("Timestamp: %s", m.Timestamp().UTC().Format(timestampLayout)), u)
-		if err := u.writeMsg(ts); err != nil {
-			return err
-		}
-	}
-
 	return u.writeMsg(m)
 }
 
@@ -223,6 +227,7 @@ type UserConfig struct {
 	Bell      bool
 	Quiet     bool
 	Timestamp bool
+	Timezone  *time.Location
 	Theme     *Theme
 }
 

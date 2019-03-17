@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/sanitize"
@@ -283,16 +284,34 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
-		Prefix: "/timestamp",
-		Help:   "Timestamps after 30min of inactivity.",
+		Prefix:     "/timestamp",
+		PrefixHelp: "[TZINFO]",
+		Help:       "Prefix messages with a timestamp. (Example: America/Toronto)",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
 			cfg := u.Config()
-			cfg.Timestamp = !cfg.Timestamp
+
+			args := msg.Args()
+			if len(args) >= 1 {
+				// FIXME: This is an annoying format to demand from users, but
+				// hopefully we can make it a non-primary flow if we add GeoIP
+				// someday.
+				timeLoc, err := time.LoadLocation(args[0])
+				if err != nil {
+					err = fmt.Errorf("%s: Use a location name such as \"America/Toronto\" or refer to the IANA Time Zone database for the full list of names: https://wikipedia.org/wiki/List_of_tz_database_time_zones", err)
+					return err
+				}
+				cfg.Timezone = timeLoc
+				cfg.Timestamp = true
+			} else {
+				cfg.Timestamp = !cfg.Timestamp
+			}
 			u.SetConfig(cfg)
 
 			var body string
-			if cfg.Timestamp {
+			if cfg.Timestamp && cfg.Timezone != nil {
+				body = fmt.Sprintf("Timestamp is toggled ON with timezone %q", cfg.Timezone)
+			} else if cfg.Timestamp {
 				body = "Timestamp is toggled ON"
 			} else {
 				body = "Timestamp is toggled OFF"

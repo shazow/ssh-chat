@@ -1,6 +1,11 @@
 package message
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
+
+const timestampLayout = "2006-01-02 15:04:05 MST"
 
 const (
 	// Reset resets the color
@@ -122,43 +127,49 @@ type Theme struct {
 	names     *Palette
 }
 
-func (t Theme) ID() string {
-	return t.id
+func (theme Theme) ID() string {
+	return theme.id
 }
 
 // Colorize name string given some index
-func (t Theme) ColorName(u *User) string {
-	if t.names == nil {
+func (theme Theme) ColorName(u *User) string {
+	if theme.names == nil {
 		return u.Name()
 	}
 
-	return t.names.Get(u.colorIdx).Format(u.Name())
+	return theme.names.Get(u.colorIdx).Format(u.Name())
 }
 
 // Colorize the PM string
-func (t Theme) ColorPM(s string) string {
-	if t.pm == nil {
+func (theme Theme) ColorPM(s string) string {
+	if theme.pm == nil {
 		return s
 	}
 
-	return t.pm.Format(s)
+	return theme.pm.Format(s)
 }
 
 // Colorize the Sys message
-func (t Theme) ColorSys(s string) string {
-	if t.sys == nil {
+func (theme Theme) ColorSys(s string) string {
+	if theme.sys == nil {
 		return s
 	}
 
-	return t.sys.Format(s)
+	return theme.sys.Format(s)
 }
 
 // Highlight a matched string, usually name
-func (t Theme) Highlight(s string) string {
-	if t.highlight == nil {
+func (theme Theme) Highlight(s string) string {
+	if theme.highlight == nil {
 		return s
 	}
-	return t.highlight.Format(s)
+	return theme.highlight.Format(s)
+}
+
+// Timestamp formats and colorizes the timestamp.
+func (theme Theme) Timestamp(t time.Time) string {
+	// TODO: Change this per-theme? Or config?
+	return theme.sys.Format(t.Format(timestampLayout))
 }
 
 // List of initialzied themes
