@@ -285,8 +285,8 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix:     "/timestamp",
-		PrefixHelp: "[TZINFO]",
-		Help:       "Prefix messages with a timestamp. (Example: America/Toronto)",
+		PrefixHelp: "[UTC_OFFSET [LABEL]]",
+		Help:       "Prefix messages with a timestamp. (Offset example: +5h45m)",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
 			cfg := u.Config()
@@ -296,12 +296,15 @@ func InitCommands(c *Commands) {
 				// FIXME: This is an annoying format to demand from users, but
 				// hopefully we can make it a non-primary flow if we add GeoIP
 				// someday.
-				timeLoc, err := time.LoadLocation(args[0])
+				offset, err := time.ParseDuration(args[0])
 				if err != nil {
-					err = fmt.Errorf("%s: Use a location name such as \"America/Toronto\" or refer to the IANA Time Zone database for the full list of names: https://wikipedia.org/wiki/List_of_tz_database_time_zones", err)
 					return err
 				}
-				cfg.Timezone = timeLoc
+				label := ""
+				if len(args) >= 2 {
+					label = args[1]
+				}
+				cfg.Timezone = time.FixedZone(label, int(offset.Seconds()))
 				cfg.Timestamp = true
 			} else {
 				cfg.Timestamp = !cfg.Timestamp
@@ -310,9 +313,10 @@ func InitCommands(c *Commands) {
 
 			var body string
 			if cfg.Timestamp && cfg.Timezone != nil {
-				body = fmt.Sprintf("Timestamp is toggled ON with timezone %q", cfg.Timezone)
+				tzname := time.Now().In(cfg.Timezone).Format("MST")
+				body = fmt.Sprintf("Timestamp is toggled ON, timezone is %q", tzname)
 			} else if cfg.Timestamp {
-				body = "Timestamp is toggled ON"
+				body = "Timestamp is toggled ON, timezone is UTC"
 			} else {
 				body = "Timestamp is toggled OFF"
 			}
