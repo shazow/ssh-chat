@@ -1,6 +1,7 @@
-This directory contains a fork of https://github.com/golang/crypto/tree/master/ssh/terminal
+## x/crypto/ssh/terminal
 
-Original license applies:
+This project contains a fork of https://github.com/golang/crypto/tree/master/ssh/terminal
+under the sshd/terminal directory. The project's original license applies:
 
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
