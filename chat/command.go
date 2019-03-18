@@ -210,9 +210,9 @@ func InitCommands(c *Commands) {
 				if cfg.Theme != nil {
 					theme = cfg.Theme.ID()
 				}
-				var output *strings.Builder
-				fmt.Fprintf(output, "Current theme: %s%s", theme, message.Newline)
-				fmt.Fprintf(output, "   Themes available: ")
+				var output strings.Builder
+				fmt.Fprintf(&output, "Current theme: %s%s", theme, message.Newline)
+				fmt.Fprintf(&output, "   Themes available: ")
 
 				for i, t := range message.Themes {
 					output.WriteString(t.ID())
