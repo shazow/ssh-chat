@@ -511,22 +511,23 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 			}
 		}
 	case keyEnter:
-		t.moveCursorToPos(len(t.line))
 		line = string(t.line)
-
 		if t.ClearLine {
-			// Clear line on enter instead of starting a new line
-			t.eraseNPreviousChars(t.pos)
-			ok = true
-			return
+			// Clear line on enter instead of starting a new line. The old
+			// prompt is retained.
+			t.moveCursorToPos(0)
+			t.clearLineToRight()
+		} else {
+			// Pushing the line up resets the cursor to 0,0 and we render a
+			// fresh prompt.
+			t.moveCursorToPos(len(t.line))
+			t.queue([]rune("\r\n"))
+			t.cursorX = 0
+			t.cursorY = 0
 		}
-
-		t.queue([]rune("\r\n"))
 		ok = true
 		t.line = t.line[:0]
 		t.pos = 0
-		t.cursorX = 0
-		t.cursorY = 0
 		t.maxLine = 0
 	case keyDeleteWord:
 		// Delete zero or more spaces and then one or more characters.
