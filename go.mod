@@ -5,6 +5,6 @@ require (
 	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/shazow/rateio v0.0.0-20150116013248-e8e00881e5c1
-	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a
-	golang.org/x/sys v0.0.0-20190312061237-fead79001313 // indirect
+	golang.org/x/crypto v0.0.0-20190320223903-b7391e95e576
+	golang.org/x/sys v0.0.0-20190321052220-f7bb7a8bee54
 )

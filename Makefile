@@ -26,7 +26,7 @@ debug: $(BINARY) $(KEY)
 	./$(BINARY) --pprof 6060 -i $(KEY) --bind ":$(PORT)" -vv
 
 test:
-	go test ./...
+	go test -race -test.timeout 5s ./...
 
 release:
 	# We use static linking for release build. LDFLAGS via

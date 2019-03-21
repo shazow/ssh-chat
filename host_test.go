@@ -225,7 +225,7 @@ func TestHostKick(t *testing.T) {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
-			scanner.Scan()
+			scanner.Scan() // Joined
 
 			// Make op
 			member, _ := host.Room.MemberByID("foo")
@@ -237,11 +237,7 @@ func TestHostKick(t *testing.T) {
 			// Change nicks, make sure op sticks
 			w.Write([]byte("/nick quux\r\n"))
 			scanner.Scan() // Prompt
-			scanner.Scan() // Prompt echo
 			scanner.Scan() // Nick change response
-
-			// Signal for the second client to connect
-			connected <- struct{}{}
 
 			// Block until second client is here
 			connected <- struct{}{}
@@ -249,7 +245,6 @@ func TestHostKick(t *testing.T) {
 
 			w.Write([]byte("/kick bar\r\n"))
 			scanner.Scan() // Prompt
-			scanner.Scan() // Prompt echo
 
 			scanner.Scan() // Kick result
 			if actual, expected := stripPrompt(scanner.Text()), " * bar was kicked by quux.\r"; actual != expected {
@@ -264,12 +259,11 @@ func TestHostKick(t *testing.T) {
 			connected <- struct{}{}
 			close(connected)
 			t.Fatal(err)
+			close(done)
 		}
 	}()
 
 	go func() {
-		<-connected
-
 		// Second client
 		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
@@ -278,10 +272,16 @@ func TestHostKick(t *testing.T) {
 
 			<-kicked
 
+			if _, err := w.Write([]byte("am I still here?\r\n")); err != nil {
+				return err
+			}
+
 			scanner.Scan()
 			return scanner.Err()
 		})
-		if err != nil {
+		if err == io.EOF {
+			// All good, we got kicked.
+		} else if err != nil {
 			close(done)
 			t.Fatal(err)
 		}

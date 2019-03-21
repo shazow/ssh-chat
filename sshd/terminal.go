@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shazow/ssh-chat/sshd/terminal"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var keepaliveInterval = time.Second * 30
