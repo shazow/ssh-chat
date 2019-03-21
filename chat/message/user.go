@@ -175,14 +175,14 @@ func (u *User) render(m Message) string {
 	default:
 		out += m.Render(cfg.Theme)
 	}
-	if cfg.Timestamp {
+	if cfg.Timeformat != nil {
 		ts := m.Timestamp()
 		if cfg.Timezone != nil {
 			ts = ts.In(cfg.Timezone)
 		} else {
 			ts = ts.UTC()
 		}
-		return cfg.Theme.Timestamp(ts) + "  " + out + Newline
+		return cfg.Theme.Timestamp(ts.Format(*cfg.Timeformat) + "  " + out + Newline)
 	}
 	return out + Newline
 }
@@ -223,12 +223,12 @@ func (u *User) Send(m Message) error {
 
 // Container for per-user configurations.
 type UserConfig struct {
-	Highlight *regexp.Regexp
-	Bell      bool
-	Quiet     bool
-	Timestamp bool
-	Timezone  *time.Location
-	Theme     *Theme
+	Highlight  *regexp.Regexp
+	Bell       bool
+	Quiet      bool
+	Timeformat *string
+	Timezone   *time.Location
+	Theme      *Theme
 }
 
 // Default user configuration to use
@@ -236,9 +236,8 @@ var DefaultUserConfig UserConfig
 
 func init() {
 	DefaultUserConfig = UserConfig{
-		Bell:      true,
-		Quiet:     false,
-		Timestamp: false,
+		Bell:  true,
+		Quiet: false,
 	}
 
 	// TODO: Seed random?
