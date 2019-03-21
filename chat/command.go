@@ -94,6 +94,10 @@ func (c Commands) Help(showOp bool) string {
 	return help
 }
 
+var timeformatDatetime = "2006-01-02 15:04:05"
+
+var timeformatTime = "15:04"
+
 var defaultCommands *Commands
 
 func init() {
@@ -285,38 +289,56 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix:     "/timestamp",
-		PrefixHelp: "[UTC_OFFSET [LABEL]]",
-		Help:       "Prefix messages with a timestamp. (Offset example: +5h45m)",
+		PrefixHelp: "[time|datetime]",
+		Help:       "Prefix messages with a timestamp. You can also provide the UTC offset: /timestamp time +5h45m",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			u := msg.From()
 			cfg := u.Config()
 
 			args := msg.Args()
+			mode := ""
 			if len(args) >= 1 {
+				mode = args[0]
+			}
+			if len(args) >= 2 {
 				// FIXME: This is an annoying format to demand from users, but
 				// hopefully we can make it a non-primary flow if we add GeoIP
 				// someday.
-				offset, err := time.ParseDuration(args[0])
+				offset, err := time.ParseDuration(args[1])
 				if err != nil {
 					return err
 				}
-				label := ""
-				if len(args) >= 2 {
-					label = args[1]
-				}
-				cfg.Timezone = time.FixedZone(label, int(offset.Seconds()))
-				cfg.Timestamp = true
-			} else {
-				cfg.Timestamp = !cfg.Timestamp
+				cfg.Timezone = time.FixedZone("", int(offset.Seconds()))
 			}
+
+			switch mode {
+			case "time":
+				cfg.Timeformat = &timeformatTime
+			case "datetime":
+				cfg.Timeformat = &timeformatDatetime
+			case "":
+				// Toggle
+				if cfg.Timeformat != nil {
+					cfg.Timeformat = nil
+				} else {
+					cfg.Timeformat = &timeformatTime
+				}
+			case "off":
+				cfg.Timeformat = nil
+			default:
+				return errors.New("timestamp value must be one of: time, datetime, off")
+			}
+
 			u.SetConfig(cfg)
 
 			var body string
-			if cfg.Timestamp && cfg.Timezone != nil {
-				tzname := time.Now().In(cfg.Timezone).Format("MST")
-				body = fmt.Sprintf("Timestamp is toggled ON, timezone is %q", tzname)
-			} else if cfg.Timestamp {
-				body = "Timestamp is toggled ON, timezone is UTC"
+			if cfg.Timeformat != nil {
+				if cfg.Timezone != nil {
+					tzname := time.Now().In(cfg.Timezone).Format("MST")
+					body = fmt.Sprintf("Timestamp is toggled ON, timezone is %q", tzname)
+				} else {
+					body = "Timestamp is toggled ON, timezone is UTC"
+				}
 			} else {
 				body = "Timestamp is toggled OFF"
 			}

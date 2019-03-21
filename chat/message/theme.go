@@ -2,10 +2,7 @@ package message
 
 import (
 	"fmt"
-	"time"
 )
-
-const timestampLayout = "2006-01-02 15:04:05"
 
 const (
 	// Reset resets the color
@@ -166,10 +163,9 @@ func (theme Theme) Highlight(s string) string {
 	return theme.highlight.Format(s)
 }
 
-// Timestamp formats and colorizes the timestamp.
-func (theme Theme) Timestamp(t time.Time) string {
-	// TODO: Change this per-theme? Or config?
-	return theme.sys.Format(t.Format(timestampLayout))
+// Timestamp colorizes the timestamp.
+func (theme Theme) Timestamp(s string) string {
+	return theme.sys.Format(s)
 }
 
 // List of initialzied themes
