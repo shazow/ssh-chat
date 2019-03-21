@@ -45,11 +45,6 @@ type Terminal struct {
 	// and the new cursor position.
 	AutoCompleteCallback func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
-	// ClearLine will clear the input line on enter, instead of printing a new
-	// line after the input. It's useful for replacing the input with something
-	// else without echoing it.
-	ClearLine bool
-
 	// Escape contains a pointer to the escape codes for this terminal.
 	// It's always a valid pointer, although the escape codes themselves
 	// may be empty if the terminal doesn't support them.
@@ -98,6 +93,11 @@ type Terminal struct {
 	// the incomplete, initial line. That value is stored in
 	// historyPending.
 	historyPending string
+
+	// enterClear will clear the input line on enter, instead of printing a
+	// new line after the input. It's useful for replacing the input with
+	// something else without echoing it.
+	enterClear bool
 }
 
 // NewTerminal runs a VT100 terminal on the given ReadWriter. If the ReadWriter is
@@ -523,7 +523,7 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 		}
 	case keyEnter:
 		line = string(t.line)
-		if t.ClearLine {
+		if t.enterClear {
 			// Clear line on enter instead of starting a new line. The old
 			// prompt is retained.
 			t.moveCursorToPos(0)
@@ -883,6 +883,15 @@ func (t *Terminal) SetSize(width, height int) error {
 	_, err := t.c.Write(t.outBuf)
 	t.outBuf = t.outBuf[:0]
 	return err
+}
+
+// SetEnterClear sets whether the input line should be cleared or echoed on
+// enter.
+func (t *Terminal) SetEnterClear(on bool) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.enterClear = on
 }
 
 type pasteIndicatorError struct{}
