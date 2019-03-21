@@ -90,6 +90,7 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
+	term.SetEnterClear(true) // We provide our own echo rendering
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	cfg := user.Config()

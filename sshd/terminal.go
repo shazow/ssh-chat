@@ -81,7 +81,6 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 
 		done: make(chan struct{}),
 	}
-	term.Terminal.ClearLine = true
 
 	go term.listen(requests)
 
