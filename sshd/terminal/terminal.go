@@ -322,6 +322,11 @@ func (t *Terminal) clearLineToRight() {
 	t.queue(op)
 }
 
+func (t *Terminal) clearScreenBelow() {
+	op := []rune{keyEscape, '[', 'J'}
+	t.queue(op)
+}
+
 const maxLineLength = 4096
 
 func (t *Terminal) setLine(newLine []rune, newPos int) {
@@ -528,6 +533,7 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 			// prompt is retained.
 			t.moveCursorToPos(0)
 			t.clearLineToRight()
+			t.clearScreenBelow() // Necessary for wrapped lines
 		} else {
 			// Pushing the line up resets the cursor to 0,0 and we render a
 			// fresh prompt.
