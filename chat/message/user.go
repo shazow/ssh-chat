@@ -238,7 +238,6 @@ func init() {
 	DefaultUserConfig = UserConfig{
 		Bell:  true,
 		Quiet: false,
-		Theme: DefaultTheme,
 	}
 
 	// TODO: Seed random?

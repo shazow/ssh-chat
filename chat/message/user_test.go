@@ -39,6 +39,7 @@ func TestRenderTimestamp(t *testing.T) {
 
 	cfg := u.Config()
 	timefmt := "AA:BB"
+	cfg.Theme = DefaultTheme
 	cfg.Timeformat = &timefmt
 	u.SetConfig(cfg)
 
