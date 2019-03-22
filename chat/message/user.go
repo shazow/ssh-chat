@@ -182,7 +182,7 @@ func (u *User) render(m Message) string {
 		} else {
 			ts = ts.UTC()
 		}
-		return cfg.Theme.Timestamp(ts.Format(*cfg.Timeformat) + "  " + out + Newline)
+		return cfg.Theme.Timestamp(ts.Format(*cfg.Timeformat)) + "  " + out + Newline
 	}
 	return out + Newline
 }
@@ -238,6 +238,7 @@ func init() {
 	DefaultUserConfig = UserConfig{
 		Bell:  true,
 		Quiet: false,
+		Theme: DefaultTheme,
 	}
 
 	// TODO: Seed random?

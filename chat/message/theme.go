@@ -174,6 +174,9 @@ var Themes []Theme
 // Default theme to use
 var DefaultTheme *Theme
 
+// MonoTheme is a simple theme without colors, useful for testing and bots.
+var MonoTheme *Theme
+
 func allColors256() *Palette {
 	colors := []uint8{}
 	var i uint8
@@ -225,6 +228,7 @@ func init() {
 	}
 
 	DefaultTheme = &Themes[0]
+	MonoTheme = &Themes[3]
 
 	/* Some debug helpers for your convenience:
 
