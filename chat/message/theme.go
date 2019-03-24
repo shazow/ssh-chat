@@ -165,6 +165,9 @@ func (theme Theme) Highlight(s string) string {
 
 // Timestamp colorizes the timestamp.
 func (theme Theme) Timestamp(s string) string {
+	if theme.sys == nil {
+		return s
+	}
 	return theme.sys.Format(s)
 }
 
