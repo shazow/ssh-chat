@@ -26,12 +26,14 @@ The server's RSA key fingerprint is `MD5:e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:
 Recent releases include builds for MacOS (darwin/amd64) and Linux (386,
 amd64, and ARM6 for your RaspberryPi).
 
-**[Grab the latest release here](https://github.com/shazow/ssh-chat/releases/)**.
+**[Grab the latest binary release here](https://github.com/shazow/ssh-chat/releases/)**.
 
 Play around with it. Additional [deploy examples are here](https://github.com/shazow/ssh-chat/wiki/Deployment).
 
 
 ## Compiling / Developing
+
+Most people just want the [latest binary release](https://github.com/shazow/ssh-chat/releases/). If you're sure you want to compile it from source, read on:
 
 You can compile ssh-chat by using `make build`. The resulting binary is portable and
 can be run on any system with a similar OS and CPU arch. Go 1.8 or higher is required to compile.
