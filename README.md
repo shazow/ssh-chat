@@ -55,13 +55,13 @@ Usage:
 Application Options:
   -v, --verbose    Show verbose logging.
       --version    Print version and exit.
-  -i, --identity=  Private key to identify server with. (~/.ssh/id_rsa)
-      --bind=      Host and port to listen on. (0.0.0.0:2022)
-      --admin=     Fingerprint of pubkey to mark as admin.
-      --whitelist= Optional file of pubkey fingerprints that are allowed to connect
-      --motd=      Message of the Day file (optional)
+  -i, --identity=  Private key to identify server with. (default: ~/.ssh/id_rsa)
+      --bind=      Host and port to listen on. (default: 0.0.0.0:2022)
+      --admin=     File of public keys who are admins.
+      --whitelist= Optional file of public keys who are allowed to connect.
+      --motd=      Optional Message of the Day file.
       --log=       Write chat log to this file.
-      --pprof=     enable http server for pprof
+      --pprof=     Enable pprof http server for profiling.
 
 Help Options:
   -h, --help       Show this help message
