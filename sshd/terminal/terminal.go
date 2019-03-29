@@ -529,11 +529,18 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 	case keyEnter:
 		line = string(t.line)
 		if t.enterClear {
-			// Clear line on enter instead of starting a new line. The old
-			// prompt is retained.
-			t.moveCursorToPos(0)
-			t.clearLineToRight()
-			t.clearScreenBelow() // Necessary for wrapped lines
+			// Clear line on enter instead of starting a new line.
+			reset := []rune{
+				// Clear whole line
+				keyEscape, '[', '2', 'K',
+				// Clear screen below (for any wrapped lines)
+				keyEscape, '[', 'J',
+			}
+			t.queue(reset)
+			// We're still technically on the same line. If we don't offset the
+			// cursorX, then the fresh prompt could be rendered in the wrong
+			// position.
+			t.cursorX += len(reset)
 		} else {
 			// Pushing the line up resets the cursor to 0,0 and we render a
 			// fresh prompt.
