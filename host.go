@@ -158,6 +158,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		}
 		if line == "" {
 			// Silently ignore empty lines.
+			term.Write([]byte{})
 			continue
 		}
 
