@@ -59,6 +59,7 @@ func (l *SSHListener) Serve() {
 			term, err := l.handleConn(conn)
 			if err != nil {
 				logger.Printf("[%s] Failed to handshake: %s", conn.RemoteAddr(), err)
+				conn.Close() // Must be closed to avoid a leak
 				return
 			}
 			l.HandlerFunc(term)
