@@ -537,10 +537,9 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 				keyEscape, '[', 'J',
 			}
 			t.queue(reset)
-			// We're still technically on the same line. If we don't offset the
-			// cursorX, then the fresh prompt could be rendered in the wrong
-			// position.
-			t.cursorX += len(reset)
+			// FIXME: This causes a slice out of bounds panic, but without it we
+			// get an offset with emojis
+			//   t.cursorX += len(reset)
 		} else {
 			// Pushing the line up resets the cursor to 0,0 and we render a
 			// fresh prompt.
