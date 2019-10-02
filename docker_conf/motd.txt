@@ -1,0 +1,1 @@
+[39;91mWelcome to chat.shazow.net on docker, enter /help for more.  [0m
