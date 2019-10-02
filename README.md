@@ -1,4 +1,3 @@
-
 [![Build Status](https://travis-ci.org/shazow/ssh-chat.svg?branch=master)](https://travis-ci.org/shazow/ssh-chat)
 [![GoDoc](https://godoc.org/github.com/shazow/ssh-chat?status.svg)](https://godoc.org/github.com/shazow/ssh-chat)
 [![Downloads](https://img.shields.io/github/downloads/shazow/ssh-chat/total.svg?color=orange)](https://github.com/shazow/ssh-chat/releases)
