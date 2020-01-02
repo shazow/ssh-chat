@@ -68,10 +68,12 @@ type Terminal struct {
 // Make new terminal from a session channel
 func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 	if ch.ChannelType() != "session" {
+		conn.Close()
 		return nil, ErrNotSessionChannel
 	}
 	channel, requests, err := ch.Accept()
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 	term := Terminal{
@@ -119,6 +121,7 @@ func NewSession(conn *ssh.ServerConn, channels <-chan ssh.NewChannel) (*Terminal
 		return NewTerminal(conn, ch)
 	}
 
+	conn.Close()
 	return nil, ErrNoSessionChannel
 }
 
