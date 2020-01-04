@@ -2,6 +2,7 @@ package sshd
 
 import (
 	"net"
+	"time"
 
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
@@ -32,11 +33,17 @@ func (l *SSHListener) handleConn(conn net.Conn) (*Terminal, error) {
 		conn = ReadLimitConn(conn, l.RateLimit())
 	}
 
+	// Handshake shouldn't take more than 10 seconds
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+
 	// Upgrade TCP connection to SSH connection
 	sshConn, channels, requests, err := ssh.NewServerConn(conn, l.config)
 	if err != nil {
 		return nil, err
 	}
+
+	// clear the deadline
+	conn.SetDeadline(time.Time{})
 
 	// FIXME: Disconnect if too many faulty requests? (Avoid DoS.)
 	go ssh.DiscardRequests(requests)
