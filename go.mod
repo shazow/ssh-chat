@@ -8,3 +8,5 @@ require (
 	golang.org/x/crypto v0.0.0-20190320223903-b7391e95e576
 	golang.org/x/sys v0.0.0-20190321052220-f7bb7a8bee54
 )
+
+go 1.13
