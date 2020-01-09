@@ -268,3 +268,7 @@ func (m CommandMsg) Args() []string {
 func (m CommandMsg) Body() string {
 	return m.body
 }
+
+func (m CommandMsg) RenderSelf(cfg UserConfig) string {
+	return m.body
+}
