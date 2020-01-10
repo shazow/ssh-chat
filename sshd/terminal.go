@@ -87,8 +87,9 @@ type Terminal struct {
 	done      chan struct{}
 	closeOnce sync.Once
 
-	mu  sync.Mutex
-	env []EnvVar
+	mu   sync.Mutex
+	env  []EnvVar
+	term string
 }
 
 // Make new terminal from a session channel
@@ -185,11 +186,16 @@ func (t *Terminal) listen(requests <-chan *ssh.Request, ready chan<- struct{}) {
 				close(ready)
 			}
 		case "pty-req":
-			width, height, ok = parsePtyRequest(req.Payload)
+			var term string
+			term, width, height, ok = parsePtyRequest(req.Payload)
 			if ok {
 				// TODO: Hardcode width to 100000?
 				err := t.SetSize(width, height)
 				ok = err == nil
+				// Save the term:
+				t.mu.Lock()
+				t.term = term
+				t.mu.Unlock()
 			}
 		case "window-change":
 			width, height, ok = parseWinchRequest(req.Payload)
@@ -221,4 +227,12 @@ func (t *Terminal) Env() Env {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return Env(t.env)
+}
+
+// Term returns the terminal string value as set by the pty.
+// If there was no pty request, this is empty.
+func (t *Terminal) Term() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.term
 }
