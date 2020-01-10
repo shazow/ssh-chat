@@ -108,7 +108,8 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 		done: make(chan struct{}),
 	}
 
-	go term.listen(requests)
+	ready := make(chan struct{})
+	go term.listen(requests, ready)
 
 	go func() {
 		// Keep-Alive Ticker
@@ -128,6 +129,14 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 			}
 		}
 	}()
+
+	select {
+	case <-ready: // ok...
+	case <-term.done:
+		return nil, errors.New("terminal aborted")
+	case <-time.NewTimer(time.Minute).C:
+		return nil, errors.New("timed out starting terminal")
+	}
 
 	return &term, nil
 }
@@ -160,7 +169,8 @@ func (t *Terminal) Close() error {
 }
 
 // Negotiate terminal type and settings
-func (t *Terminal) listen(requests <-chan *ssh.Request) {
+// ready is closed when the terminal is ready.
+func (t *Terminal) listen(requests <-chan *ssh.Request, ready chan<- struct{}) {
 	hasShell := false
 
 	for req := range requests {
@@ -172,6 +182,7 @@ func (t *Terminal) listen(requests <-chan *ssh.Request) {
 			if !hasShell {
 				ok = true
 				hasShell = true
+				close(ready)
 			}
 		case "pty-req":
 			width, height, ok = parsePtyRequest(req.Payload)
