@@ -96,6 +96,28 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	cfg := user.Config()
 	cfg.Theme = &h.theme
 	user.SetConfig(cfg)
+
+	env := term.Env()
+	for _, e := range env {
+		switch e.Key {
+		case "SSHCHAT_TIMESTAMP":
+			if e.Value != "" && e.Value != "0" {
+				cmd := "/timestamp"
+				if e.Value != "1" {
+					cmd += " " + e.Value
+				}
+				if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
+					h.Room.HandleMsg(msg)
+				}
+			}
+		case "SSHCHAT_THEME":
+			cmd := "/theme " + e.Value
+			if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
+				h.Room.HandleMsg(msg)
+			}
+		}
+	}
+
 	go user.Consume()
 
 	// Close term once user is closed.
