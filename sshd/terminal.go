@@ -189,7 +189,7 @@ func (t *Terminal) listen(requests <-chan *ssh.Request) {
 			}
 		case "env":
 			var v EnvVar
-			if err := ssh.Unmarshal(req.Payload, &v); err != nil {
+			if err := ssh.Unmarshal(req.Payload, &v); err == nil {
 				t.mu.Lock()
 				t.env = append(t.env, v)
 				t.mu.Unlock()
