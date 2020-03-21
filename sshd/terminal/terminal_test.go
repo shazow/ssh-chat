@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 	"testing"
+	"unicode/utf8"
 )
 
 type MockTerminal struct {
@@ -404,5 +405,31 @@ func TestOutputNewlines(t *testing.T) {
 
 	if output != expected {
 		t.Errorf("incorrect output: was %q, expected %q", output, expected)
+	}
+}
+
+func TestTerminalvisualLength(t *testing.T) {
+	var tests = []struct {
+		input string
+		want  int
+	}{
+		{"hello world", 11},
+		{"babalala", 8},
+		{"端子", 4},
+		{"を搭載", 6},
+		{"baba端子lalaを搭載", 18},
+	}
+	for _, test := range tests {
+		var runes []rune
+		for i, w := 0, 0; i < len(test.input); i += w {
+			runeValue, width := utf8.DecodeRuneInString(test.input[i:])
+			runes = append(runes, runeValue)
+			w = width
+		}
+		output := visualLength(runes)
+		if output != test.want {
+			t.Errorf("incorrect [%s] output: was %d, expected %d",
+				test.input, output, test.want)
+		}
 	}
 }
