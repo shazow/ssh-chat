@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"unicode/utf8"
+
 	"golang.org/x/text/width"
 )
 
