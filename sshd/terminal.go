@@ -93,6 +93,7 @@ type Terminal struct {
 }
 
 // Make new terminal from a session channel
+// TODO: For v2, make a separate `Serve(ctx context.Context) error` method to activate the Terminal
 func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 	if ch.ChannelType() != "session" {
 		return nil, ErrNotSessionChannel
@@ -131,15 +132,18 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 		}
 	}()
 
+	// We need to wait for term.ready to acquire a shell before we return, this
+	// gives the SSH session a chance to populate the env vars and other state.
+	// TODO: Make the timeout configurable
+	// TODO: Use context.Context for abort/timeout in the future, will need to change the API.
 	select {
-	case <-ready: // ok...
+	case <-ready: // shell acquired
+		return &term, nil
 	case <-term.done:
 		return nil, errors.New("terminal aborted")
 	case <-time.NewTimer(time.Minute).C:
 		return nil, errors.New("timed out starting terminal")
 	}
-
-	return &term, nil
 }
 
 // NewSession Finds a session channel and make a Terminal from it
@@ -169,7 +173,7 @@ func (t *Terminal) Close() error {
 	return err
 }
 
-// Negotiate terminal type and settings
+// listen negotiates the terminal type and state
 // ready is closed when the terminal is ready.
 func (t *Terminal) listen(requests <-chan *ssh.Request, ready chan<- struct{}) {
 	hasShell := false

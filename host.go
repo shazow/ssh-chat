@@ -97,6 +97,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	cfg.Theme = &h.theme
 	user.SetConfig(cfg)
 
+	// Load user config overrides from ENV
+	// TODO: Would be nice to skip the command parsing pipeline just to load
+	// config values. Would need to factor out some command handler logic into
+	// accessible helpers.
 	env := term.Env()
 	for _, e := range env {
 		switch e.Key {
