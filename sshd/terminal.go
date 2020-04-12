@@ -55,6 +55,29 @@ func (c sshConn) Name() string {
 	return c.User()
 }
 
+// EnvVar is an environment variable key-value pair
+type EnvVar struct {
+	Key   string
+	Value string
+}
+
+func (v EnvVar) String() string {
+	return v.Key + "=" + v.Value
+}
+
+// Env is a wrapper type around []EnvVar with some helper methods
+type Env []EnvVar
+
+// Get returns the latest value for a given key, or empty string if not found
+func (e Env) Get(key string) string {
+	for i := len(e) - 1; i >= 0; i-- {
+		if e[i].Key == key {
+			return e[i].Value
+		}
+	}
+	return ""
+}
+
 // Terminal extends ssh/terminal to include a close method
 type Terminal struct {
 	terminal.Terminal
@@ -63,6 +86,9 @@ type Terminal struct {
 
 	done      chan struct{}
 	closeOnce sync.Once
+
+	mu  sync.Mutex
+	env []EnvVar
 }
 
 // Make new terminal from a session channel
@@ -161,10 +187,27 @@ func (t *Terminal) listen(requests <-chan *ssh.Request) {
 				err := t.SetSize(width, height)
 				ok = err == nil
 			}
+		case "env":
+			var v EnvVar
+			if err := ssh.Unmarshal(req.Payload, &v); err == nil {
+				t.mu.Lock()
+				t.env = append(t.env, v)
+				t.mu.Unlock()
+				ok = true
+			}
 		}
 
 		if req.WantReply {
 			req.Reply(ok, nil)
 		}
 	}
+}
+
+// Env returns a list of environment key-values that have been set. They are
+// returned in the order that they have been set, there is no deduplication or
+// other pre-processing applied.
+func (t *Terminal) Env() Env {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return Env(t.env)
 }
