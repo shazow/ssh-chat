@@ -160,9 +160,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	// Successfully joined.
-	term.SetPrompt(GetPrompt(user))
-	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
-	user.SetHighlight(user.Name())
+	if !apiMode {
+		term.SetPrompt(GetPrompt(user))
+		term.AutoCompleteCallback = h.AutoCompleteFunction(user)
+		user.SetHighlight(user.Name())
+	}
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
@@ -209,6 +211,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 		// FIXME: Any reason to use h.room.Send(m) instead?
 		h.HandleMsg(m)
+
+		if apiMode {
+			// Skip the remaining rendering workarounds
+			continue
+		}
 
 		cmd := m.Command()
 		if cmd == "/nick" || cmd == "/theme" {
