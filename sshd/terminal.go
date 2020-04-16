@@ -103,7 +103,7 @@ func NewTerminal(conn *ssh.ServerConn, ch ssh.NewChannel) (*Terminal, error) {
 		return nil, err
 	}
 	term := Terminal{
-		Terminal: *terminal.NewTerminal(channel, "Connecting..."),
+		Terminal: *terminal.NewTerminal(channel, ""),
 		Conn:     sshConn{conn},
 		Channel:  channel,
 

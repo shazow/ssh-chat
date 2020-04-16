@@ -90,11 +90,20 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
-	term.SetEnterClear(true) // We provide our own echo rendering
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	cfg := user.Config()
-	cfg.Theme = &h.theme
+
+	apiMode := strings.ToLower(term.Term()) == "bot"
+
+	if apiMode {
+		cfg.Theme = message.MonoTheme
+		cfg.Echo = false
+	} else {
+		term.SetEnterClear(true) // We provide our own echo rendering
+		cfg.Theme = &h.theme
+	}
+
 	user.SetConfig(cfg)
 
 	// Load user config overrides from ENV
@@ -151,9 +160,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	// Successfully joined.
-	term.SetPrompt(GetPrompt(user))
-	term.AutoCompleteCallback = h.AutoCompleteFunction(user)
-	user.SetHighlight(user.Name())
+	if !apiMode {
+		term.SetPrompt(GetPrompt(user))
+		term.AutoCompleteCallback = h.AutoCompleteFunction(user)
+		user.SetHighlight(user.Name())
+	}
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
@@ -190,14 +201,21 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 		m := message.ParseInput(line, user)
 
-		if m, ok := m.(*message.CommandMsg); ok {
-			// Other messages render themselves by the room, commands we'll
-			// have to re-echo ourselves manually.
-			user.HandleMsg(m)
+		if !apiMode {
+			if m, ok := m.(*message.CommandMsg); ok {
+				// Other messages render themselves by the room, commands we'll
+				// have to re-echo ourselves manually.
+				user.HandleMsg(m)
+			}
 		}
 
 		// FIXME: Any reason to use h.room.Send(m) instead?
 		h.HandleMsg(m)
+
+		if apiMode {
+			// Skip the remaining rendering workarounds
+			continue
+		}
 
 		cmd := m.Command()
 		if cmd == "/nick" || cmd == "/theme" {

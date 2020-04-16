@@ -161,6 +161,9 @@ func (u *User) render(m Message) string {
 	switch m := m.(type) {
 	case PublicMsg:
 		if u == m.From() {
+			if !cfg.Echo {
+				return ""
+			}
 			out += m.RenderSelf(cfg)
 		} else {
 			out += m.RenderFor(cfg)
@@ -226,6 +229,7 @@ type UserConfig struct {
 	Highlight  *regexp.Regexp
 	Bell       bool
 	Quiet      bool
+	Echo       bool // Echo shows your own messages after sending, disabled for bots
 	Timeformat *string
 	Timezone   *time.Location
 	Theme      *Theme
@@ -237,6 +241,7 @@ var DefaultUserConfig UserConfig
 func init() {
 	DefaultUserConfig = UserConfig{
 		Bell:  true,
+		Echo:  true,
 		Quiet: false,
 	}
 
