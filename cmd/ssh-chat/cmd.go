@@ -120,37 +120,36 @@ func main() {
 		if options.Whitelist != "" {
 			logger.Warning("Passphrase is disabled while whitelist is enabled.")
 		}
-		{
-			cb := config.KeyboardInteractiveCallback
-			config.KeyboardInteractiveCallback = func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
-				perm, err := cb(conn, challenge)
-				if err != nil {
-					return perm, err
-				}
-				answers, err := challenge("", "", []string{"Passphrase required to connect: "}, []bool{true})
-				if err != nil {
-					return nil, err
-				}
-				if len(answers) == 1 && answers[0] == options.Passphrase {
-					// Success
-					return perm, nil
-				}
-				// It's not gonna do much but may as well throttle brute force attempts a little
-				time.Sleep(2 * time.Second)
-
-				return nil, errors.New("incorrect passphrase")
-			}
+		if config.KeyboardInteractiveCallback != nil {
+			fail(1, "Passphrase authentication conflicts with existing KeyboardInteractive setup.") // This should not happen
 		}
-		{
-			// We also need to override the PublicKeyCallback to prevent rando pubkeys from bypassing
-			cb := config.PublicKeyCallback
-			config.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-				perms, err := cb(conn, key)
-				if err == nil {
-					err = errors.New("passphrase authentication required")
-				}
-				return perms, err
+
+		// We use KeyboardInteractiveCallback instead of PasswordCallback to
+		// avoid preventing the client from including a pubkey in the user
+		// identification.
+		config.KeyboardInteractiveCallback = func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			answers, err := challenge("", "", []string{"Passphrase required to connect: "}, []bool{true})
+			if err != nil {
+				return nil, err
 			}
+			if len(answers) == 1 && answers[0] == options.Passphrase {
+				// Success
+				return nil, nil
+			}
+			// It's not gonna do much but may as well throttle brute force attempts a little
+			time.Sleep(2 * time.Second)
+
+			return nil, errors.New("incorrect passphrase")
+		}
+
+		// We also need to override the PublicKeyCallback to prevent rando pubkeys from bypassing
+		cb := config.PublicKeyCallback
+		config.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			perms, err := cb(conn, key)
+			if err == nil {
+				err = errors.New("passphrase authentication required")
+			}
+			return perms, err
 		}
 
 	}
