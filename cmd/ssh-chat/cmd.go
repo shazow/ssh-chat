@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os/signal"
 	"os/user"
 	"strings"
+	"time"
 
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
@@ -19,8 +21,9 @@ import (
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
+
+	_ "net/http/pprof"
 )
-import _ "net/http/pprof"
 
 // Version of the binary, assigned during build.
 var Version string = "dev"
@@ -36,7 +39,21 @@ type Options struct {
 	Motd      string `long:"motd" description:"Optional Message of the Day file."`
 	Log       string `long:"log" description:"Write chat log to this file."`
 	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
+
+	// Hidden flags, because they're discouraged from being used casually.
+	Passphrase string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure." hidden:"true"`
 }
+
+const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
+place to start looking. Some useful links:
+
+* Project Repository:
+  https://github.com/shazow/ssh-chat
+* Project Wiki FAQ:
+  https://github.com/shazow/ssh-chat/wiki/FAQ
+* Command Flags Declaration:
+  https://github.com/shazow/ssh-chat/blob/master/cmd/ssh-chat/cmd.go#L29
+`
 
 var logLevels = []log.Level{
 	log.Warning,
@@ -56,6 +73,9 @@ func main() {
 	if err != nil {
 		if p == nil {
 			fmt.Print(err)
+		}
+		if flagErr, ok := err.(*flags.Error); ok && flagErr.Type == flags.ErrHelp {
+			fmt.Print(extraHelp)
 		}
 		return
 	}
@@ -78,7 +98,8 @@ func main() {
 	}
 
 	logLevel := logLevels[numVerbose]
-	sshchat.SetLogger(golog.New(os.Stderr, logLevel))
+	logger := golog.New(os.Stderr, logLevel)
+	sshchat.SetLogger(logger)
 
 	if logLevel == log.Debug {
 		// Enable logging from submodules
@@ -109,6 +130,45 @@ func main() {
 	config := sshd.MakeAuth(auth)
 	config.AddHostKey(signer)
 	config.ServerVersion = "SSH-2.0-Go ssh-chat"
+	// FIXME: Should we be using config.NoClientAuth = true by default?
+
+	if options.Passphrase != "" {
+		if options.Whitelist != "" {
+			logger.Warning("Passphrase is disabled while whitelist is enabled.")
+		}
+		if config.KeyboardInteractiveCallback != nil {
+			fail(1, "Passphrase authentication conflicts with existing KeyboardInteractive setup.") // This should not happen
+		}
+
+		// We use KeyboardInteractiveCallback instead of PasswordCallback to
+		// avoid preventing the client from including a pubkey in the user
+		// identification.
+		config.KeyboardInteractiveCallback = func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			answers, err := challenge("", "", []string{"Passphrase required to connect: "}, []bool{true})
+			if err != nil {
+				return nil, err
+			}
+			if len(answers) == 1 && answers[0] == options.Passphrase {
+				// Success
+				return nil, nil
+			}
+			// It's not gonna do much but may as well throttle brute force attempts a little
+			time.Sleep(2 * time.Second)
+
+			return nil, errors.New("incorrect passphrase")
+		}
+
+		// We also need to override the PublicKeyCallback to prevent rando pubkeys from bypassing
+		cb := config.PublicKeyCallback
+		config.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			perms, err := cb(conn, key)
+			if err == nil {
+				err = errors.New("passphrase authentication required")
+			}
+			return perms, err
+		}
+
+	}
 
 	s, err := sshd.ListenSSH(options.Bind, config)
 	if err != nil {
