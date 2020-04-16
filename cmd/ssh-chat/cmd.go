@@ -30,17 +30,30 @@ var Version string = "dev"
 
 // Options contains the flag options
 type Options struct {
-	Verbose    []bool `short:"v" long:"verbose" description:"Show verbose logging."`
-	Version    bool   `long:"version" description:"Print version and exit."`
-	Identity   string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Bind       string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
-	Admin      string `long:"admin" description:"File of public keys who are admins."`
-	Whitelist  string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
-	Passphrase string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
-	Motd       string `long:"motd" description:"Optional Message of the Day file."`
-	Log        string `long:"log" description:"Write chat log to this file."`
-	Pprof      int    `long:"pprof" description:"Enable pprof http server for profiling."`
+	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose logging."`
+	Version   bool   `long:"version" description:"Print version and exit."`
+	Identity  string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Bind      string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
+	Admin     string `long:"admin" description:"File of public keys who are admins."`
+	Whitelist string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
+	Motd      string `long:"motd" description:"Optional Message of the Day file."`
+	Log       string `long:"log" description:"Write chat log to this file."`
+	Pprof     int    `long:"pprof" description:"Enable pprof http server for profiling."`
+
+	// Hidden flags, because they're discouraged from being used casually.
+	Passphrase string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure." hidden:"true"`
 }
+
+const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
+place to start looking. Some useful links:
+
+* Project Repository:
+  https://github.com/shazow/ssh-chat
+* Project Wiki FAQ:
+  https://github.com/shazow/ssh-chat/wiki/FAQ
+* Command Flags Declaration:
+  https://github.com/shazow/ssh-chat/blob/master/cmd/ssh-chat/cmd.go#L29
+`
 
 var logLevels = []log.Level{
 	log.Warning,
@@ -60,6 +73,9 @@ func main() {
 	if err != nil {
 		if p == nil {
 			fmt.Print(err)
+		}
+		if flagErr, ok := err.(*flags.Error); ok && flagErr.Type == flags.ErrHelp {
+			fmt.Print(extraHelp)
 		}
 		return
 	}
