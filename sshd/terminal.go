@@ -234,9 +234,13 @@ func (t *Terminal) Env() Env {
 }
 
 // Term returns the terminal string value as set by the pty.
-// If there was no pty request, this is empty.
+// If there was no pty request, it falls back to the TERM value passed in as an
+// Env variable.
 func (t *Terminal) Term() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.term
+	if t.term != "" {
+		return t.term
+	}
+	return Env(t.env).Get("TERM")
 }
