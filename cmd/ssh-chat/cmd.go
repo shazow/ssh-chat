@@ -112,14 +112,9 @@ func main() {
 		}
 	}
 
-	privateKey, err := ReadPrivateKey(privateKeyPath)
+	signer, err := ReadPrivateKey(privateKeyPath)
 	if err != nil {
-		fail(2, "Couldn't read private key: %v\n", err)
-	}
-
-	signer, err := ssh.ParsePrivateKey(privateKey)
-	if err != nil {
-		fail(3, "Failed to parse key: %v\n", err)
+		fail(3, "Failed to read identity private key: %v\n", err)
 	}
 
 	auth := sshchat.NewAuth()
