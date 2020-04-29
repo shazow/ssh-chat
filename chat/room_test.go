@@ -105,6 +105,12 @@ func TestIgnore(t *testing.T) {
 		t.Fatalf("should have %d ignored users, has %d", 1, len(ignoredList))
 	}
 
+	// ignoring the same user twice returns an error message and doesn't add the user twice
+	ch.Send(message.NewEmoteMsg("crying", ignored.user))
+	if ignorer.user.HasMessages() {
+		t.Fatal("should not have emote messages")
+	}
+
 	// when a message is sent from the ignored user, it is delivered to non-ignoring users
 	ch.Send(message.NewPublicMsg("hello", ignored.user))
 	other.user.HandleMsg(other.user.ConsumeOne())
