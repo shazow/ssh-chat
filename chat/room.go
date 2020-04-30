@@ -89,6 +89,14 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 	case message.MessageTo:
 		user := m.To()
+		if _, ok := m.(*message.PrivateMsg); ok {
+			fromMsg, _ := m.(message.MessageFrom)
+			if fromMsg != nil && user.Ignored.In(fromMsg.From().ID()) {
+				// Skip because ignored
+				return
+			}
+		}
+
 		user.Send(m)
 	default:
 		fromMsg, _ := m.(message.MessageFrom)

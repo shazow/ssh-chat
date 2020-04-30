@@ -183,6 +183,10 @@ func (m PrivateMsg) To() *User {
 	return m.to
 }
 
+func (m PrivateMsg) From() *User {
+	return m.from
+}
+
 func (m PrivateMsg) Render(t *Theme) string {
 	s := fmt.Sprintf("[PM from %s] %s", m.from.Name(), m.body)
 	if t == nil {
