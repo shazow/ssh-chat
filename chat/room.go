@@ -79,6 +79,11 @@ func (r *Room) SetLogging(out io.Writer) {
 
 // HandleMsg reacts to a message, will block until done.
 func (r *Room) HandleMsg(m message.Message) {
+	var fromID string
+	if fromMsg, ok := m.(message.MessageFrom); ok {
+		fromID = fromMsg.From().ID()
+	}
+
 	switch m := m.(type) {
 	case *message.CommandMsg:
 		cmd := *m
@@ -89,30 +94,23 @@ func (r *Room) HandleMsg(m message.Message) {
 		}
 	case message.MessageTo:
 		user := m.To()
-		if _, ok := m.(*message.PrivateMsg); ok {
-			fromMsg, _ := m.(message.MessageFrom)
-			if fromMsg != nil && user.Ignored.In(fromMsg.From().ID()) {
-				// Skip because ignored
-				return
-			}
+		if user.Ignored.In(fromID) {
+			return // Skip ignored
 		}
 
 		user.Send(m)
 	default:
-		fromMsg, _ := m.(message.MessageFrom)
 		r.history.Add(m)
 		r.Members.Each(func(_ string, item set.Item) (err error) {
 			user := item.Value().(*Member).User
 
-			if fromMsg != nil && user.Ignored.In(fromMsg.From().ID()) {
-				// Skip because ignored
-				return
+			if user.Ignored.In(fromID) {
+				return // Skip ignored
 			}
 
 			if _, ok := m.(*message.AnnounceMsg); ok {
 				if user.Config().Quiet {
-					// Skip announcements
-					return
+					return // Skip announcements
 				}
 			}
 			user.Send(m)
