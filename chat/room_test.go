@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/set"
@@ -105,15 +104,18 @@ func TestIgnore(t *testing.T) {
 		t.Fatalf("should have %d ignored users, has %d", 1, len(ignoredList))
 	}
 
-	// when an emote is sent by an ignored user, it should not be displayed
-	ch.Send(message.NewEmoteMsg("crying", ignored.user))
-
+	// when an emote is sent by an ignored user, it should not be displayed for ignorer
+	ch.HandleMsg(message.NewEmoteMsg("is crying", ignored.user))
 	if ignorer.user.HasMessages() {
 		t.Fatal("should not have emote messages")
 	}
 
+	other.user.HandleMsg(other.user.ConsumeOne())
+	other.screen.Read(&buffer)
+	expectOutput(t, buffer, "** "+ignored.user.Name()+" is crying"+message.Newline)
+
 	// when a message is sent from the ignored user, it is delivered to non-ignoring users
-	ch.Send(message.NewPublicMsg("hello", ignored.user))
+	ch.HandleMsg(message.NewPublicMsg("hello", ignored.user))
 	other.user.HandleMsg(other.user.ConsumeOne())
 	other.screen.Read(&buffer)
 	expectOutput(t, buffer, ignored.user.Name()+": hello"+message.Newline)
@@ -145,15 +147,10 @@ func TestIgnore(t *testing.T) {
 	}
 
 	// after unignoring a user, its messages can be received again
-	ch.Send(message.NewPublicMsg("hello again!", ignored.user))
-
-	// give some time for the channel to get the message
-	time.Sleep(100)
+	ch.HandleMsg(message.NewPublicMsg("hello again!", ignored.user))
 
 	// ensure ignorer has received the message
 	if !ignorer.user.HasMessages() {
-		// FIXME: This is flaky :/
-		t.Skip("test is broken")
 		t.Fatal("should have messages")
 	}
 	ignorer.user.HandleMsg(ignorer.user.ConsumeOne())
@@ -162,6 +159,8 @@ func TestIgnore(t *testing.T) {
 }
 
 func expectOutput(t *testing.T, buffer []byte, expected string) {
+	t.Helper()
+
 	bytes := []byte(expected)
 	if !reflect.DeepEqual(buffer, bytes) {
 		t.Errorf("Got: %q; Expected: %q", buffer, expected)
