@@ -23,6 +23,8 @@ var ErrUserClosed = errors.New("user closed")
 type User struct {
 	Identifier
 	Ignored  *set.Set
+	OnChange func()
+
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -72,12 +74,20 @@ func (u *User) SetConfig(cfg UserConfig) {
 	u.mu.Lock()
 	u.config = cfg
 	u.mu.Unlock()
+
+	if u.OnChange != nil {
+		u.OnChange()
+	}
 }
 
 // Rename the user with a new Identifier.
 func (u *User) SetID(id string) {
 	u.Identifier.SetID(id)
 	u.setColorIdx(rand.Int())
+
+	if u.OnChange != nil {
+		u.OnChange()
+	}
 }
 
 // ReplyTo returns the last user that messaged this user.
