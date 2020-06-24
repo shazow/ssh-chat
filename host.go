@@ -95,7 +95,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	user := message.NewUserScreen(id, term)
 	user.OnChange = func() {
 		term.SetPrompt(GetPrompt(user))
-		user.SetHighlight(user.Name())
+		user.SetHighlight(user.ID())
 	}
 	cfg := user.Config()
 
@@ -283,7 +283,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			if completed == "/reply" {
 				replyTo := u.ReplyTo()
 				if replyTo != nil {
-					name := replyTo.Name()
+					name := replyTo.ID()
 					_, found := h.GetUser(name)
 					if found {
 						completed = "/msg " + name
@@ -634,10 +634,29 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
+			symbolSet := false
+			if len(args) == 3 {
+				s := args[2]
+				if id, ok := member.Identifier.(*Identity); ok {
+					id.SetSymbol(s)
+				} else {
+					return errors.New("user does not support setting symbol")
+				}
+
+				body := fmt.Sprintf("Assigned symbol %q by %s.", s, msg.From().Name())
+				room.Send(message.NewSystemMsg(body, member.User))
+				symbolSet = true
+			}
+
 			oldID := member.ID()
 			newID := sanitize.Name(args[1])
 			if newID == oldID {
 				return errors.New("new name is the same as the original")
+			} else if newID == "" && symbolSet {
+				if member.User.OnChange != nil {
+					member.User.OnChange()
+				}
+				return nil
 			}
 
 			member.SetID(newID)
