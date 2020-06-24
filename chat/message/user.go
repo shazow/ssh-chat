@@ -206,7 +206,7 @@ func (u *User) writeMsg(m Message) error {
 	r := u.render(m)
 	_, err := u.screen.Write([]byte(r))
 	if err != nil {
-		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
+		logger.Printf("Write failed to %s, closing: %s", u.ID(), err)
 		u.Close()
 	}
 	return err
@@ -227,7 +227,7 @@ func (u *User) Send(m Message) error {
 		return ErrUserClosed
 	case u.msg <- m:
 	case <-time.After(messageTimeout):
-		logger.Printf("Message buffer full, closing: %s", u.Name())
+		logger.Printf("Message buffer full, closing: %s", u.ID())
 		u.Close()
 		return ErrUserClosed
 	}

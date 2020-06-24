@@ -239,7 +239,7 @@ func (r *Room) NamesPrefix(prefix string) []string {
 	// Pull out names
 	names := make([]string, 0, len(items))
 	for _, user := range users {
-		names = append(names, user.Name())
+		names = append(names, user.ID())
 	}
 	return names
 }
