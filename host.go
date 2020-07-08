@@ -407,12 +407,11 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if !ok {
 				return errors.New("user not found")
 			}
-
 			id := target.Identifier.(*Identity)
 			var whois string
 			switch room.IsOp(msg.From()) {
 			case true:
-				whois = id.WhoisAdmin()
+				whois = id.WhoisAdmin(room, h)
 			case false:
 				whois = id.Whois()
 			}
