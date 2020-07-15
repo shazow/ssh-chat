@@ -411,7 +411,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			var whois string
 			switch room.IsOp(msg.From()) {
 			case true:
-				whois = id.WhoisAdmin(room, h)
+				whois = id.WhoisAdmin(room)
 			case false:
 				whois = id.Whois()
 			}

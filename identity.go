@@ -60,7 +60,7 @@ func (i Identity) Whois() string {
 }
 
 // WhoisAdmin returns a whois description for admin users.
-func (i Identity) WhoisAdmin(room *chat.Room, host *Host) string {
+func (i Identity) WhoisAdmin(room *chat.Room) string {
 	ip, _, _ := net.SplitHostPort(i.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
@@ -68,15 +68,14 @@ func (i Identity) WhoisAdmin(room *chat.Room, host *Host) string {
 	}
 
 	isOp := ""
-	user, ok := host.GetUser(i.id)
-	if ok && room.IsOp(user) {
-		isOp = " > Op" + message.Newline
+	if member, ok := room.MemberByID(i.ID()); ok && room.IsOp(member.User) {
+		isOp = message.Newline + " > op: true"
 	}
 
 	return "name: " + i.Name() + message.Newline +
-		isOp +
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.Since(i.created) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago" +
+		isOp
 }
