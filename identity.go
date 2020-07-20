@@ -4,6 +4,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
@@ -59,15 +60,22 @@ func (i Identity) Whois() string {
 }
 
 // WhoisAdmin returns a whois description for admin users.
-func (i Identity) WhoisAdmin() string {
+func (i Identity) WhoisAdmin(room *chat.Room) string {
 	ip, _, _ := net.SplitHostPort(i.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
+
+	isOp := ""
+	if member, ok := room.MemberByID(i.ID()); ok && room.IsOp(member.User) {
+		isOp = message.Newline + " > op: true"
+	}
+
 	return "name: " + i.Name() + message.Newline +
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.Since(i.created) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago" +
+		isOp
 }
