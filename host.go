@@ -243,8 +243,8 @@ func (h *Host) Serve() {
 	h.listener.Serve()
 }
 
-func (h *Host) completeName(partial string) string {
-	names := h.NamesPrefix(partial)
+func (h *Host) completeName(partial string, current_user *message.User) string {
+	names := h.NamesPrefix(partial, current_user)
 	if len(names) == 0 {
 		// Didn't find anything
 		return ""
@@ -300,7 +300,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			}
 		} else {
 			// Name
-			completed = h.completeName(partial)
+			completed = h.completeName(partial, u)
 			if completed == "" {
 				return
 			}

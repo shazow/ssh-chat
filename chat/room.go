@@ -226,7 +226,7 @@ func (r *Room) SetTopic(s string) {
 
 // NamesPrefix lists all members' names with a given prefix, used to query
 // for autocompletion purposes. Sorted by which user was last active.
-func (r *Room) NamesPrefix(prefix string) []string {
+func (r *Room) NamesPrefix(prefix string, current_user *message.User) []string {
 	items := r.Members.ListPrefix(prefix)
 
 	// Sort results by recently active
@@ -235,6 +235,14 @@ func (r *Room) NamesPrefix(prefix string) []string {
 		users = append(users, item.Value().(*Member).User)
 	}
 	sort.Sort(message.RecentActiveUsers(users))
+	for i, user := range users {
+		if user.Name() == current_user.Name() {
+			// move it to the end. one user in the list?
+			save := users[0]
+			copy(users[i:], users[i+1:])
+			users[len(users)-1] = save
+		}
+	}
 
 	// Pull out names
 	names := make([]string, 0, len(items))
