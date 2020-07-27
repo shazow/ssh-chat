@@ -394,20 +394,20 @@ func TestRoomNamesPrefix(t *testing.T) {
 	members[3].HandleMsg(message.NewMsg("hi")) // foo
 	members[1].HandleMsg(message.NewMsg("hi")) // aab
 
-	if got, want := r.NamesPrefix("a", members[3].User), []string{"aab", "aaa", "aac"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.NamesPrefix("a"), []string{"aab", "aaa", "aac"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}
 
 	members[2].HandleMsg(message.NewMsg("hi")) // aac
-	if got, want := r.NamesPrefix("a", members[3].User), []string{"aac", "aab", "aaa"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.NamesPrefix("a"), []string{"aac", "aab", "aaa"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}
 
-	if got, want := r.NamesPrefix("f", members[0].User), []string{"foo"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.NamesPrefix("f"), []string{"foo"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}
 
-	if got, want := r.NamesPrefix("bar", members[3].User), []string{}; !reflect.DeepEqual(got, want) {
+	if got, want := r.NamesPrefix("bar"), []string{}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}
 }
