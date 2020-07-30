@@ -262,7 +262,7 @@ func (a RecentActiveUsers) Less(i, j int) bool {
 	if a[i].lastMsg.IsZero() {
 		return a[i].joined.Before(a[j].joined)
 	} else {
-		return a[i].lastMsg.After(a[j].lastMsg)
+		return a[i].lastMsg.Before(a[j].lastMsg)
 	}
 
 }
