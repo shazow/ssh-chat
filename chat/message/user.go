@@ -62,6 +62,12 @@ func (u *User) Joined() time.Time {
 	return u.joined
 }
 
+func (u *User) LastMsg() time.Time {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.lastMsg
+}
+
 func (u *User) Config() UserConfig {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -161,6 +167,10 @@ func (u *User) render(m Message) string {
 	switch m := m.(type) {
 	case PublicMsg:
 		if u == m.From() {
+			u.mu.Lock()
+			u.lastMsg = m.Timestamp()
+			u.mu.Unlock()
+
 			if !cfg.Echo {
 				return ""
 			}
@@ -204,9 +214,6 @@ func (u *User) writeMsg(m Message) error {
 
 // HandleMsg will render the message to the screen, blocking.
 func (u *User) HandleMsg(m Message) error {
-	u.mu.Lock()
-	u.lastMsg = m.Timestamp()
-	u.mu.Unlock()
 	return u.writeMsg(m)
 }
 
@@ -248,7 +255,9 @@ func init() {
 	// TODO: Seed random?
 }
 
-// RecentActiveUsers is a slice of *Users that knows how to be sorted by the time of the last message.
+// RecentActiveUsers is a slice of *Users that knows how to be sorted by the
+// time of the last message. If no message has been sent, then fall back to the
+// time joined instead.
 type RecentActiveUsers []*User
 
 func (a RecentActiveUsers) Len() int      { return len(a) }
@@ -259,10 +268,15 @@ func (a RecentActiveUsers) Less(i, j int) bool {
 	a[j].mu.Lock()
 	defer a[j].mu.Unlock()
 
-	if a[i].lastMsg.IsZero() {
-		return a[i].joined.Before(a[j].joined)
-	} else {
-		return a[i].lastMsg.Before(a[j].lastMsg)
+	ai := a[i].lastMsg
+	if ai.IsZero() {
+		ai = a[i].joined
 	}
 
+	aj := a[j].lastMsg
+	if aj.IsZero() {
+		aj = a[j].joined
+	}
+
+	return ai.After(aj)
 }
