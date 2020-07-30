@@ -5,9 +5,9 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
-	"sort"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/sanitize"
