@@ -2,6 +2,7 @@ package sshchat
 
 import (
 	"net"
+	"strings"
 	"time"
 
 	"github.com/shazow/ssh-chat/chat"
@@ -48,6 +49,7 @@ func (i Identity) Name() string {
 }
 
 // Whois returns a whois description for non-admin users.
+// TODO: Add optional room context?
 func (i Identity) Whois() string {
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
@@ -67,15 +69,24 @@ func (i Identity) WhoisAdmin(room *chat.Room) string {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
 
-	isOp := ""
-	if member, ok := room.MemberByID(i.ID()); ok && room.IsOp(member.User) {
-		isOp = message.Newline + " > op: true"
-	}
-
-	return "name: " + i.Name() + message.Newline +
+	out := strings.Builder{}
+	out.WriteString("name: " + i.Name() + message.Newline +
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.Since(i.created) + " ago" +
-		isOp
+		" > joined: " + humantime.Since(i.created) + " ago")
+
+	if member, ok := room.MemberByID(i.ID()); ok {
+		// Add room-specific whois
+		// FIXME: Should these always be present, even if they're false? Maybe
+		// change that once we add room context to Whois() above.
+		if !member.LastMsg().IsZero() {
+			out.WriteString(message.Newline + " > room/messaged: " + humantime.Since(member.LastMsg()) + " ago")
+		}
+		if room.IsOp(member.User) {
+			out.WriteString(message.Newline + " > room/op: true")
+		}
+	}
+
+	return out.String()
 }
