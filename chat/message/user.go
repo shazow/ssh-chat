@@ -258,5 +258,11 @@ func (a RecentActiveUsers) Less(i, j int) bool {
 	defer a[i].mu.Unlock()
 	a[j].mu.Lock()
 	defer a[j].mu.Unlock()
-	return a[i].lastMsg.After(a[j].lastMsg)
+
+	if a[i].lastMsg.IsZero() {
+		return a[i].joined.Before(a[j].joined)
+	} else {
+		return a[i].lastMsg.Before(a[j].lastMsg)
+	}
+
 }
