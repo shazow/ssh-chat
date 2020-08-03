@@ -122,6 +122,7 @@ type Theme struct {
 	pm        Style
 	highlight Style
 	names     *Palette
+	useID     bool
 }
 
 func (theme Theme) ID() string {
@@ -130,11 +131,17 @@ func (theme Theme) ID() string {
 
 // Colorize name string given some index
 func (theme Theme) ColorName(u *User) string {
+	var name string
+	if theme.useID {
+		name = u.ID()
+	} else {
+		name = u.Name()
+	}
 	if theme.names == nil {
-		return u.Name()
+		return name
 	}
 
-	return theme.names.Get(u.colorIdx).Format(u.Name())
+	return theme.names.Get(u.colorIdx).Format(name)
 }
 
 // Colorize the PM string
@@ -226,7 +233,8 @@ func init() {
 			highlight: style(Bold + "\033[48;5;22m\033[38;5;46m"), // Green on dark green
 		},
 		{
-			id: "mono",
+			id:    "mono",
+			useID: true,
 		},
 	}
 
