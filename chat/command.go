@@ -411,4 +411,51 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+
+	c.Add(Command{
+		Prefix:     "/focus",
+		PrefixHelp: "[USER ...]",
+		Help:       "Only show messages from focused users, or $ to reset.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			ids := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/focus"))
+			if ids == "" {
+				// Print focused names, if any.
+				var names []string
+				msg.From().Focused.Each(func(_ string, item set.Item) error {
+					names = append(names, item.Key())
+					return nil
+				})
+
+				var systemMsg string
+				if len(names) == 0 {
+					systemMsg = "Unfocused."
+				} else {
+					systemMsg = fmt.Sprintf("Focusing on %d users: %s", len(names), strings.Join(names, ", "))
+				}
+
+				room.Send(message.NewSystemMsg(systemMsg, msg.From()))
+				return nil
+			}
+
+			n := msg.From().Focused.Clear()
+			if ids == "$" {
+				room.Send(message.NewSystemMsg(fmt.Sprintf("Removed focus from %d users.", n), msg.From()))
+				return nil
+			}
+
+			var focused []string
+			for _, name := range strings.Split(ids, " ") {
+				id := sanitize.Name(name)
+				if id == "" {
+					continue // Skip
+				}
+				focused = append(focused, id)
+				if err := msg.From().Focused.Set(set.Itemize(id, set.ZeroValue)); err != nil {
+					return err
+				}
+			}
+			room.Send(message.NewSystemMsg(fmt.Sprintf("Focusing: %s", strings.Join(focused, ", ")), msg.From()))
+			return nil
+		},
+	})
 }
