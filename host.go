@@ -669,9 +669,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			oldID := member.ID()
 			newID := sanitize.Name(args[1])
-			if newID == oldID {
+			if newID == oldID && !symbolSet {
 				return errors.New("new name is the same as the original")
-			} else if newID == "" && symbolSet {
+			} else if (newID == "" || newID == oldID) && symbolSet {
 				if member.User.OnChange != nil {
 					member.User.OnChange()
 				}
