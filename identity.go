@@ -2,8 +2,10 @@ package sshchat
 
 import (
 	"net"
+	"strings"
 	"time"
 
+	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
@@ -55,6 +57,7 @@ func (i Identity) Name() string {
 }
 
 // Whois returns a whois description for non-admin users.
+// TODO: Add optional room context?
 func (i Identity) Whois() string {
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
@@ -67,15 +70,31 @@ func (i Identity) Whois() string {
 }
 
 // WhoisAdmin returns a whois description for admin users.
-func (i Identity) WhoisAdmin() string {
+func (i Identity) WhoisAdmin(room *chat.Room) string {
 	ip, _, _ := net.SplitHostPort(i.RemoteAddr().String())
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
-	return "name: " + i.Name() + message.Newline +
+
+	out := strings.Builder{}
+	out.WriteString("name: " + i.Name() + message.Newline +
 		" > ip: " + ip + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.Since(i.created) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago")
+
+	if member, ok := room.MemberByID(i.ID()); ok {
+		// Add room-specific whois
+		// FIXME: Should these always be present, even if they're false? Maybe
+		// change that once we add room context to Whois() above.
+		if !member.LastMsg().IsZero() {
+			out.WriteString(message.Newline + " > room/messaged: " + humantime.Since(member.LastMsg()) + " ago")
+		}
+		if room.IsOp(member.User) {
+			out.WriteString(message.Newline + " > room/op: true")
+		}
+	}
+
+	return out.String()
 }

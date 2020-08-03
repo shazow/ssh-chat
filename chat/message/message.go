@@ -131,6 +131,9 @@ func (m PublicMsg) RenderFor(cfg UserConfig) string {
 
 // RenderSelf renders the message for when it's echoing your own message.
 func (m PublicMsg) RenderSelf(cfg UserConfig) string {
+	if cfg.Theme == nil {
+		return fmt.Sprintf("[%s] %s", m.from.Name(), m.body)
+	}
 	return fmt.Sprintf("[%s] %s", cfg.Theme.ColorName(m.from), m.body)
 }
 

@@ -388,17 +388,22 @@ func TestRoomNamesPrefix(t *testing.T) {
 		}
 	}
 
+	sendMsg := func(from *Member, body string) {
+		// lastMsg is set during render of self messags, so we can't use NewMsg
+		from.HandleMsg(message.NewPublicMsg(body, from.User))
+	}
+
 	// Inject some activity
-	members[2].HandleMsg(message.NewMsg("hi")) // aac
-	members[0].HandleMsg(message.NewMsg("hi")) // aaa
-	members[3].HandleMsg(message.NewMsg("hi")) // foo
-	members[1].HandleMsg(message.NewMsg("hi")) // aab
+	sendMsg(members[2], "hi") // aac
+	sendMsg(members[0], "hi") // aaa
+	sendMsg(members[3], "hi") // foo
+	sendMsg(members[1], "hi") // aab
 
 	if got, want := r.NamesPrefix("a"), []string{"aab", "aaa", "aac"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}
 
-	members[2].HandleMsg(message.NewMsg("hi")) // aac
+	sendMsg(members[2], "hi") // aac
 	if got, want := r.NamesPrefix("a"), []string{"aac", "aab", "aaa"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %q; want: %q", got, want)
 	}

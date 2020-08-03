@@ -22,9 +22,9 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
-	Ignored  *set.Set
 	OnChange func()
-
+	Ignored  set.Interface
+	Focused  set.Interface
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -47,6 +47,7 @@ func NewUser(identity Identifier) *User {
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
 		Ignored:    set.New(),
+		Focused:    set.New(),
 	}
 	u.setColorIdx(rand.Int())
 
@@ -62,6 +63,12 @@ func NewUserScreen(identity Identifier, screen io.WriteCloser) *User {
 
 func (u *User) Joined() time.Time {
 	return u.joined
+}
+
+func (u *User) LastMsg() time.Time {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.lastMsg
 }
 
 func (u *User) Config() UserConfig {
@@ -171,10 +178,17 @@ func (u *User) render(m Message) string {
 	switch m := m.(type) {
 	case PublicMsg:
 		if u == m.From() {
+			u.mu.Lock()
+			u.lastMsg = m.Timestamp()
+			u.mu.Unlock()
+
 			if !cfg.Echo {
 				return ""
 			}
 			out += m.RenderSelf(cfg)
+		} else if u.Focused.Len() > 0 && !u.Focused.In(m.From().ID()) {
+			// Skip message during focus
+			return ""
 		} else {
 			out += m.RenderFor(cfg)
 		}
@@ -214,9 +228,6 @@ func (u *User) writeMsg(m Message) error {
 
 // HandleMsg will render the message to the screen, blocking.
 func (u *User) HandleMsg(m Message) error {
-	u.mu.Lock()
-	u.lastMsg = m.Timestamp()
-	u.mu.Unlock()
 	return u.writeMsg(m)
 }
 
@@ -258,7 +269,9 @@ func init() {
 	// TODO: Seed random?
 }
 
-// RecentActiveUsers is a slice of *Users that knows how to be sorted by the time of the last message.
+// RecentActiveUsers is a slice of *Users that knows how to be sorted by the
+// time of the last message. If no message has been sent, then fall back to the
+// time joined instead.
 type RecentActiveUsers []*User
 
 func (a RecentActiveUsers) Len() int      { return len(a) }
@@ -268,5 +281,16 @@ func (a RecentActiveUsers) Less(i, j int) bool {
 	defer a[i].mu.Unlock()
 	a[j].mu.Lock()
 	defer a[j].mu.Unlock()
-	return a[i].lastMsg.After(a[j].lastMsg)
+
+	ai := a[i].lastMsg
+	if ai.IsZero() {
+		ai = a[i].joined
+	}
+
+	aj := a[j].lastMsg
+	if aj.IsZero() {
+		aj = a[j].joined
+	}
+
+	return ai.After(aj)
 }

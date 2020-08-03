@@ -237,14 +237,19 @@ func (h *Host) Serve() {
 	h.listener.Serve()
 }
 
-func (h *Host) completeName(partial string) string {
+func (h *Host) completeName(partial string, skipName string) string {
 	names := h.NamesPrefix(partial)
 	if len(names) == 0 {
 		// Didn't find anything
 		return ""
+	} else if name := names[0]; name != skipName {
+		// First name is not the skipName, great
+		return name
+	} else if len(names) > 1 {
+		// Next candidate
+		return names[1]
 	}
-
-	return names[len(names)-1]
+	return ""
 }
 
 func (h *Host) completeCommand(partial string) string {
@@ -294,7 +299,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			}
 		} else {
 			// Name
-			completed = h.completeName(partial)
+			completed = h.completeName(partial, u.Name())
 			if completed == "" {
 				return
 			}
@@ -401,12 +406,11 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if !ok {
 				return errors.New("user not found")
 			}
-
 			id := target.Identifier.(*Identity)
 			var whois string
 			switch room.IsOp(msg.From()) {
 			case true:
-				whois = id.WhoisAdmin()
+				whois = id.WhoisAdmin(room)
 			case false:
 				whois = id.Whois()
 			}
