@@ -16,6 +16,8 @@ Join the party:
 $ ssh ssh.chat
 ```
 
+Please abide by our [project's Code of Conduct](https://github.com/shazow/ssh-chat/blob/master/CODE_OF_CONDUCT.md) while participating in chat.
+
 The server's RSA key fingerprint is `MD5:e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6a:db` or `SHA256:HQDLlZsXL3t0lV5CHM0OXeZ5O6PcfHuzkS8cRbbTLBI`. If you see something different, you might be [MITM](https://en.wikipedia.org/wiki/Man-in-the-middle_attack)'d.
 
 (Apologies if the server is down, try again shortly.)
@@ -84,4 +86,4 @@ Feel free to submit more questions to be answered and added to the page.
 
 ## License
 
-This project is licensed under the MIT open source license.
+MIT
