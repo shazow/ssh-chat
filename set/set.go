@@ -15,6 +15,25 @@ var ErrMissing = errors.New("item does not exist")
 // Returned when a nil item is added. Nil values are considered expired and invalid.
 var ErrNil = errors.New("item value must not be nil")
 
+// ZeroValue can be used when we only care about the key, not about the value.
+var ZeroValue = struct{}{}
+
+// Interface is the Set interface
+type Interface interface {
+	Clear() int
+	Each(fn IterFunc) error
+	// Add only if the item does not already exist
+	Add(item Item) error
+	// Set item, override if it already exists
+	Set(item Item) error
+	Get(key string) (Item, error)
+	In(key string) bool
+	Len() int
+	ListPrefix(prefix string) []Item
+	Remove(key string) error
+	Replace(oldKey string, item Item) error
+}
+
 type IterFunc func(key string, item Item) error
 
 type Set struct {

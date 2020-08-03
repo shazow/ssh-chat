@@ -22,7 +22,8 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
-	Ignored  *set.Set
+	Ignored  set.Interface
+	Focused  set.Interface
 	colorIdx int
 	joined   time.Time
 	msg      chan Message
@@ -45,6 +46,7 @@ func NewUser(identity Identifier) *User {
 		msg:        make(chan Message, messageBuffer),
 		done:       make(chan struct{}),
 		Ignored:    set.New(),
+		Focused:    set.New(),
 	}
 	u.setColorIdx(rand.Int())
 
@@ -175,6 +177,9 @@ func (u *User) render(m Message) string {
 				return ""
 			}
 			out += m.RenderSelf(cfg)
+		} else if u.Focused.Len() > 0 && !u.Focused.In(m.From().ID()) {
+			// Skip message during focus
+			return ""
 		} else {
 			out += m.RenderFor(cfg)
 		}
