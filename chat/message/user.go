@@ -22,6 +22,7 @@ var ErrUserClosed = errors.New("user closed")
 // User definition, implemented set Item interface and io.Writer
 type User struct {
 	Identifier
+	OnChange func()
 	Ignored  set.Interface
 	Focused  set.Interface
 	colorIdx int
@@ -80,12 +81,20 @@ func (u *User) SetConfig(cfg UserConfig) {
 	u.mu.Lock()
 	u.config = cfg
 	u.mu.Unlock()
+
+	if u.OnChange != nil {
+		u.OnChange()
+	}
 }
 
 // Rename the user with a new Identifier.
 func (u *User) SetID(id string) {
 	u.Identifier.SetID(id)
 	u.setColorIdx(rand.Int())
+
+	if u.OnChange != nil {
+		u.OnChange()
+	}
 }
 
 // ReplyTo returns the last user that messaged this user.
@@ -211,7 +220,7 @@ func (u *User) writeMsg(m Message) error {
 	r := u.render(m)
 	_, err := u.screen.Write([]byte(r))
 	if err != nil {
-		logger.Printf("Write failed to %s, closing: %s", u.Name(), err)
+		logger.Printf("Write failed to %s, closing: %s", u.ID(), err)
 		u.Close()
 	}
 	return err
@@ -229,7 +238,7 @@ func (u *User) Send(m Message) error {
 		return ErrUserClosed
 	case u.msg <- m:
 	case <-time.After(messageTimeout):
-		logger.Printf("Message buffer full, closing: %s", u.Name())
+		logger.Printf("Message buffer full, closing: %s", u.ID())
 		u.Close()
 		return ErrUserClosed
 	}

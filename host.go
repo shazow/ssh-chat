@@ -13,6 +13,7 @@ import (
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
+	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -92,6 +93,10 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
+	user.OnChange = func() {
+		term.SetPrompt(GetPrompt(user))
+		user.SetHighlight(user.ID())
+	}
 	cfg := user.Config()
 
 	apiMode := strings.ToLower(term.Term()) == "bot"
@@ -216,17 +221,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			// Skip the remaining rendering workarounds
 			continue
 		}
-
-		cmd := m.Command()
-		if cmd == "/nick" || cmd == "/theme" {
-			// Hijack /nick command to update terminal synchronously. Wouldn't
-			// work if we use h.room.Send(m) above.
-			//
-			// FIXME: This is hacky, how do we improve the API to allow for
-			// this? Chat module shouldn't know about terminals.
-			term.SetPrompt(GetPrompt(user))
-			user.SetHighlight(user.Name())
-		}
 	}
 
 	err = h.Leave(user)
@@ -294,7 +288,7 @@ func (h *Host) AutoCompleteFunction(u *message.User) func(line string, pos int, 
 			if completed == "/reply" {
 				replyTo := u.ReplyTo()
 				if replyTo != nil {
-					name := replyTo.Name()
+					name := replyTo.ID()
 					_, found := h.GetUser(name)
 					if found {
 						completed = "/msg " + name
@@ -619,6 +613,65 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				body = fmt.Sprintf("Removed op by %s.", msg.From().Name())
 			}
 			room.Send(message.NewSystemMsg(body, member.User))
+
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/rename",
+		PrefixHelp: "USER NEW_NAME [SYMBOL]",
+		Help:       "Rename USER to NEW_NAME, add optional SYMBOL prefix",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) < 2 {
+				return errors.New("must specify user and new name")
+			}
+
+			member, ok := room.MemberByID(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			symbolSet := false
+			if len(args) == 3 {
+				s := args[2]
+				if id, ok := member.Identifier.(*Identity); ok {
+					id.SetSymbol(s)
+				} else {
+					return errors.New("user does not support setting symbol")
+				}
+
+				body := fmt.Sprintf("Assigned symbol %q by %s.", s, msg.From().Name())
+				room.Send(message.NewSystemMsg(body, member.User))
+				symbolSet = true
+			}
+
+			oldID := member.ID()
+			newID := sanitize.Name(args[1])
+			if newID == oldID {
+				return errors.New("new name is the same as the original")
+			} else if newID == "" && symbolSet {
+				if member.User.OnChange != nil {
+					member.User.OnChange()
+				}
+				return nil
+			}
+
+			member.SetID(newID)
+			err := room.Rename(oldID, member)
+			if err != nil {
+				member.SetID(oldID)
+				return err
+			}
+
+			body := fmt.Sprintf("%s was renamed by %s.", oldID, msg.From().Name())
+			room.Send(message.NewAnnounceMsg(body))
 
 			return nil
 		},

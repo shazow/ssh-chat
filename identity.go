@@ -16,6 +16,7 @@ import (
 type Identity struct {
 	sshd.Connection
 	id      string
+	symbol  string // symbol is displayed as a prefix to the name
 	created time.Time
 }
 
@@ -43,8 +44,15 @@ func (i *Identity) SetName(name string) {
 	i.SetID(name)
 }
 
+func (i *Identity) SetSymbol(symbol string) {
+	i.symbol = symbol
+}
+
 // Name returns the name for the Identity
 func (i Identity) Name() string {
+	if i.symbol != "" {
+		return i.symbol + " " + i.id
+	}
 	return i.id
 }
 
