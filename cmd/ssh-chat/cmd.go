@@ -205,15 +205,22 @@ func main() {
 	}
 
 	if options.Motd != "" {
-		motd, err := ioutil.ReadFile(options.Motd)
-		if err != nil {
-			fail(7, "Failed to load MOTD file: %v\n", err)
+		host.GetMOTD = func() (string, error) {
+			motd, err := ioutil.ReadFile(options.Motd)
+			if err != nil {
+				return "", err
+			}
+			motdString := string(motd)
+			// hack to normalize line endings into \r\n
+			motdString = strings.Replace(motdString, "\r\n", "\n", -1)
+			motdString = strings.Replace(motdString, "\n", "\r\n", -1)
+			return motdString, nil
 		}
-		motdString := string(motd)
-		// hack to normalize line endings into \r\n
-		motdString = strings.Replace(motdString, "\r\n", "\n", -1)
-		motdString = strings.Replace(motdString, "\n", "\r\n", -1)
-		host.SetMotd(motdString)
+		if motdString, err := host.GetMOTD(); err != nil {
+			fail(7, "Failed to load MOTD file: %v\n", err)
+		} else {
+			host.SetMotd(motdString)
+		}
 	}
 
 	if options.Log == "-" {

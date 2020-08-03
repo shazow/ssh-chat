@@ -1,4 +1,4 @@
 [31;1mWelcome to ssh-chat, enter [0m/help[31;1m for more.
-   [32;1m🐛 Please enjoy our selection of bugs, but run your own server if you want to crash it:[0m https://ssh.chat/issues
-   [33;1m🍮 Sponsors get an emoji prefix:[0m https://ssh.chat/sponsor
-   [34;1m😌 Be nice and follow our Code of Conduct:[0m https://ssh.chat/conduct
+[32;1m🐛 Please enjoy our selection of bugs, but run your own server if you want to crash it:[0m https://ssh.chat/issues
+[33;1m🍮 Sponsors get an emoji prefix:[0m https://ssh.chat/sponsor
+[34;1m😌 Be nice and follow our Code of Conduct:[0m https://ssh.chat/conduct

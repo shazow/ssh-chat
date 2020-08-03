@@ -46,6 +46,9 @@ type Host struct {
 	mu    sync.Mutex
 	motd  string
 	count int
+
+	// GetMOTD is used to reload the motd from an external source
+	GetMOTD func() (string, error)
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -75,6 +78,7 @@ func (h *Host) SetTheme(theme message.Theme) {
 }
 
 // SetMotd sets the host's message of the day.
+// TODO: Change to SetMOTD
 func (h *Host) SetMotd(motd string) {
 	h.mu.Lock()
 	h.motd = motd
@@ -544,7 +548,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		Op:         true,
 		Prefix:     "/motd",
 		PrefixHelp: "[MESSAGE]",
-		Help:       "Set a new MESSAGE of the day, print the current motd without parameters.",
+		Help:       "Set a new MESSAGE of the day, or print the motd if no MESSAGE.",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			args := msg.Args()
 			user := msg.From()
@@ -561,10 +565,21 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("must be OP to modify the MOTD")
 			}
 
-			motd = strings.Join(args, " ")
-			h.SetMotd(motd)
+			var err error
+			var s string = strings.Join(args, " ")
+
+			if s == "@" {
+				if h.GetMOTD == nil {
+					return errors.New("motd reload not set")
+				}
+				if s, err = h.GetMOTD(); err != nil {
+					return err
+				}
+			}
+
+			h.SetMotd(s)
 			fromMsg := fmt.Sprintf("New message of the day set by %s:", msg.From().Name())
-			room.Send(message.NewAnnounceMsg(fromMsg + message.Newline + "-> " + motd))
+			room.Send(message.NewAnnounceMsg(fromMsg + message.Newline + "-> " + s))
 
 			return nil
 		},
