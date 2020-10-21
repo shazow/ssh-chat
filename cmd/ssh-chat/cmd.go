@@ -30,16 +30,17 @@ var Version string = "dev"
 
 // Options contains the flag options
 type Options struct {
-	Admin      string `long:"admin" description:"File of public keys who are admins."`
-	Bind       string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
-	Identity   string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Log        string `long:"log" description:"Write chat log to this file."`
-	Motd       string `long:"motd" description:"Optional Message of the Day file."`
-	Pprof      int    `long:"pprof" description:"Enable pprof http server for profiling."`
-	Verbose    []bool `short:"v" long:"verbose" description:"Show verbose logging."`
-	Version    bool   `long:"version" description:"Print version and exit."`
-	Whitelist  string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
-	Passphrase string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
+	Admin       string `long:"admin" description:"File of public keys who are admins."`
+	Bind        string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
+	Identity    string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Log         string `long:"log" description:"Write chat log to this file."`
+	Motd        string `long:"motd" description:"Optional Message of the Day file."`
+	Pprof       int    `long:"pprof" description:"Enable pprof http server for profiling."`
+	Verbose     []bool `short:"v" long:"verbose" description:"Show verbose logging."`
+	Version     bool   `long:"version" description:"Print version and exit."`
+	Whitelist   string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
+	Passphrase  string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
+	RateLimited bool   `long:"nolimit" description:"Disable rate limiting"`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -173,6 +174,7 @@ func main() {
 	host := sshchat.NewHost(s, auth)
 	host.SetTheme(message.Themes[0])
 	host.Version = Version
+	host.RateLimited = !options.RateLimited
 
 	err = fromFile(options.Admin, func(line []byte) error {
 		key, _, _, _, err := ssh.ParseAuthorizedKey(line)

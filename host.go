@@ -47,6 +47,8 @@ type Host struct {
 	motd  string
 	count int
 
+	RateLimited bool
+
 	// GetMOTD is used to reload the motd from an external source
 	GetMOTD func() (string, error)
 }
@@ -193,11 +195,14 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			break
 		}
 
-		err = ratelimit.Count(1)
-		if err != nil {
-			user.Send(message.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
-			continue
+		if h.RateLimited {
+			err = ratelimit.Count(1)
+			if err != nil {
+				user.Send(message.NewSystemMsg("Message rejected: Rate limiting is in effect.", user))
+				continue
+			}
 		}
+
 		if len(line) > maxInputLength {
 			user.Send(message.NewSystemMsg("Message rejected: Input too long.", user))
 			continue
