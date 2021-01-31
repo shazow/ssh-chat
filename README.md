@@ -4,19 +4,17 @@
 [![Bountysource](https://www.bountysource.com/badge/team?team_id=52292&style=bounties_received)](https://www.bountysource.com/teams/ssh-chat/issues?utm_source=ssh-chat&utm_medium=shield&utm_campaign=bounties_received)
 
 
-# ssh-chat
+# ssh.chat
 
 Custom SSH server written in Go. Instead of a shell, you get a chat prompt.
 
-## Demo
-
-Join the party:
+## Join the party:
 
 ```
 $ ssh ssh.chat
 ```
 
-Please abide by our [project's Code of Conduct](https://github.com/shazow/ssh-chat/blob/master/CODE_OF_CONDUCT.md) while participating in chat.
+Please abide by our [project's Code of Conduct](https://ssh.chat/conduct) while participating in chat.
 
 The server's RSA key fingerprint is `MD5:e5:d5:d1:75:90:38:42:f6:c7:03:d7:d0:56:7d:6a:db` or `SHA256:HQDLlZsXL3t0lV5CHM0OXeZ5O6PcfHuzkS8cRbbTLBI`. If you see something different, you might be [MITM](https://en.wikipedia.org/wiki/Man-in-the-middle_attack)'d.
 
