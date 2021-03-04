@@ -288,6 +288,15 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+	
+	c.Add(Command{
+		Prefix: "/tableflip",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			room.Send(message.NewEmoteMsg(`(╯°□°）╯︵ ┻━┻`, msg.From()))
+			return nil
+		},
+	})
+
 
 	c.Add(Command{
 		Prefix:     "/timestamp",
