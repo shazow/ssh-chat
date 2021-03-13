@@ -1,6 +1,7 @@
 package sshchat
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -64,8 +65,9 @@ func (i Identity) Whois(room *chat.Room) string {
 	}
 	awayMsg := ""
 	if m, ok := room.MemberByID(i.ID()); ok {
-		if m.IsAway() {
-			awayMsg = message.Newline + " > away since: " + humantime.Since(m.LastActivity())
+		isAway, awaySince, awayMessage := m.GetAway()
+		if isAway {
+			awayMsg = fmt.Sprintf("%s > away since: (%s) %s", message.Newline, humantime.Since(awaySince), awayMessage)
 		}
 	}
 	return "name: " + i.Name() + message.Newline +

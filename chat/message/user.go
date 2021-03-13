@@ -37,8 +37,8 @@ type User struct {
 	config  UserConfig
 	replyTo *User // Set when user gets a /msg, for replying.
 
-	lastMsg time.Time // When the last message was rendered
-	away    bool      // is the user marked away
+	lastMsg    time.Time // When the last message was rendered
+	awayStatus string    // user's away status
 }
 
 func NewUser(identity Identifier) *User {
@@ -74,27 +74,31 @@ func (u *User) LastMsg() time.Time {
 }
 
 // SetAway sets the users availablity state
-func (u *User) SetAway(away bool) {
+func (u *User) SetAway(msg string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	u.away = away
+	u.awayStatus = msg
 }
 
-// IsAway returns if the user is away/active
-func (u *User) IsAway() bool {
+// SetActive sets the users as active
+func (u *User) SetActive() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	return u.away
+	u.awayStatus = ""
 }
 
-// LastActivity returns when the user last did something
-func (u *User) LastActivity() time.Time {
+// GetAway returns if the user is away, when they went away and if they set a message
+func (u *User) GetAway() (bool, time.Time, string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.lastMsg.IsZero() {
-		return u.joined
+	if u.awayStatus == "" {
+		return false, time.Time{}, ""
 	}
-	return u.lastMsg
+	lastPublicActivity := u.lastMsg
+	if u.lastMsg.IsZero() {
+		lastPublicActivity = u.joined
+	}
+	return true, lastPublicActivity, u.awayStatus
 }
 
 func (u *User) Config() UserConfig {
@@ -206,7 +210,6 @@ func (u *User) render(m Message) string {
 		if u == m.From() {
 			u.mu.Lock()
 			u.lastMsg = m.Timestamp()
-			u.away = false
 			u.mu.Unlock()
 
 			if !cfg.Echo {

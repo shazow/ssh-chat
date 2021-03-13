@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -196,21 +197,22 @@ func InitCommands(c *Commands) {
 			for _, uname := range names {
 				user := uname.Value().(*Member).User
 				colUser := colorize(user)
-				if user.IsAway() {
+				if isAway, _, _ := user.GetAway(); isAway {
 					awayColNames = append(awayColNames, colUser)
 				} else {
 					activeColNames = append(activeColNames, colUser)
 				}
 			}
-
-			activeMsg := fmt.Sprintf("%d active: %s", len(activeColNames), strings.Join(activeColNames, ", "))
-			room.Send(message.NewSystemMsg(activeMsg, msg.From()))
+			numPeople := strconv.Itoa(len(names))
+			activePeople := strings.Join(activeColNames, ", ")
 
 			if len(awayColNames) > 0 {
-				awayMsg := fmt.Sprintf("%d away: %s", len(awayColNames), strings.Join(awayColNames, ","))
-				room.Send(message.NewSystemMsg(awayMsg, msg.From()))
+				awayPeople := strings.Join(awayColNames, ",")
+				room.Send(message.NewSystemMsgP(msg.From(), numPeople, " connected: ", activePeople, "; away: ", awayPeople))
+				return nil
 			}
 
+			room.Send(message.NewSystemMsgP(msg.From(), numPeople, " connected: ", activePeople))
 			return nil
 		},
 	})
@@ -473,29 +475,27 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
-		Prefix: "/active",
-		Help:   "Set yourself as active",
+		Prefix:     "/away",
+		PrefixHelp: "[AWAY MESSAGE]",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			msg.From().SetAway(false)
-			room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
-			return nil
-		},
-	})
-	c.Alias("/active", "/nirb")
+			awayMsg := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/away"))
+			isAway, _, _ := msg.From().GetAway()
+			if awayMsg == "" {
+				if isAway {
+					msg.From().SetActive()
+					room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
+					return nil
+				}
 
-	c.Add(Command{
-		Prefix: "/away",
-		Help:   "Toggle away status from chat",
-		Handler: func(room *Room, msg message.CommandMsg) error {
-			beforeWasAway := msg.From().IsAway()
-			msg.From().SetAway(!beforeWasAway)
-			if beforeWasAway {
-				room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
-			} else {
-				room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+				room.Send(message.NewSystemMsg("Not away. Add an away message to set away.", msg.From()))
+				return nil
 			}
+
+			msg.From().SetAway(awayMsg)
+			room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+
+			room.Send(message.NewEmoteMsg("has gone away: "+awayMsg, msg.From()))
 			return nil
 		},
 	})
-	c.Alias("/away", "/rabbit")
 }
