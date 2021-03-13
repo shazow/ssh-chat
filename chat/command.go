@@ -485,10 +485,15 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix: "/away",
-		Help:   "Set yourself as away from chat",
+		Help:   "Toggle away status from chat",
 		Handler: func(room *Room, msg message.CommandMsg) error {
-			msg.From().SetAway(true)
-			room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+			beforeWasAway := msg.From().IsAway()
+			msg.From().SetAway(!beforeWasAway)
+			if beforeWasAway {
+				room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
+			} else {
+				room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+			}
 			return nil
 		},
 	})
