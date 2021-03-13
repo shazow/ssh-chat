@@ -484,6 +484,7 @@ func InitCommands(c *Commands) {
 				if isAway {
 					msg.From().SetActive()
 					room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
+					room.Send(message.NewEmoteMsg("is back", msg.From()))
 					return nil
 				}
 
