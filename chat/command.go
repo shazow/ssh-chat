@@ -191,13 +191,26 @@ func InitCommands(c *Commands) {
 
 			names := room.Members.ListPrefix("")
 			sort.Slice(names, func(i, j int) bool { return names[i].Key() < names[j].Key() })
-			colNames := make([]string, len(names))
-			for i, uname := range names {
-				colNames[i] = colorize(uname.Value().(*Member).User)
+			activeColNames := []string{}
+			awayColNames := []string{}
+			for _, uname := range names {
+				user := uname.Value().(*Member).User
+				colUser := colorize(user)
+				if user.IsAway() {
+					awayColNames = append(awayColNames, colUser)
+				} else {
+					activeColNames = append(activeColNames, colUser)
+				}
 			}
 
-			body := fmt.Sprintf("%d connected: %s", len(colNames), strings.Join(colNames, ", "))
-			room.Send(message.NewSystemMsg(body, msg.From()))
+			activeMsg := fmt.Sprintf("%d active: %s", len(activeColNames), strings.Join(activeColNames, ", "))
+			room.Send(message.NewSystemMsg(activeMsg, msg.From()))
+
+			if len(awayColNames) > 0 {
+				awayMsg := fmt.Sprintf("%d away: %s", len(awayColNames), strings.Join(awayColNames, ","))
+				room.Send(message.NewSystemMsg(awayMsg, msg.From()))
+			}
+
 			return nil
 		},
 	})
@@ -458,4 +471,26 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+
+	c.Add(Command{
+		Prefix: "/active",
+		Help:   "Set yourself as active",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			msg.From().SetAway(false)
+			room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
+			return nil
+		},
+	})
+	c.Alias("/active", "/nirb")
+
+	c.Add(Command{
+		Prefix: "/away",
+		Help:   "Set yourself as away from chat",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			msg.From().SetAway(true)
+			room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+			return nil
+		},
+	})
+	c.Alias("/away", "/rabbit")
 }

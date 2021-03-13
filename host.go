@@ -415,7 +415,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			case true:
 				whois = id.WhoisAdmin(room)
 			case false:
-				whois = id.Whois()
+				whois = id.Whois(room)
 			}
 			room.Send(message.NewSystemMsg(whois, msg.From()))
 
@@ -508,7 +508,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			room.Send(message.NewAnnounceMsg(body))
 			target.Close()
 
-			logger.Debugf("Banned: \n-> %s", id.Whois())
+			logger.Debugf("Banned: \n-> %s", id.Whois(room))
 
 			return nil
 		},

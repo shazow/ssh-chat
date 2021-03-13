@@ -57,16 +57,22 @@ func (i Identity) Name() string {
 }
 
 // Whois returns a whois description for non-admin users.
-// TODO: Add optional room context?
-func (i Identity) Whois() string {
+func (i Identity) Whois(room *chat.Room) string {
 	fingerprint := "(no public key)"
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
+	awayMsg := ""
+	if m, ok := room.MemberByID(i.ID()); ok {
+		if m.IsAway() {
+			awayMsg = message.Newline + " > away since: " + humantime.Since(m.LastActivity())
+		}
+	}
 	return "name: " + i.Name() + message.Newline +
 		" > fingerprint: " + fingerprint + message.Newline +
 		" > client: " + sanitize.Data(string(i.ClientVersion()), 64) + message.Newline +
-		" > joined: " + humantime.Since(i.created) + " ago"
+		" > joined: " + humantime.Since(i.created) + " ago" +
+		awayMsg
 }
 
 // WhoisAdmin returns a whois description for admin users.

@@ -35,8 +35,10 @@ type User struct {
 
 	mu      sync.Mutex
 	config  UserConfig
-	replyTo *User     // Set when user gets a /msg, for replying.
+	replyTo *User // Set when user gets a /msg, for replying.
+
 	lastMsg time.Time // When the last message was rendered
+	away    bool      // is the user marked away
 }
 
 func NewUser(identity Identifier) *User {
@@ -68,6 +70,30 @@ func (u *User) Joined() time.Time {
 func (u *User) LastMsg() time.Time {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	return u.lastMsg
+}
+
+// SetAway sets the users availablity state
+func (u *User) SetAway(away bool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.away = away
+}
+
+// IsAway returns if the user is away/active
+func (u *User) IsAway() bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.away
+}
+
+// LastActivity returns when the user last did something
+func (u *User) LastActivity() time.Time {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.lastMsg.IsZero() {
+		return u.joined
+	}
 	return u.lastMsg
 }
 
@@ -180,6 +206,7 @@ func (u *User) render(m Message) string {
 		if u == m.From() {
 			u.mu.Lock()
 			u.lastMsg = m.Timestamp()
+			u.away = false
 			u.mu.Unlock()
 
 			if !cfg.Echo {
