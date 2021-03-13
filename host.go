@@ -379,8 +379,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("no message to reply to")
 			}
 
-			name := target.Name()
-			_, found := h.GetUser(name)
+			_, found := h.GetUser(target.ID())
 			if !found {
 				return errors.New("user not found")
 			}
@@ -388,7 +387,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			m := message.NewPrivateMsg(strings.Join(args, " "), msg.From(), target)
 			room.Send(&m)
 
-			txt := fmt.Sprintf("[Sent PM to %s]", name)
+			txt := fmt.Sprintf("[Sent PM to %s]", target.Name())
 			ms := message.NewSystemMsg(txt, msg.From())
 			room.Send(ms)
 			target.SetReplyTo(msg.From())
