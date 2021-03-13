@@ -458,4 +458,30 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+
+	c.Add(Command{
+		Prefix:     "/away",
+		PrefixHelp: "[AWAY MESSAGE]",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			awayMsg := strings.TrimSpace(strings.TrimLeft(msg.Body(), "/away"))
+			isAway, _, _ := msg.From().GetAway()
+			if awayMsg == "" {
+				if isAway {
+					msg.From().SetActive()
+					room.Send(message.NewSystemMsg("You are marked as active, welcome back!", msg.From()))
+					room.Send(message.NewEmoteMsg("is back", msg.From()))
+					return nil
+				}
+
+				room.Send(message.NewSystemMsg("Not away. Add an away message to set away.", msg.From()))
+				return nil
+			}
+
+			msg.From().SetAway(awayMsg)
+			room.Send(message.NewSystemMsg("You are marked as away, enjoy your excursion!", msg.From()))
+
+			room.Send(message.NewEmoteMsg("has gone away: "+awayMsg, msg.From()))
+			return nil
+		},
+	})
 }
