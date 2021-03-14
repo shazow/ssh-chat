@@ -39,6 +39,7 @@ type User struct {
 
 	lastMsg    time.Time // When the last message was rendered
 	awayStatus string    // user's away status
+	awaySince  time.Time
 }
 
 func NewUser(identity Identifier) *User {
@@ -78,6 +79,9 @@ func (u *User) SetAway(msg string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.awayStatus = msg
+	if msg != "" {
+		u.awaySince = time.Now()
+	}
 }
 
 // SetActive sets the users as active
@@ -94,11 +98,7 @@ func (u *User) GetAway() (bool, time.Time, string) {
 	if u.awayStatus == "" {
 		return false, time.Time{}, ""
 	}
-	lastPublicActivity := u.lastMsg
-	if u.lastMsg.IsZero() {
-		lastPublicActivity = u.joined
-	}
-	return true, lastPublicActivity, u.awayStatus
+	return true, u.awaySince, u.awayStatus
 }
 
 func (u *User) Config() UserConfig {
