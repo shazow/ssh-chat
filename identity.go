@@ -63,11 +63,13 @@ func (i Identity) Whois(room *chat.Room) string {
 	if i.PublicKey() != nil {
 		fingerprint = sshd.Fingerprint(i.PublicKey())
 	}
+	// TODO: Rewrite this using strings.Builder like WhoisAdmin
+
 	awayMsg := ""
 	if m, ok := room.MemberByID(i.ID()); ok {
 		isAway, awaySince, awayMessage := m.GetAway()
 		if isAway {
-			awayMsg = fmt.Sprintf("%s > away since: (%s) %s", message.Newline, humantime.Since(awaySince), awayMessage)
+			awayMsg = fmt.Sprintf("%s > away: (%s ago) %s", message.Newline, humantime.Since(awaySince), awayMessage)
 		}
 	}
 	return "name: " + i.Name() + message.Newline +

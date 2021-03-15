@@ -33,13 +33,12 @@ type User struct {
 	screen    io.WriteCloser
 	closeOnce sync.Once
 
-	mu      sync.Mutex
-	config  UserConfig
-	replyTo *User // Set when user gets a /msg, for replying.
-
-	lastMsg    time.Time // When the last message was rendered
-	awayStatus string    // user's away status
-	awaySince  time.Time
+	mu         sync.Mutex
+	config     UserConfig
+	replyTo    *User     // Set when user gets a /msg, for replying.
+	lastMsg    time.Time // When the last message was rendered.
+	awayReason string    // Away reason, "" when not away.
+	awaySince  time.Time // When away was set, 0 when not away.
 }
 
 func NewUser(identity Identifier) *User {
@@ -74,31 +73,24 @@ func (u *User) LastMsg() time.Time {
 	return u.lastMsg
 }
 
-// SetAway sets the users availablity state
+// SetAway sets the users away reason and state.
 func (u *User) SetAway(msg string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	u.awayStatus = msg
-	if msg != "" {
+	u.awayReason = msg
+	if msg == "" {
+		u.awaySince = time.Time{}
+	} else {
+		// Reset away timer even if already away
 		u.awaySince = time.Now()
 	}
 }
 
-// SetActive sets the users as active
-func (u *User) SetActive() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.awayStatus = ""
-}
-
-// GetAway returns if the user is away, when they went away and if they set a message
+// GetAway returns if the user is away, when they went away, and the reason.
 func (u *User) GetAway() (bool, time.Time, string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.awayStatus == "" {
-		return false, time.Time{}, ""
-	}
-	return true, u.awaySince, u.awayStatus
+	return u.awayReason != "", u.awaySince, u.awayReason
 }
 
 func (u *User) Config() UserConfig {
