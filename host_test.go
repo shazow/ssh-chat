@@ -13,6 +13,7 @@ import (
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 )
 
 func stripPrompt(s string) string {
@@ -91,11 +92,12 @@ func TestHostNameCollision(t *testing.T) {
 	host := NewHost(s, nil)
 	go host.Serve()
 
-	done := make(chan struct{}, 1)
+	ready := make(chan struct{})
+	g := errgroup.Group{}
 
 	// First client
-	go func() {
-		err := sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
+	g.Go(func() error {
+		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -107,7 +109,7 @@ func TestHostNameCollision(t *testing.T) {
 			}
 
 			// Ready for second client
-			done <- struct{}{}
+			ready <- struct{}{}
 
 			scanner.Scan()
 			actual = scanner.Text()
@@ -123,38 +125,35 @@ func TestHostNameCollision(t *testing.T) {
 			}
 
 			// Wrap it up.
-			close(done)
+			close(ready)
 			return nil
 		})
-		if err != nil {
-			done <- struct{}{}
-			t.Fatal(err)
-		}
-	}()
+	})
 
 	// Wait for first client
-	<-done
+	<-ready
 
 	// Second client
-	err = sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-		scanner := bufio.NewScanner(r)
+	g.Go(func() error {
+		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
+			scanner := bufio.NewScanner(r)
 
-		// Consume the initial buffer
-		scanner.Scan()
-		scanner.Scan()
-		scanner.Scan()
+			// Consume the initial buffer
+			scanner.Scan()
+			scanner.Scan()
+			scanner.Scan()
 
-		actual := scanner.Text()
-		if !strings.HasPrefix(actual, "[Guest1] ") {
-			t.Errorf("Second client did not get Guest1 name: %q", actual)
-		}
-		return nil
+			actual := scanner.Text()
+			if !strings.HasPrefix(actual, "[Guest1] ") {
+				t.Errorf("Second client did not get Guest1 name: %q", actual)
+			}
+			return nil
+		})
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	<-done
+	if err := g.Wait(); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestHostWhitelist(t *testing.T) {
@@ -215,13 +214,13 @@ func TestHostKick(t *testing.T) {
 	host := NewHost(s, nil)
 	go host.Serve()
 
+	g := errgroup.Group{}
 	connected := make(chan struct{})
 	kicked := make(chan struct{})
-	done := make(chan struct{})
 
-	go func() {
+	g.Go(func() error {
 		// First client
-		err := sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
+		return sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -252,41 +251,34 @@ func TestHostKick(t *testing.T) {
 			}
 
 			kicked <- struct{}{}
-
 			return nil
 		})
-		if err != nil {
-			connected <- struct{}{}
-			close(connected)
-			t.Fatal(err)
-			close(done)
-		}
-	}()
+	})
 
-	go func() {
+	g.Go(func() error {
 		// Second client
-		err := sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
+		return sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 			<-connected
 			scanner.Scan()
 
 			<-kicked
 
-			if _, err := w.Write([]byte("am I still here?\r\n")); err != nil {
-				return err
+			if _, err := w.Write([]byte("am I still here?\r\n")); err != io.EOF {
+				return errors.New("expected to be kicked")
 			}
 
 			scanner.Scan()
-			return scanner.Err()
+			if err := scanner.Err(); err == io.EOF {
+				// All good, we got kicked.
+				return nil
+			} else {
+				return err
+			}
 		})
-		if err == io.EOF {
-			// All good, we got kicked.
-		} else if err != nil {
-			close(done)
-			t.Fatal(err)
-		}
-		close(done)
-	}()
+	})
 
-	<-done
+	if err := g.Wait(); err != nil {
+		t.Error(err)
+	}
 }
