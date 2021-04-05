@@ -167,7 +167,9 @@ func (t *Terminal) Close() error {
 	var err error
 	t.closeOnce.Do(func() {
 		close(t.done)
-		t.Channel.Close()
+		if err := t.Channel.Close(); err != nil {
+			logger.Printf("[%s] Failed to close terminal channel: %s", t.Conn.RemoteAddr(), err)
+		}
 		err = t.Conn.Close()
 	})
 	return err

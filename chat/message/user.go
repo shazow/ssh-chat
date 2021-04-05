@@ -143,7 +143,9 @@ func (u *User) setColorIdx(idx int) {
 func (u *User) Close() {
 	u.closeOnce.Do(func() {
 		if u.screen != nil {
-			u.screen.Close()
+			if err := u.screen.Close(); err != nil {
+				logger.Printf("Failed to close user %q screen: %s", u.ID(), err)
+			}
 		}
 		// close(u.msg) TODO: Close?
 		close(u.done)
