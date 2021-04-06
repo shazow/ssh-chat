@@ -334,17 +334,17 @@ func (h *Host) GetUser(name string) (*message.User, bool) {
 // InitCommands adds host-specific commands to a Commands container. These will
 // override any existing commands.
 func (h *Host) InitCommands(c *chat.Commands) {
-	sendPM := func(room *chat.Room, msg message.CommandMsg, target *message.User) error {
-		m := message.NewPrivateMsg(strings.Join(msg.Args(), " "), msg.From(), target)
+	sendPM := func(room *chat.Room, msg string, from *message.User, target *message.User) error {
+		m := message.NewPrivateMsg(msg, from, target)
 		room.Send(&m)
 
 		txt := fmt.Sprintf("[Sent PM to %s]", target.Name())
 		if isAway, _, awayReason := target.GetAway(); isAway {
 			txt += " Away: " + awayReason
 		}
-		sysMsg := message.NewSystemMsg(txt, msg.From())
+		sysMsg := message.NewSystemMsg(txt, from)
 		room.Send(sysMsg)
-		target.SetReplyTo(msg.From())
+		target.SetReplyTo(from)
 		return nil
 	}
 
@@ -366,7 +366,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			return sendPM(room, msg, target)
+			return sendPM(room, strings.Join(args[1:], " "), msg.From(), target)
 		},
 	})
 
@@ -391,7 +391,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
-			return sendPM(room, msg, target)
+			return sendPM(room, strings.Join(args, " "), msg.From(), target)
 		},
 	})
 
