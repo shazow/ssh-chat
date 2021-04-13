@@ -1,7 +1,9 @@
 package chat
 
-import "io"
-import stdlog "log"
+import (
+	"io"
+	stdlog "log"
+)
 
 var logger *stdlog.Logger
 

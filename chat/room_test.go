@@ -158,6 +158,94 @@ func TestIgnore(t *testing.T) {
 	expectOutput(t, buffer, ignored.user.Name()+": hello again!"+message.Newline)
 }
 
+func TestMute(t *testing.T) {
+	var buffer []byte
+
+	ch := NewRoom()
+	go ch.Serve()
+	defer ch.Close()
+
+	// Create 3 users, join the room and clear their screen buffers
+	users := make([]ScreenedUser, 3)
+	members := make([]*Member, 3)
+	for i := 0; i < 3; i++ {
+		screen := &MockScreen{}
+		user := message.NewUserScreen(message.SimpleID(fmt.Sprintf("user%d", i)), screen)
+		users[i] = ScreenedUser{
+			user:   user,
+			screen: screen,
+		}
+
+		member, err := ch.Join(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		members[i] = member
+	}
+
+	for _, u := range users {
+		for i := 0; i < 3; i++ {
+			u.user.HandleMsg(u.user.ConsumeOne())
+			u.screen.Read(&buffer)
+		}
+	}
+
+	// Use some handy variable names for distinguish between roles
+	muter := users[0]
+	muted := users[1]
+	other := users[2]
+
+	members[0].IsOp = true
+
+	// test muting unexisting user
+	if err := sendCommand("/mute test", muter, ch, &buffer); err != nil {
+		t.Fatal(err)
+	}
+	expectOutput(t, buffer, "-> Err: user not found"+message.Newline)
+
+	// test muting by non-op
+	if err := sendCommand("/mute "+muted.user.Name(), other, ch, &buffer); err != nil {
+		t.Fatal(err)
+	}
+	expectOutput(t, buffer, "-> Err: must be op"+message.Newline)
+
+	// test muting existing user
+	if err := sendCommand("/mute "+muted.user.Name(), muter, ch, &buffer); err != nil {
+		t.Fatal(err)
+	}
+	expectOutput(t, buffer, "-> Muted: "+muted.user.Name()+message.Newline)
+
+	if got, want := members[1].IsMuted(), true; got != want {
+		t.Error("muted user failed to set mute flag")
+	}
+
+	// when an emote is sent by a muted user, it should not be displayed for anyone
+	ch.HandleMsg(message.NewPublicMsg("hello!", muted.user))
+	ch.HandleMsg(message.NewEmoteMsg("is crying", muted.user))
+
+	if muter.user.HasMessages() {
+		muter.user.HandleMsg(muter.user.ConsumeOne())
+		muter.screen.Read(&buffer)
+		t.Errorf("muter should not have messages: %s", buffer)
+	}
+	if other.user.HasMessages() {
+		other.user.HandleMsg(other.user.ConsumeOne())
+		other.screen.Read(&buffer)
+		t.Errorf("other should not have messages: %s", buffer)
+	}
+
+	// test unmuting
+	if err := sendCommand("/mute "+muted.user.Name(), muter, ch, &buffer); err != nil {
+		t.Fatal(err)
+	}
+	expectOutput(t, buffer, "-> Unmuted: "+muted.user.Name()+message.Newline)
+
+	ch.HandleMsg(message.NewPublicMsg("hello again!", muted.user))
+	other.user.HandleMsg(other.user.ConsumeOne())
+	other.screen.Read(&buffer)
+	expectOutput(t, buffer, muted.user.Name()+": hello again!"+message.Newline)
+}
+
 func expectOutput(t *testing.T, buffer []byte, expected string) {
 	t.Helper()
 

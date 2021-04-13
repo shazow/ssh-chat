@@ -27,6 +27,23 @@ var ErrInvalidName = errors.New("invalid name")
 type Member struct {
 	*message.User
 	IsOp bool
+
+	// TODO: Move IsOp under mu?
+
+	mu      sync.Mutex
+	isMuted bool // When true, messages should not be broadcasted.
+}
+
+func (m *Member) IsMuted() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.isMuted
+}
+
+func (m *Member) SetMute(muted bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.isMuted = muted
 }
 
 // Room definition, also a Set of User Items
@@ -82,6 +99,20 @@ func (r *Room) HandleMsg(m message.Message) {
 	var fromID string
 	if fromMsg, ok := m.(message.MessageFrom); ok {
 		fromID = fromMsg.From().ID()
+	}
+
+	if fromID != "" {
+		if item, err := r.Members.Get(fromID); err != nil {
+			// Message from a member who is not in the room, this should not happen.
+			logger.Printf("Room received unexpected message from a non-member: %v", m)
+			return
+		} else if member, ok := item.Value().(*Member); ok && member.IsMuted() {
+			// Short circuit message handling for muted users
+			if _, ok = m.(*message.CommandMsg); !ok {
+				member.User.Send(m)
+			}
+			return
+		}
 	}
 
 	switch m := m.(type) {
@@ -150,6 +181,7 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Remove user ID from sets, probably referring to a prior user.
 	r.History(u)
 	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.Members.Len())
 	r.Send(message.NewAnnounceMsg(s))

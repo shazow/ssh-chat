@@ -477,4 +477,38 @@ func InitCommands(c *Commands) {
 			return nil
 		},
 	})
+
+	c.Add(Command{
+		Op:         true,
+		Prefix:     "/mute",
+		PrefixHelp: "USER",
+		Help:       "Toggle muting USER, preventing messages from broadcasting.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				return errors.New("must specify user")
+			}
+
+			member, ok := room.MemberByID(args[0])
+			if !ok {
+				return errors.New("user not found")
+			}
+
+			setMute := !member.IsMuted()
+			member.SetMute(setMute)
+			id := member.ID()
+
+			if setMute {
+				room.Send(message.NewSystemMsg("Muted: "+id, msg.From()))
+			} else {
+				room.Send(message.NewSystemMsg("Unmuted: "+id, msg.From()))
+			}
+
+			return nil
+		},
+	})
 }
