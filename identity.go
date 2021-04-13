@@ -96,6 +96,9 @@ func (i Identity) WhoisAdmin(room *chat.Room) string {
 
 	if member, ok := room.MemberByID(i.ID()); ok {
 		// Add room-specific whois
+		if isAway, awaySince, awayMessage := member.GetAway(); isAway {
+			fmt.Fprintf(&out, message.Newline+" > away: (%s ago) %s", humantime.Since(awaySince), awayMessage)
+		}
 		// FIXME: Should these always be present, even if they're false? Maybe
 		// change that once we add room context to Whois() above.
 		if !member.LastMsg().IsZero() {
