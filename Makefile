@@ -38,3 +38,8 @@ release:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 LDFLAGS='$(LDFLAGS)' ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
 	CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 LDFLAGS='$(LDFLAGS)' ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
 	CGO_ENABLED=0 GOOS=windows GOARCH=386 LDFLAGS='$(LDFLAGS)' ./build_release "github.com/shazow/ssh-chat/cmd/ssh-chat" README.md LICENSE
+
+deploy: build/ssh-chat-linux_amd64.tgz
+	ssh -p 2022 ssh.chat tar xvz < build/ssh-chat-linux_amd64.tgz
+	@echo " --- Ready to deploy ---"
+	@echo "Run: ssh -p 2022 ssh.chat sudo systemctl restart ssh-chat"
