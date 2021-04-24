@@ -480,7 +480,7 @@ func InitCommands(c *Commands) {
 
 	c.Add(Command{
 		Prefix: "/back",
-		Help:   "Set yourself as back, clear away status",
+		Help:   "Clear away status.",
 		Handler: func(room *Room, msg message.CommandMsg) error {
 			isAway, _, _ := msg.From().GetAway()
 			if isAway {
