@@ -29,4 +29,4 @@ jobs:
       run: go build -v .
 
     - name: Test
-      run: go test -race -vet "all" -v .
+      run: go test -race -vet "all" -v ./...
