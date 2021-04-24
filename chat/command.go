@@ -479,6 +479,19 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix: "/back",
+		Help:   "Set yourself as back, clear away status",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			isAway, _, _ := msg.From().GetAway()
+			if isAway {
+				msg.From().SetAway("")
+				room.Send(message.NewEmoteMsg("is back.", msg.From()))
+			}
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Op:         true,
 		Prefix:     "/mute",
 		PrefixHelp: "USER",
