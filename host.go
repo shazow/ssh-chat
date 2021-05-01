@@ -114,32 +114,6 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	}
 
 	user.SetConfig(cfg)
-
-	// Load user config overrides from ENV
-	// TODO: Would be nice to skip the command parsing pipeline just to load
-	// config values. Would need to factor out some command handler logic into
-	// accessible helpers.
-	env := term.Env()
-	for _, e := range env {
-		switch e.Key {
-		case "SSHCHAT_TIMESTAMP":
-			if e.Value != "" && e.Value != "0" {
-				cmd := "/timestamp"
-				if e.Value != "1" {
-					cmd += " " + e.Value
-				}
-				if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
-					h.Room.HandleMsg(msg)
-				}
-			}
-		case "SSHCHAT_THEME":
-			cmd := "/theme " + e.Value
-			if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
-				h.Room.HandleMsg(msg)
-			}
-		}
-	}
-
 	go user.Consume()
 
 	// Close term once user is closed.
@@ -166,6 +140,33 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	if err != nil {
 		logger.Errorf("[%s] Failed to join: %s", term.Conn.RemoteAddr(), err)
 		return
+	}
+
+	// Load user config overrides from ENV
+	// TODO: Would be nice to skip the command parsing pipeline just to load
+	// config values. Would need to factor out some command handler logic into
+	// accessible helpers.
+	env := term.Env()
+	for _, e := range env {
+		switch e.Key {
+		case "SSHCHAT_TIMESTAMP":
+			if e.Value != "" && e.Value != "0" {
+				fmt.Println("got timestamp", e.Value)
+				cmd := "/timestamp"
+				if e.Value != "1" {
+					cmd += " " + e.Value
+				}
+				if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
+					fmt.Println("sending command to server:", cmd)
+					h.Room.HandleMsg(msg)
+				}
+			}
+		case "SSHCHAT_THEME":
+			cmd := "/theme " + e.Value
+			if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
+				h.Room.HandleMsg(msg)
+			}
+		}
 	}
 
 	// Successfully joined.

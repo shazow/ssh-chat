@@ -78,7 +78,7 @@ func TestHostGetPrompt(t *testing.T) {
 
 func TestHostNameCollision(t *testing.T) {
 	t.Skip("Test is flakey on CI. :(")
-	
+
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
@@ -282,5 +282,64 @@ func TestHostKick(t *testing.T) {
 
 	if err := g.Wait(); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestClientEnvConfig(t *testing.T) {
+	key, err := sshd.NewRandomSigner(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := sshd.MakeNoAuth()
+	config.AddHostKey(key)
+
+	s, err := sshd.ListenSSH("localhost:0", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	host := NewHost(s, nil)
+	go host.Serve()
+
+	clientConfig := sshd.NewClientConfig("dingus")
+	conn, err := ssh.Dial("tcp", s.Addr().String(), clientConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	defer conn.Close()
+
+	session, err := conn.NewSession()
+	if err != nil {
+		t.Error(err)
+	}
+	defer session.Close()
+
+	session.Setenv("SSHCHAT_TIMESTAMP", "datetime +8h")
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = session.Shell()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// consume
+	bufio.NewScanner(stdout).Scan()
+
+	// this fails occasionally because the user has not been registered by the server yet
+	// add some kind of wait/synchornization mechanism
+	u, ok := host.GetUser("dingus")
+	if !ok {
+		t.Fatal("test user not found in host: ", host.Members)
+	}
+	userConfig := u.Config()
+	// add cases
+	// /timestamp datetime => 2006-01-02 15:04:05
+	// /timestamp time => 15:04
+	if userConfig.Timeformat != nil && *userConfig.Timeformat != "2006-01-02 15:04:05" {
+		t.Fatal("unexpected timeformat:", *userConfig.Timeformat)
 	}
 }
