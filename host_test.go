@@ -331,6 +331,11 @@ func connectUserWithConfig(name string, envConfig map[string]string) (*message.U
 	}
 	defer s.Close()
 	host := NewHost(s, nil)
+
+	newUsers := make(chan *message.User)
+	host.OnUserJoined = func(u *message.User) {
+		newUsers <- u
+	}
 	go host.Serve()
 
 	clientConfig := sshd.NewClientConfig(name)
@@ -355,9 +360,10 @@ func connectUserWithConfig(name string, envConfig map[string]string) (*message.U
 		return nil, fmt.Errorf("unable to open shell: %w", err)
 	}
 
-	u, ok := host.GetUser(name)
-	if !ok {
-		return nil, fmt.Errorf("user %s not found in host", name)
+	for u := range newUsers {
+		if u.Name() == name {
+			return u, nil
+		}
 	}
-	return u, nil
+	return nil, fmt.Errorf("user %s not found in the host", name)
 }

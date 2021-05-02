@@ -49,6 +49,8 @@ type Host struct {
 
 	// GetMOTD is used to reload the motd from an external source
 	GetMOTD func() (string, error)
+	// OnUserJoined is used to notify when a user joins a host
+	OnUserJoined func(*message.User)
 }
 
 // NewHost creates a Host on top of an existing listener.
@@ -181,6 +183,10 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
 	logger.Debugf("[%s] Joined: %s", term.Conn.RemoteAddr(), user.Name())
+
+	if h.OnUserJoined != nil {
+		h.OnUserJoined(user)
+	}
 
 	for {
 		line, err := term.ReadLine()
