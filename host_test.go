@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io"
 	mathRand "math/rand"
 	"strings"
@@ -78,7 +79,7 @@ func TestHostGetPrompt(t *testing.T) {
 
 func TestHostNameCollision(t *testing.T) {
 	t.Skip("Test is flakey on CI. :(")
-	
+
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
@@ -283,4 +284,86 @@ func TestHostKick(t *testing.T) {
 	if err := g.Wait(); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestTimestampEnvConfig(t *testing.T) {
+	cases := []struct {
+		input      string
+		timeformat *string
+	}{
+		{"", strptr("15:04")},
+		{"1", strptr("15:04")},
+		{"0", nil},
+		{"time +8h", strptr("15:04")},
+		{"datetime +8h", strptr("2006-01-02 15:04:05")},
+	}
+	for _, tc := range cases {
+		u, err := connectUserWithConfig("dingus", map[string]string{
+			"SSHCHAT_TIMESTAMP": tc.input,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		userConfig := u.Config()
+		if userConfig.Timeformat != nil && tc.timeformat != nil {
+			if *userConfig.Timeformat != *tc.timeformat {
+				t.Fatal("unexpected timeformat:", *userConfig.Timeformat, "expected:", *tc.timeformat)
+			}
+		}
+	}
+}
+
+func strptr(s string) *string {
+	return &s
+}
+
+func connectUserWithConfig(name string, envConfig map[string]string) (*message.User, error) {
+	key, err := sshd.NewRandomSigner(512)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create signer: %w", err)
+	}
+	config := sshd.MakeNoAuth()
+	config.AddHostKey(key)
+
+	s, err := sshd.ListenSSH("localhost:0", config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create a test server: %w", err)
+	}
+	defer s.Close()
+	host := NewHost(s, nil)
+
+	newUsers := make(chan *message.User)
+	host.OnUserJoined = func(u *message.User) {
+		newUsers <- u
+	}
+	go host.Serve()
+
+	clientConfig := sshd.NewClientConfig(name)
+	conn, err := ssh.Dial("tcp", s.Addr().String(), clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to test ssh-chat server: %w", err)
+	}
+	defer conn.Close()
+
+	session, err := conn.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("unable to open session: %w", err)
+	}
+	defer session.Close()
+
+	for key := range envConfig {
+		session.Setenv(key, envConfig[key])
+	}
+
+	err = session.Shell()
+	if err != nil {
+		return nil, fmt.Errorf("unable to open shell: %w", err)
+	}
+
+	for u := range newUsers {
+		if u.Name() == name {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("user %s not found in the host", name)
 }
