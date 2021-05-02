@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io"
 	mathRand "math/rand"
 	"strings"
@@ -285,61 +286,78 @@ func TestHostKick(t *testing.T) {
 	}
 }
 
-func TestClientEnvConfig(t *testing.T) {
+func TestTimestampEnvConfig(t *testing.T) {
+	cases := []struct {
+		input      string
+		timeformat *string
+	}{
+		{"", strptr("15:04")},
+		{"1", strptr("15:04")},
+		{"0", nil},
+		{"time +8h", strptr("15:04")},
+		{"datetime +8h", strptr("2006-01-02 15:04:05")},
+	}
+	for _, tc := range cases {
+		u, err := connectUserWithConfig("dingus", map[string]string{
+			"SSHCHAT_TIMESTAMP": tc.input,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		userConfig := u.Config()
+		if userConfig.Timeformat != nil && tc.timeformat != nil {
+			if *userConfig.Timeformat != *tc.timeformat {
+				t.Fatal("unexpected timeformat:", *userConfig.Timeformat, "expected:", *tc.timeformat)
+			}
+		}
+	}
+}
+
+func strptr(s string) *string {
+	return &s
+}
+
+func connectUserWithConfig(name string, envConfig map[string]string) (*message.User, error) {
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
-		t.Fatal(err)
+		return nil, fmt.Errorf("unable to create signer: %w", err)
 	}
 	config := sshd.MakeNoAuth()
 	config.AddHostKey(key)
 
 	s, err := sshd.ListenSSH("localhost:0", config)
 	if err != nil {
-		t.Fatal(err)
+		return nil, fmt.Errorf("unable to create a test server: %w", err)
 	}
 	defer s.Close()
 	host := NewHost(s, nil)
 	go host.Serve()
 
-	clientConfig := sshd.NewClientConfig("dingus")
+	clientConfig := sshd.NewClientConfig(name)
 	conn, err := ssh.Dial("tcp", s.Addr().String(), clientConfig)
 	if err != nil {
-		t.Error(err)
+		return nil, fmt.Errorf("unable to connect to test ssh-chat server: %w", err)
 	}
 	defer conn.Close()
 
 	session, err := conn.NewSession()
 	if err != nil {
-		t.Error(err)
+		return nil, fmt.Errorf("unable to open session: %w", err)
 	}
 	defer session.Close()
 
-	session.Setenv("SSHCHAT_TIMESTAMP", "datetime +8h")
-
-	stdout, err := session.StdoutPipe()
-	if err != nil {
-		t.Error(err)
+	for key := range envConfig {
+		session.Setenv(key, envConfig[key])
 	}
 
 	err = session.Shell()
 	if err != nil {
-		t.Error(err)
+		return nil, fmt.Errorf("unable to open shell: %w", err)
 	}
 
-	// consume
-	bufio.NewScanner(stdout).Scan()
-
-	// this fails occasionally because the user has not been registered by the server yet
-	// add some kind of wait/synchornization mechanism
-	u, ok := host.GetUser("dingus")
+	u, ok := host.GetUser(name)
 	if !ok {
-		t.Fatal("test user not found in host: ", host.Members)
+		return nil, fmt.Errorf("user %s not found in host", name)
 	}
-	userConfig := u.Config()
-	// add cases
-	// /timestamp datetime => 2006-01-02 15:04:05
-	// /timestamp time => 15:04
-	if userConfig.Timeformat != nil && *userConfig.Timeformat != "2006-01-02 15:04:05" {
-		t.Fatal("unexpected timeformat:", *userConfig.Timeformat)
-	}
+	return u, nil
 }

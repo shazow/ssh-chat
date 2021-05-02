@@ -151,13 +151,11 @@ func (h *Host) Connect(term *sshd.Terminal) {
 		switch e.Key {
 		case "SSHCHAT_TIMESTAMP":
 			if e.Value != "" && e.Value != "0" {
-				fmt.Println("got timestamp", e.Value)
 				cmd := "/timestamp"
 				if e.Value != "1" {
 					cmd += " " + e.Value
 				}
 				if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
-					fmt.Println("sending command to server:", cmd)
 					h.Room.HandleMsg(msg)
 				}
 			}
