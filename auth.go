@@ -1,6 +1,8 @@
 package sshchat
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -43,7 +45,9 @@ func newAuthAddr(addr net.Addr) string {
 }
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
+// If the contained password is not empty, it complements a whitelist.
 type Auth struct {
+	passwordHash []byte
 	bannedAddr   *set.Set
 	bannedClient *set.Set
 	banned       *set.Set
@@ -51,7 +55,7 @@ type Auth struct {
 	ops          *set.Set
 }
 
-// NewAuth creates a new empty Auth.
+// NewAuth creates a Auth, optionally with a password.
 func NewAuth() *Auth {
 	return &Auth{
 		bannedAddr:   set.New(),
@@ -62,17 +66,33 @@ func NewAuth() *Auth {
 	}
 }
 
+// SetPassword anables password authentication with the given password.
+// If an emty password is geiven, disable password authentication.
+func (a *Auth) SetPassword(password string) {
+	if password == "" {
+		a.passwordHash = nil
+	} else {
+		hashArray := sha256.Sum256([]byte(password))
+		a.passwordHash = hashArray[:]
+	}
+}
+
 // AllowAnonymous determines if anonymous users are permitted.
 func (a *Auth) AllowAnonymous() bool {
-	return a.whitelist.Len() == 0
+	return a.whitelist.Len() == 0 && a.passwordHash == nil
+}
+
+// AcceptPassword determines if password authentication is accepted.
+func (a *Auth) AcceptPassword() bool {
+	return a.passwordHash != nil
 }
 
 // Check determines if a pubkey fingerprint is permitted.
 func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
 	authkey := newAuthKey(key)
 
-	if a.whitelist.Len() != 0 {
-		// Only check whitelist if there is something in it, otherwise it's disabled.
+	if !a.AllowAnonymous() {
+		// Only check whitelist if we don't allow everyone to connect.
 		whitelisted := a.whitelist.In(authkey)
 		if !whitelisted {
 			return ErrNotWhitelisted
@@ -95,6 +115,18 @@ func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) err
 		return ErrBanned
 	}
 
+	return nil
+}
+
+// CheckPassword determines if a password is permitted.
+func (a *Auth) CheckPassword(password string) error {
+	if !a.AcceptPassword() {
+		return errors.New("passwords not accepted") // this should never happen
+	}
+	passedPasswordhash := sha256.Sum256([]byte(password))
+	if subtle.ConstantTimeCompare(passedPasswordhash[:], a.passwordHash) == 0 {
+		return errors.New("incorrect password")
+	}
 	return nil
 }
 

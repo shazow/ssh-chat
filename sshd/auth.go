@@ -14,8 +14,12 @@ import (
 type Auth interface {
 	// Whether to allow connections without a public key.
 	AllowAnonymous() bool
+	// If password authtication is accepted
+	AcceptPassword() bool
 	// Given address and public key and client agent string, returns nil if the connection should be allowed.
 	Check(net.Addr, ssh.PublicKey, string) error
+	// Given a password, returns nil if the connection should be allowed
+	CheckPassword(string) error
 }
 
 // MakeAuth makes an ssh.ServerConfig which performs authentication against an Auth implementation.
@@ -34,11 +38,26 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 			}}
 			return perm, nil
 		},
+
+		// We use KeyboardInteractiveCallback instead of PasswordCallback to
+		// avoid preventing the client from including a pubkey in the user
+		// identification.
 		KeyboardInteractiveCallback: func(conn ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
-			if !auth.AllowAnonymous() {
-				return nil, errors.New("public key authentication required")
+			var err error
+			if auth.AcceptPassword() {
+				var answers []string
+				answers, err = challenge("", "", []string{"Passphrase required to connect: "}, []bool{true})
+				if err == nil {
+					if len(answers) != 1 {
+						err = errors.New("didn't get password")
+					} else {
+						err = auth.CheckPassword(answers[0])
+						// TODO: some kind of brute force throttling here?
+					}
+				}
+			} else {
+				err = auth.Check(conn.RemoteAddr(), nil, sanitize.Data(string(conn.ClientVersion()), 64))
 			}
-			err := auth.Check(conn.RemoteAddr(), nil, sanitize.Data(string(conn.ClientVersion()), 64))
 			return nil, err
 		},
 	}
