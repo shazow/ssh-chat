@@ -22,7 +22,7 @@ func (a RejectAuth) AcceptPassphrase() bool {
 func (a RejectAuth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
 	return errRejectAuth
 }
-func (a RejectAuth) CheckPubkey(ssh.PublicKey) error {
+func (a RejectAuth) CheckPublicKey(ssh.PublicKey) error {
 	return errRejectAuth
 }
 func (a RejectAuth) CheckPassphrase(string) error {

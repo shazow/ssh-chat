@@ -20,7 +20,7 @@ type Auth interface {
 	// Given address and public key and client agent string, returns nil if the connection is not banned.
 	CheckBans(net.Addr, ssh.PublicKey, string) error
 	// Given a public key, returns nil if the connection should be allowed.
-	CheckPubkey(ssh.PublicKey) error
+	CheckPublicKey(ssh.PublicKey) error
 	// Given a passphrase, returns nil if the connection should be allowed.
 	CheckPassphrase(string) error
 	// BanAddr bans an IP address for the specified amount of time.
@@ -38,7 +38,7 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 			if err != nil {
 				return nil, err
 			}
-			err = auth.CheckPubkey(key)
+			err = auth.CheckPublicKey(key)
 			if err != nil {
 				return nil, err
 			}
@@ -65,12 +65,11 @@ func MakeAuth(auth Auth) *ssh.ServerConfig {
 					} else {
 						err = auth.CheckPassphrase(answers[0])
 						if err != nil {
-							// TODO: make rate-limiting configurable
-							auth.BanAddr(conn.RemoteAddr(), time.Minute * 1)
+							auth.BanAddr(conn.RemoteAddr(), time.Second*2)
 						}
 					}
 				}
-			} else if !auth.AllowAnonymous(){
+			} else if !auth.AllowAnonymous() {
 				err = errors.New("public key authentication required")
 			}
 			return nil, err

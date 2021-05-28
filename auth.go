@@ -113,7 +113,7 @@ func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string)
 }
 
 // CheckPubkey determines if a pubkey fingerprint is permitted.
-func (a *Auth) CheckPubkey(key ssh.PublicKey) error {
+func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
 	authkey := newAuthKey(key)
 	whitelisted := a.whitelist.In(authkey)
 	if a.AllowAnonymous() || whitelisted {
