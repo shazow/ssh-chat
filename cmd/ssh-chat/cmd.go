@@ -135,7 +135,7 @@ func main() {
 	host.Version = Version
 
 	if options.Passphrase != "" {
-		auth.SetPassword(options.Passphrase)
+		auth.SetPassphrase(options.Passphrase)
 	}
 
 	err = fromFile(options.Admin, func(line []byte) error {

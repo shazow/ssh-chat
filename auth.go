@@ -19,8 +19,11 @@ import (
 // when whitelisting is enabled.
 var ErrNotWhitelisted = errors.New("not whitelisted")
 
-// ErrBanned is the error returned when a key is checked that is banned.
+// ErrBanned is the error returned when a client is banned.
 var ErrBanned = errors.New("banned")
+
+// ErrIncorrectPassphrase is the error returned when a provided passphrase is incorrect.
+var ErrIncorrectPassphrase = errors.New("incorrect passphrase")
 
 // newAuthKey returns string from an ssh.PublicKey used to index the key in our lookup.
 func newAuthKey(key ssh.PublicKey) string {
@@ -45,17 +48,17 @@ func newAuthAddr(addr net.Addr) string {
 }
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
-// If the contained password is not empty, it complements a whitelist.
+// If the contained passphrase is not empty, it complements a whitelist.
 type Auth struct {
-	passwordHash []byte
-	bannedAddr   *set.Set
-	bannedClient *set.Set
-	banned       *set.Set
-	whitelist    *set.Set
-	ops          *set.Set
+	passphraseHash []byte
+	bannedAddr     *set.Set
+	bannedClient   *set.Set
+	banned         *set.Set
+	whitelist      *set.Set
+	ops            *set.Set
 }
 
-// NewAuth creates a Auth, optionally with a password.
+// NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
 		bannedAddr:   set.New(),
@@ -66,39 +69,30 @@ func NewAuth() *Auth {
 	}
 }
 
-// SetPassword anables password authentication with the given password.
-// If an emty password is geiven, disable password authentication.
-func (a *Auth) SetPassword(password string) {
-	if password == "" {
-		a.passwordHash = nil
+// SetPassphrase enables passphrase authentication with the given passphrase.
+// If an empty passphrase is given, disable passphrase authentication.
+func (a *Auth) SetPassphrase(passphrase string) {
+	if passphrase == "" {
+		a.passphraseHash = nil
 	} else {
-		hashArray := sha256.Sum256([]byte(password))
-		a.passwordHash = hashArray[:]
+		hashArray := sha256.Sum256([]byte(passphrase))
+		a.passphraseHash = hashArray[:]
 	}
 }
 
 // AllowAnonymous determines if anonymous users are permitted.
 func (a *Auth) AllowAnonymous() bool {
-	return a.whitelist.Len() == 0 && a.passwordHash == nil
+	return a.whitelist.Len() == 0 && a.passphraseHash == nil
 }
 
-// AcceptPassword determines if password authentication is accepted.
-func (a *Auth) AcceptPassword() bool {
-	return a.passwordHash != nil
+// AcceptPassphrase determines if passphrase authentication is accepted.
+func (a *Auth) AcceptPassphrase() bool {
+	return a.passphraseHash != nil
 }
 
-// Check determines if a pubkey fingerprint is permitted.
-func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
+// CheckBans checks IP, key and client bans.
+func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
 	authkey := newAuthKey(key)
-
-	if !a.AllowAnonymous() {
-		// Only check whitelist if we don't allow everyone to connect.
-		whitelisted := a.whitelist.In(authkey)
-		if !whitelisted {
-			return ErrNotWhitelisted
-		}
-		return nil
-	}
 
 	var banned bool
 	if authkey != "" {
@@ -118,14 +112,25 @@ func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) err
 	return nil
 }
 
-// CheckPassword determines if a password is permitted.
-func (a *Auth) CheckPassword(password string) error {
-	if !a.AcceptPassword() {
-		return errors.New("passwords not accepted") // this should never happen
+// CheckPubkey determines if a pubkey fingerprint is permitted.
+func (a *Auth) CheckPubkey(key ssh.PublicKey) error {
+	authkey := newAuthKey(key)
+	whitelisted := a.whitelist.In(authkey)
+	if a.AllowAnonymous() || whitelisted {
+		return nil
+	} else {
+		return ErrNotWhitelisted
 	}
-	passedPasswordhash := sha256.Sum256([]byte(password))
-	if subtle.ConstantTimeCompare(passedPasswordhash[:], a.passwordHash) == 0 {
-		return errors.New("incorrect password")
+}
+
+// CheckPassphrase determines if a passphrase is permitted.
+func (a *Auth) CheckPassphrase(passphrase string) error {
+	if !a.AcceptPassphrase() {
+		return errors.New("passphrases not accepted") // this should never happen
+	}
+	passedPassphraseHash := sha256.Sum256([]byte(passphrase))
+	if subtle.ConstantTimeCompare(passedPassphraseHash[:], a.passphraseHash) == 0 {
+		return ErrIncorrectPassphrase
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -15,15 +16,19 @@ type RejectAuth struct{}
 func (a RejectAuth) AllowAnonymous() bool {
 	return false
 }
-func (a RejectAuth) AcceptPassword() bool {
+func (a RejectAuth) AcceptPassphrase() bool {
 	return false
 }
-func (a RejectAuth) Check(net.Addr, ssh.PublicKey, string) error {
+func (a RejectAuth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
 	return errRejectAuth
 }
-func (a RejectAuth) CheckPassword(string) error {
+func (a RejectAuth) CheckPubkey(ssh.PublicKey) error {
 	return errRejectAuth
 }
+func (a RejectAuth) CheckPassphrase(string) error {
+	return errRejectAuth
+}
+func (a RejectAuth) BanAddr(net.Addr, time.Duration) {}
 
 func TestClientReject(t *testing.T) {
 	signer, err := NewRandomSigner(512)
