@@ -28,7 +28,7 @@ func TestAuthWhitelist(t *testing.T) {
 	}
 
 	auth := NewAuth()
-	err = auth.Check(nil, key, "")
+	err = auth.CheckPublicKey(key)
 	if err != nil {
 		t.Error("Failed to permit in default state:", err)
 	}
@@ -44,7 +44,7 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Error("Clone key does not match.")
 	}
 
-	err = auth.Check(nil, keyClone, "")
+	err = auth.CheckPublicKey(keyClone)
 	if err != nil {
 		t.Error("Failed to permit whitelisted:", err)
 	}
@@ -54,8 +54,42 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = auth.Check(nil, key2, "")
+	err = auth.CheckPublicKey(key2)
 	if err == nil {
 		t.Error("Failed to restrict not whitelisted:", err)
+	}
+}
+
+func TestAuthPassphrases(t *testing.T) {
+	auth := NewAuth()
+
+	if auth.AcceptPassphrase() {
+		t.Error("Doesn't known it won't accept passphrases.")
+	}
+	auth.SetPassphrase("")
+	if auth.AcceptPassphrase() {
+		t.Error("Doesn't known it won't accept passphrases.")
+	}
+
+	err := auth.CheckPassphrase("Pa$$w0rd")
+	if err == nil {
+		t.Error("Failed to deny without passphrase:", err)
+	}
+
+	auth.SetPassphrase("Pa$$w0rd")
+
+	err = auth.CheckPassphrase("Pa$$w0rd")
+	if err != nil {
+		t.Error("Failed to allow vaild passphrase:", err)
+	}
+
+	err = auth.CheckPassphrase("something else")
+	if err == nil {
+		t.Error("Failed to restrict wrong passphrase:", err)
+	}
+
+	auth.SetPassphrase("")
+	if auth.AcceptPassphrase() {
+		t.Error("Didn't clear passphrase.")
 	}
 }

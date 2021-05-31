@@ -1,6 +1,8 @@
 package sshchat
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -17,8 +19,11 @@ import (
 // when whitelisting is enabled.
 var ErrNotWhitelisted = errors.New("not whitelisted")
 
-// ErrBanned is the error returned when a key is checked that is banned.
+// ErrBanned is the error returned when a client is banned.
 var ErrBanned = errors.New("banned")
+
+// ErrIncorrectPassphrase is the error returned when a provided passphrase is incorrect.
+var ErrIncorrectPassphrase = errors.New("incorrect passphrase")
 
 // newAuthKey returns string from an ssh.PublicKey used to index the key in our lookup.
 func newAuthKey(key ssh.PublicKey) string {
@@ -43,12 +48,14 @@ func newAuthAddr(addr net.Addr) string {
 }
 
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
+// If the contained passphrase is not empty, it complements a whitelist.
 type Auth struct {
-	bannedAddr   *set.Set
-	bannedClient *set.Set
-	banned       *set.Set
-	whitelist    *set.Set
-	ops          *set.Set
+	passphraseHash []byte
+	bannedAddr     *set.Set
+	bannedClient   *set.Set
+	banned         *set.Set
+	whitelist      *set.Set
+	ops            *set.Set
 }
 
 // NewAuth creates a new empty Auth.
@@ -62,23 +69,30 @@ func NewAuth() *Auth {
 	}
 }
 
-// AllowAnonymous determines if anonymous users are permitted.
-func (a *Auth) AllowAnonymous() bool {
-	return a.whitelist.Len() == 0
+// SetPassphrase enables passphrase authentication with the given passphrase.
+// If an empty passphrase is given, disable passphrase authentication.
+func (a *Auth) SetPassphrase(passphrase string) {
+	if passphrase == "" {
+		a.passphraseHash = nil
+	} else {
+		hashArray := sha256.Sum256([]byte(passphrase))
+		a.passphraseHash = hashArray[:]
+	}
 }
 
-// Check determines if a pubkey fingerprint is permitted.
-func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
-	authkey := newAuthKey(key)
+// AllowAnonymous determines if anonymous users are permitted.
+func (a *Auth) AllowAnonymous() bool {
+	return a.whitelist.Len() == 0 && a.passphraseHash == nil
+}
 
-	if a.whitelist.Len() != 0 {
-		// Only check whitelist if there is something in it, otherwise it's disabled.
-		whitelisted := a.whitelist.In(authkey)
-		if !whitelisted {
-			return ErrNotWhitelisted
-		}
-		return nil
-	}
+// AcceptPassphrase determines if passphrase authentication is accepted.
+func (a *Auth) AcceptPassphrase() bool {
+	return a.passphraseHash != nil
+}
+
+// CheckBans checks IP, key and client bans.
+func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string) error {
+	authkey := newAuthKey(key)
 
 	var banned bool
 	if authkey != "" {
@@ -95,6 +109,29 @@ func (a *Auth) Check(addr net.Addr, key ssh.PublicKey, clientVersion string) err
 		return ErrBanned
 	}
 
+	return nil
+}
+
+// CheckPubkey determines if a pubkey fingerprint is permitted.
+func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
+	authkey := newAuthKey(key)
+	whitelisted := a.whitelist.In(authkey)
+	if a.AllowAnonymous() || whitelisted {
+		return nil
+	} else {
+		return ErrNotWhitelisted
+	}
+}
+
+// CheckPassphrase determines if a passphrase is permitted.
+func (a *Auth) CheckPassphrase(passphrase string) error {
+	if !a.AcceptPassphrase() {
+		return errors.New("passphrases not accepted") // this should never happen
+	}
+	passedPassphraseHash := sha256.Sum256([]byte(passphrase))
+	if subtle.ConstantTimeCompare(passedPassphraseHash[:], a.passphraseHash) == 0 {
+		return ErrIncorrectPassphrase
+	}
 	return nil
 }
 
