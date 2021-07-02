@@ -12,9 +12,6 @@ var ErrCollision = errors.New("key already exists")
 // Returned when a requested item does not exist in the set.
 var ErrMissing = errors.New("item does not exist")
 
-// Returned when a nil item is added. Nil values are considered expired and invalid.
-var ErrNil = errors.New("item value must not be nil")
-
 // ZeroValue can be used when we only care about the key, not about the value.
 var ZeroValue = struct{}{}
 
@@ -100,7 +97,7 @@ func (s *Set) Get(key string) (Item, error) {
 func (s *Set) cleanup(key string) {
 	s.Lock()
 	item, ok := s.lookup[key]
-	if ok && item == nil {
+	if ok && item.Value() == nil {
 		delete(s.lookup, key)
 	}
 	s.Unlock()
@@ -108,9 +105,6 @@ func (s *Set) cleanup(key string) {
 
 // Add item to this set if it does not exist already.
 func (s *Set) Add(item Item) error {
-	if item.Value() == nil {
-		return ErrNil
-	}
 	key := s.normalize(item.Key())
 
 	s.Lock()
@@ -127,9 +121,6 @@ func (s *Set) Add(item Item) error {
 
 // Set item to this set, even if it already exists.
 func (s *Set) Set(item Item) error {
-	if item.Value() == nil {
-		return ErrNil
-	}
 	key := s.normalize(item.Key())
 
 	s.Lock()
@@ -156,9 +147,6 @@ func (s *Set) Remove(key string) error {
 // Replace oldKey with a new item, which might be a new key.
 // Can be used to rename items.
 func (s *Set) Replace(oldKey string, item Item) error {
-	if item.Value() == nil {
-		return ErrNil
-	}
 	newKey := s.normalize(item.Key())
 	oldKey = s.normalize(oldKey)
 
