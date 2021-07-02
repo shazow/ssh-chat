@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
 	flags "github.com/jessevdk/go-flags"
-	"golang.org/x/crypto/ssh"
 
 	sshchat "github.com/shazow/ssh-chat"
 	"github.com/shazow/ssh-chat/chat"
@@ -138,35 +136,16 @@ func main() {
 		auth.SetPassphrase(options.Passphrase)
 	}
 
-	err = fromFile(options.Admin, func(line []byte) error {
-		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
-		if err != nil {
-			if err.Error() == "ssh: no key found" {
-				return nil // Skip line
-			}
-			return err
-		}
-		auth.Op(key, 0)
-		return nil
-	})
+	err = auth.LoadOpsFromFile(options.Admin)
 	if err != nil {
 		fail(5, "Failed to load admins: %v\n", err)
 	}
 
-	err = fromFile(options.Whitelist, func(line []byte) error {
-		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
-		if err != nil {
-			if err.Error() == "ssh: no key found" {
-				return nil // Skip line
-			}
-			return err
-		}
-		auth.Whitelist(key, 0)
-		return nil
-	})
+	err = auth.LoadWhitelistFromFile(options.Whitelist)
 	if err != nil {
 		fail(6, "Failed to load whitelist: %v\n", err)
 	}
+	auth.WhitelistMode = options.Whitelist != ""
 
 	if options.Motd != "" {
 		host.GetMOTD = func() (string, error) {
@@ -205,26 +184,4 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
-}
-
-func fromFile(path string, handler func(line []byte) error) error {
-	if path == "" {
-		// Skip
-		return nil
-	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		err := handler(scanner.Bytes())
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
