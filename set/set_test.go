@@ -21,14 +21,23 @@ func TestSetExpiring(t *testing.T) {
 		t.Error("not len 1 after set")
 	}
 
-	item := &ExpiringItem{nil, time.Now().Add(-time.Nanosecond * 1)}
+	item := Expire(StringItem("asdf"), -time.Nanosecond).(*ExpiringItem)
 	if !item.Expired() {
 		t.Errorf("ExpiringItem a nanosec ago is not expiring")
+	}
+	if err := s.Add(item); err != nil {
+		t.Error("Error adding expired item to set: ", err)
+	}
+	if s.In("asdf") {
+		t.Error("Expired item in set")
+	}
+	if s.Len() != 1 {
+		t.Error("not len 1 after expired item")
 	}
 
 	item = &ExpiringItem{nil, time.Now().Add(time.Minute * 5)}
 	if item.Expired() {
-		t.Errorf("ExpiringItem in 2 minutes is expiring now")
+		t.Errorf("ExpiringItem in 5 minutes is expiring now")
 	}
 
 	item = Expire(StringItem("bar"), time.Minute*5).(*ExpiringItem)
@@ -42,11 +51,13 @@ func TestSetExpiring(t *testing.T) {
 	if err := s.Add(item); err != nil {
 		t.Fatalf("failed to add item: %s", err)
 	}
-	_, ok := s.lookup["bar"]
+	itemInLookup, ok := s.lookup["bar"]
 	if !ok {
-		t.Fatalf("expired bar added to lookup")
+		t.Fatalf("bar not present in lookup even though it's not expired")
 	}
-	s.lookup["bar"] = item
+	if itemInLookup != item {
+		t.Fatalf("present item %#v != %#v original item", itemInLookup, item)
+	}
 
 	if !s.In("bar") {
 		t.Errorf("not matched after timed set")
