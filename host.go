@@ -9,8 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
@@ -692,6 +695,195 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			body := fmt.Sprintf("%s was renamed by %s.", oldID, msg.From().Name())
 			room.Send(message.NewAnnounceMsg(body))
 
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
+		// TODO: find a better name for reverify
+		// TODO: default for reload
+		// TODO: add keys for a specific duration?
+		// TODO: reverify: what about passphrases?
+		//	- make this a different command (why? a passphrase can't change)
+		//	- who cares, kick them? -- after all, they can just reconnect
+		//	- store a flag in users that authenticated via passphrase and skip here (much more complicated)
+		//  - in which cases does this situation actually happen?
+		// TODO: "panic" (?) command for (import + on + reverify)?
+		// TODO: "print" command with a format for saving to the whitelist file?
+		//   -> hard because the whitelist set inly saved fingerprints
+		Op: true,
+		Prefix: "/whitelist",
+		PrefixHelp: "COMMAND [ARGS...]",
+		Help: "Manipulate the whitelist or whitelist state. See /whitelist help for subcommands",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			if !room.IsOp(msg.From()){
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				args = []string{"help"}
+			}
+
+			// send exactly one message to preserve order
+			replyLines := []string{}
+			sendMsg := func(content string, formatting ...interface{}){
+				replyLines = append(replyLines, fmt.Sprintf(content, formatting...))
+			}
+
+			forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error)error{
+				return h.Members.Each(func(key string, item set.Item) error{
+					v := item.Value()
+					if v == nil {  // expired between Each and here
+						return nil
+					}
+					user := v.(*chat.Member)
+					pk := user.Identifier.(*Identity).PublicKey()
+					return cmd(user, pk)
+				})
+			}
+
+			forPubkeyUser := func(cmd func(ssh.PublicKey)) {
+				invalidUsers := []string{}
+				invalidKeys := []string{}
+				noKeyUsers := []string{}
+				var keyType string
+				for _, v := range args[1:]{
+					switch {
+					case keyType != "":
+						pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyType + " " + v))
+						if err == nil {
+							cmd(pk)
+						} else {
+							invalidKeys = append(invalidKeys, keyType + " " + v)
+						}
+						keyType = ""
+					case strings.HasPrefix(v, "ssh-"):
+						keyType = v
+					default:
+						user, ok := h.GetUser(v)
+						if ok {
+							pk := user.Identifier.(*Identity).PublicKey()
+							if pk == nil {
+								noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+							} else {
+								cmd(pk)
+							}
+						} else {
+							invalidUsers = append(invalidUsers, v)
+						}
+					}
+				}
+				if len(noKeyUsers) != 0 {
+					sendMsg("users without a public key: %v", noKeyUsers)
+				}
+				if len(invalidUsers) != 0 {
+					sendMsg("invalid users: %v", invalidUsers)
+				}
+				if len(invalidKeys) != 0 {
+					sendMsg("invalid keys: %v", invalidKeys)
+				}
+			}
+
+			switch args[0] {
+			case "help":
+				sendMsg("Usage: /whitelist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status")
+				sendMsg("help: this help message")
+				sendMsg("on, off: set whitelist mode (applies to new connections)")
+				sendMsg("add, remove: add or remove keys from the whitelist")
+				sendMsg("import: add all keys of users connected since AGE (default 0) ago to the whitelist")
+				sendMsg("reload: re-read the whitelist file and keep or discard entries in the current whitelist but not in the file")
+				sendMsg("reverify: kick all users not in the whitelist if whitelisting is enabled")
+				sendMsg("status: show status information")
+			case "on":
+				h.auth.WhitelistMode = true
+			case "off":
+				h.auth.WhitelistMode = false
+			case "add":
+				forPubkeyUser(func(pk ssh.PublicKey){h.auth.Whitelist(pk, 0)})
+			case "remove":
+				forPubkeyUser(func(pk ssh.PublicKey){h.auth.Whitelist(pk, 1)})
+			case "import":
+				var since time.Duration
+				var err error
+				if len(args) > 1 {
+					since, err = time.ParseDuration(args[1])
+					if err != nil {
+						return err
+					}
+				}
+				cutoff := time.Now().Add(-since)
+				noKeyUsers := []string{}
+				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+					if user.Joined().Before(cutoff) {
+						if pk == nil {
+							noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+						} else {
+							h.auth.Whitelist(pk, 0)
+						}
+					}
+					return nil
+				})
+				if len(noKeyUsers) != 0 {
+					sendMsg("users without a public key: %v", noKeyUsers)
+				}
+			case "reload":
+				if !(len(args) > 1 && (args[1] == "keep" || args[1] == "flush")) {
+					return errors.New("must specify whether to keep or flush current entries")
+				}
+				if args[1] == "flush" {
+					h.auth.whitelist.Clear()
+				}
+				err := h.auth.LoadWhitelistFromFile(h.auth.whitelistFile)
+				if err != nil {
+					return err
+				}
+			case "reverify":
+				if !h.auth.WhitelistMode {
+					sendMsg("whitelist is disabled, so nobody will be kicked")
+					break
+				}
+				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey)error{
+					if !h.auth.IsOp(pk) && h.auth.CheckPublicKey(pk) != nil { // TODO: why doesn't CheckPublicKey do this?
+						user.Close() // TODO: some message anywhere?
+					}
+					return nil
+				})
+			case "status":
+				if h.auth.WhitelistMode {
+					sendMsg("The whitelist is currently enabled.")
+				} else {
+					sendMsg("The whitelist is currently disabled.")
+				}
+				whitelistedUsers := []string{}
+				whitelistedKeys := []string{}
+				// TODO: this can probably be optimized
+				h.auth.whitelist.Each(func(key string, item set.Item) error {
+					keyFP := item.Key()
+					if forConnectedUsers(func (user *chat.Member, pk ssh.PublicKey) error {
+						if pk != nil && sshd.Fingerprint(pk) == keyFP {
+							whitelistedUsers = append(whitelistedUsers, user.Name())
+							return errors.New("not an actual error, but exit early because we found the key")
+						}
+						return nil
+					}) == nil {
+						// if we land here, the key matches no users
+						whitelistedKeys = append(whitelistedKeys, keyFP)
+					}
+					return nil
+				})
+				if len(whitelistedUsers) != 0 {
+					sendMsg("The following connected users are on the whitelist: %v", whitelistedUsers)
+				}
+				if len(whitelistedKeys) != 0 {
+					sendMsg("The following keys of not connected users are on the whitelist: %v", whitelistedKeys)
+				}
+			default:
+				return errors.New("invalid subcommand: " + args[0])
+			}
+			if len(replyLines) != 0 {
+				room.Send(message.NewSystemMsg(strings.Join(replyLines, "\n"), msg.From()))
+			}
 			return nil
 		},
 	})
