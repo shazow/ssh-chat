@@ -710,7 +710,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		//  - in which cases does this situation actually happen?
 		// TODO: "panic" (?) command for (import + on + reverify)?
 		// TODO: "print" command with a format for saving to the whitelist file?
-		//   -> hard because the whitelist set inly saved fingerprints
+		//   -> hard because the whitelist set only saves fingerprints
 		Op: true,
 		Prefix: "/whitelist",
 		PrefixHelp: "COMMAND [ARGS...]",
@@ -882,7 +882,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("invalid subcommand: " + args[0])
 			}
 			if len(replyLines) != 0 {
-				room.Send(message.NewSystemMsg(strings.Join(replyLines, "\n"), msg.From()))
+				room.Send(message.NewSystemMsg(strings.Join(replyLines, "\r\n"), msg.From()))
 			}
 			return nil
 		},

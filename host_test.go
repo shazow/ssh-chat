@@ -25,6 +25,9 @@ func stripPrompt(s string) string {
 	if endPos := strings.Index(s, "\x1b[2K "); endPos > 0 {
 		return s[endPos+4:]
 	}
+	if endPos := strings.Index(s, "\x1b[K-> "); endPos > 0 {
+		return s[endPos+6:]
+	}
 	if endPos := strings.Index(s, "] "); endPos > 0 {
 		return s[endPos+2:]
 	}
@@ -43,6 +46,10 @@ func TestStripPrompt(t *testing.T) {
 		{
 			Input: "[foo] \x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[K * Guest1 joined. (Connected: 2)\r",
 			Want:  " * Guest1 joined. (Connected: 2)\r",
+		},
+		{
+			Input: "[foo] \x1b[6D\x1b[K-> From your friendly system.\r",
+			Want: "From your friendly system.\r",
 		},
 	}
 
@@ -77,20 +84,23 @@ func TestHostGetPrompt(t *testing.T) {
 	}
 }
 
-func TestHostNameCollision(t *testing.T) {
+func getHost(t *testing.T, config *ssh.ServerConfig) (*sshd.SSHListener, *Host) {
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := sshd.MakeNoAuth()
 	config.AddHostKey(key)
 
 	s, err := sshd.ListenSSH("localhost:0", config)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return s, NewHost(s, NewAuth())
+}
+
+func TestHostNameCollision(t *testing.T) {
+	s, host := getHost(t, sshd.MakeNoAuth())
 	defer s.Close()
-	host := NewHost(s, nil)
 
 	newUsers := make(chan *message.User)
 	host.OnUserJoined = func(u *message.User) {
@@ -158,26 +168,14 @@ func TestHostNameCollision(t *testing.T) {
 }
 
 func TestHostWhitelist(t *testing.T) {
-	key, err := sshd.NewRandomSigner(512)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	auth := NewAuth()
-	config := sshd.MakeAuth(auth)
-	config.AddHostKey(key)
-
-	s, err := sshd.ListenSSH("localhost:0", config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s, host := getHost(t, sshd.MakeAuth(auth))
 	defer s.Close()
-	host := NewHost(s, auth)
 	go host.Serve()
 
 	target := s.Addr().String()
 
-	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
+	err := sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
 	if err != nil {
 		t.Error(err)
 	}
@@ -195,6 +193,117 @@ func TestHostWhitelist(t *testing.T) {
 	if err == nil {
 		t.Error("Failed to block unwhitelisted connection.")
 	}
+}
+
+func TestHostWhitelistCommand(t *testing.T) {
+	s, host := getHost(t, sshd.MakeNoAuth())
+	defer s.Close()
+	go host.Serve()
+
+	users := make(chan *message.User)
+	host.OnUserJoined = func(u *message.User){
+		users <- u
+	}
+
+	sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
+		<- users
+		m, ok := host.MemberByID("foo")
+		if !ok {
+			t.Fatal("can't get member foo")
+		}
+
+		scanner := bufio.NewScanner(r)
+		scanner.Scan() // Joined
+		// <- messages
+
+		assertLineEq := func(expected string){
+			if !scanner.Scan() {
+				t.Error("no line available")
+			}
+			if actual := stripPrompt(scanner.Text()); actual != expected {
+				t.Errorf("expected %q, got %q", expected, actual)
+			}
+		}
+		sendCmd := func(cmd string, formatting ...interface{}){
+			host.HandleMsg(message.ParseInput(fmt.Sprintf(cmd, formatting...), m.User))
+		}
+
+		sendCmd("/whitelist")
+		assertLineEq("Err: must be op\r")
+		m.IsOp = true
+		sendCmd("/whitelist")
+		for _, expected := range [...]string{"Usage", "help", "on, off", "add, remove", "import", "reload", "reverify", "status"} {
+			if !scanner.Scan() {
+				t.Error("no line available")
+			}
+			if actual := stripPrompt(scanner.Text()); !strings.HasPrefix(actual, expected) {
+				t.Errorf("Unexpected help message order: have %q, want prefix %q", actual, expected)
+			}
+		}
+
+		sendCmd("/whitelist on")
+		if !host.auth.WhitelistMode {
+			t.Error("whitelist not enabled after /whitelist on")
+		}
+		host.HandleMsg(message.ParseInput("/whitelist off", m.User))
+		if host.auth.WhitelistMode {
+			t.Error("whitelist not disabled after /whitelist off")
+		}
+
+		// TODO: can we pass a public key when connecting?
+		// useful for add, remove, import, reverify, status
+
+		testKey1 := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUiNw0nQku4pcUCbZcJlIEAIf5bXJYTy/DKI1vh5b+P"
+		testKey1FP := "SHA256:GJNSl9NUcOS2pZYALn0C5Qgfh5deT+R+FfqNIUvpM9s="
+		testKey2 := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINDnlvlhBf4Jx7RlqTO6C5iOUhsBk2CHOpwPgPUbo8vb"
+		testKey2FP := "SHA256:tMBXmUCPMxbSNj1pzQlGR+N2RiAIvcnqT18vX0r2rrM="
+
+		sendCmd("/whitelist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo %s %s", testKey1, testKey2)
+		assertLineEq("users without a public key: [foo]\r")
+		assertLineEq("invalid users: [invalid]\r")
+		assertLineEq("invalid keys: [ssh-invalid blah ssh-rsa wrongAsWell]\r")
+		if !host.auth.whitelist.In(testKey1FP) || !host.auth.whitelist.In(testKey2FP) {
+			t.Error("failed to add keys to whitelist")
+		}
+		sendCmd("/whitelist remove invalid %s", testKey1)
+		assertLineEq("invalid users: [invalid]\r")
+		if host.auth.whitelist.In(testKey1FP) {
+			t.Error("failed to remove key from whitelist")
+		}
+		if !host.auth.whitelist.In(testKey2FP) {
+			t.Error("removed wrong key")
+		}
+
+		// TODO: to test the AGE arg, we need another connection and possibly a sleep
+		sendCmd("/whitelist import")
+		assertLineEq("users without a public key: [foo]\r")
+
+		// TODO: test reload with files?
+		sendCmd("/whitelist reload keep")
+		if !host.auth.whitelist.In(testKey2FP) {
+			t.Error("cleared whitelist to be kept")
+		}
+		sendCmd("/whitelist reload flush")
+		if host.auth.whitelist.In(testKey2FP) {
+			t.Error("kept whitelist to be cleared")
+		}
+		sendCmd("/whitelist reload thisIsWrong")
+		assertLineEq("Err: must specify whether to keep or flush current entries\r")
+		sendCmd("/whitelist reload")
+		assertLineEq("Err: must specify whether to keep or flush current entries\r")
+
+		sendCmd("/whitelist reverify")
+		assertLineEq("whitelist is disabled, so nobody will be kicked\r")
+
+		sendCmd("/whitelist add " + testKey1)
+		sendCmd("/whitelist status")
+		assertLineEq("The whitelist is currently disabled.\r")
+		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the whitelist: [%s]\r", testKey1FP))
+
+		sendCmd("/whitelist invalidSubcommand")
+		assertLineEq("Err: invalid subcommand: invalidSubcommand\r")
+		return nil
+	})
 }
 
 func TestHostKick(t *testing.T) {
