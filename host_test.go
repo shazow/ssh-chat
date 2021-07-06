@@ -49,7 +49,7 @@ func TestStripPrompt(t *testing.T) {
 		},
 		{
 			Input: "[foo] \x1b[6D\x1b[K-> From your friendly system.\r",
-			Want: "From your friendly system.\r",
+			Want:  "From your friendly system.\r",
 		},
 	}
 
@@ -201,12 +201,12 @@ func TestHostWhitelistCommand(t *testing.T) {
 	go host.Serve()
 
 	users := make(chan *message.User)
-	host.OnUserJoined = func(u *message.User){
+	host.OnUserJoined = func(u *message.User) {
 		users <- u
 	}
 
 	sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-		<- users
+		<-users
 		m, ok := host.MemberByID("foo")
 		if !ok {
 			t.Fatal("can't get member foo")
@@ -216,7 +216,7 @@ func TestHostWhitelistCommand(t *testing.T) {
 		scanner.Scan() // Joined
 		// <- messages
 
-		assertLineEq := func(expected string){
+		assertLineEq := func(expected string) {
 			if !scanner.Scan() {
 				t.Error("no line available")
 			}
@@ -224,7 +224,7 @@ func TestHostWhitelistCommand(t *testing.T) {
 				t.Errorf("expected %q, got %q", expected, actual)
 			}
 		}
-		sendCmd := func(cmd string, formatting ...interface{}){
+		sendCmd := func(cmd string, formatting ...interface{}) {
 			host.HandleMsg(message.ParseInput(fmt.Sprintf(cmd, formatting...), m.User))
 		}
 

@@ -13,10 +13,10 @@ import (
 
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
-	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -711,12 +711,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		// TODO: "panic" (?) command for (import + on + reverify)?
 		// TODO: "print" command with a format for saving to the whitelist file?
 		//   -> hard because the whitelist set only saves fingerprints
-		Op: true,
-		Prefix: "/whitelist",
+		Op:         true,
+		Prefix:     "/whitelist",
 		PrefixHelp: "COMMAND [ARGS...]",
-		Help: "Manipulate the whitelist or whitelist state. See /whitelist help for subcommands",
+		Help:       "Manipulate the whitelist or whitelist state. See /whitelist help for subcommands",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
-			if !room.IsOp(msg.From()){
+			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
 
@@ -727,14 +727,14 @@ func (h *Host) InitCommands(c *chat.Commands) {
 
 			// send exactly one message to preserve order
 			replyLines := []string{}
-			sendMsg := func(content string, formatting ...interface{}){
+			sendMsg := func(content string, formatting ...interface{}) {
 				replyLines = append(replyLines, fmt.Sprintf(content, formatting...))
 			}
 
-			forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error)error{
-				return h.Members.Each(func(key string, item set.Item) error{
+			forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error) error {
+				return h.Members.Each(func(key string, item set.Item) error {
 					v := item.Value()
-					if v == nil {  // expired between Each and here
+					if v == nil { // expired between Each and here
 						return nil
 					}
 					user := v.(*chat.Member)
@@ -748,14 +748,14 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				invalidKeys := []string{}
 				noKeyUsers := []string{}
 				var keyType string
-				for _, v := range args[1:]{
+				for _, v := range args[1:] {
 					switch {
 					case keyType != "":
 						pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyType + " " + v))
 						if err == nil {
 							cmd(pk)
 						} else {
-							invalidKeys = append(invalidKeys, keyType + " " + v)
+							invalidKeys = append(invalidKeys, keyType+" "+v)
 						}
 						keyType = ""
 					case strings.HasPrefix(v, "ssh-"):
@@ -800,9 +800,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			case "off":
 				h.auth.WhitelistMode = false
 			case "add":
-				forPubkeyUser(func(pk ssh.PublicKey){h.auth.Whitelist(pk, 0)})
+				forPubkeyUser(func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) })
 			case "remove":
-				forPubkeyUser(func(pk ssh.PublicKey){h.auth.Whitelist(pk, 1)})
+				forPubkeyUser(func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) })
 			case "import":
 				var since time.Duration
 				var err error
@@ -843,7 +843,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 					sendMsg("whitelist is disabled, so nobody will be kicked")
 					break
 				}
-				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey)error{
+				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
 					if !h.auth.IsOp(pk) && h.auth.CheckPublicKey(pk) != nil { // TODO: why doesn't CheckPublicKey do this?
 						user.Close() // TODO: some message anywhere?
 					}
@@ -860,7 +860,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				// TODO: this can probably be optimized
 				h.auth.whitelist.Each(func(key string, item set.Item) error {
 					keyFP := item.Key()
-					if forConnectedUsers(func (user *chat.Member, pk ssh.PublicKey) error {
+					if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
 						if pk != nil && sshd.Fingerprint(pk) == keyFP {
 							whitelistedUsers = append(whitelistedUsers, user.Name())
 							return errors.New("not an actual error, but exit early because we found the key")

@@ -1,16 +1,16 @@
 package sshchat
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
-	"os"
-	"bufio"
 
 	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
@@ -59,8 +59,8 @@ type Auth struct {
 	banned         *set.Set
 	whitelist      *set.Set
 	ops            *set.Set
-	opFile string
-	whitelistFile string
+	opFile         string
+	whitelistFile  string
 }
 
 // NewAuth creates a new empty Auth.
@@ -169,7 +169,7 @@ func (a *Auth) IsOp(key ssh.PublicKey) bool {
 // LoadOpsFromFile reads a file in authorized_keys format and makes public keys operators
 func (a *Auth) LoadOpsFromFile(path string) error {
 	a.opFile = path
-	return fromFile(path, func(key ssh.PublicKey){a.Op(key, 0)})
+	return fromFile(path, func(key ssh.PublicKey) { a.Op(key, 0) })
 }
 
 // Whitelist will set a public key as a whitelisted user.
@@ -194,7 +194,7 @@ func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 // LoadWhitelistFromFile reads a file in authorized_keys format and whitelists public keys
 func (a *Auth) LoadWhitelistFromFile(path string) error {
 	a.whitelistFile = path
-	return fromFile(path, func(key ssh.PublicKey){a.Whitelist(key, 0)})
+	return fromFile(path, func(key ssh.PublicKey) { a.Whitelist(key, 0) })
 }
 
 // Ban will set a public key as banned.
