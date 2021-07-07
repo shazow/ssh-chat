@@ -84,10 +84,16 @@ func TestHostGetPrompt(t *testing.T) {
 	}
 }
 
-func getHost(t *testing.T, config *ssh.ServerConfig) (*sshd.SSHListener, *Host) {
+func getHost(t *testing.T, auth *Auth) (*sshd.SSHListener, *Host) {
 	key, err := sshd.NewRandomSigner(512)
 	if err != nil {
 		t.Fatal(err)
+	}
+	var config *ssh.ServerConfig
+	if auth == nil {
+		config = sshd.MakeNoAuth()
+	} else {
+		config = sshd.MakeAuth(auth)
 	}
 	config.AddHostKey(key)
 
@@ -95,11 +101,11 @@ func getHost(t *testing.T, config *ssh.ServerConfig) (*sshd.SSHListener, *Host) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	return s, NewHost(s, NewAuth())
+	return s, NewHost(s, auth)
 }
 
 func TestHostNameCollision(t *testing.T) {
-	s, host := getHost(t, sshd.MakeNoAuth())
+	s, host := getHost(t, nil)
 	defer s.Close()
 
 	newUsers := make(chan *message.User)
@@ -169,7 +175,7 @@ func TestHostNameCollision(t *testing.T) {
 
 func TestHostWhitelist(t *testing.T) {
 	auth := NewAuth()
-	s, host := getHost(t, sshd.MakeAuth(auth))
+	s, host := getHost(t, auth)
 	defer s.Close()
 	go host.Serve()
 
@@ -196,7 +202,7 @@ func TestHostWhitelist(t *testing.T) {
 }
 
 func TestHostWhitelistCommand(t *testing.T) {
-	s, host := getHost(t, sshd.MakeNoAuth())
+	s, host := getHost(t, NewAuth())
 	defer s.Close()
 	go host.Serve()
 
@@ -214,7 +220,6 @@ func TestHostWhitelistCommand(t *testing.T) {
 
 		scanner := bufio.NewScanner(r)
 		scanner.Scan() // Joined
-		// <- messages
 
 		assertLineEq := func(expected string) {
 			if !scanner.Scan() {
@@ -245,7 +250,7 @@ func TestHostWhitelistCommand(t *testing.T) {
 		if !host.auth.WhitelistMode {
 			t.Error("whitelist not enabled after /whitelist on")
 		}
-		host.HandleMsg(message.ParseInput("/whitelist off", m.User))
+		sendCmd("/whitelist off")
 		if host.auth.WhitelistMode {
 			t.Error("whitelist not disabled after /whitelist off")
 		}
