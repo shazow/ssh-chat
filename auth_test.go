@@ -34,7 +34,7 @@ func TestAuthWhitelist(t *testing.T) {
 	}
 
 	auth.Whitelist(key, 0)
-	auth.WhitelistMode = true
+	auth.SetWhitelistMode(true)
 
 	keyClone, err := ClonePublicKey(key)
 	if err != nil {

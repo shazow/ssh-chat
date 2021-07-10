@@ -193,7 +193,7 @@ func TestHostWhitelist(t *testing.T) {
 
 	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
 	auth.Whitelist(clientpubkey, 0)
-	auth.WhitelistMode = true
+	auth.SetWhitelistMode(true)
 
 	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
 	if err == nil {
@@ -247,11 +247,11 @@ func TestHostWhitelistCommand(t *testing.T) {
 		}
 
 		sendCmd("/whitelist on")
-		if !host.auth.WhitelistMode {
+		if !host.auth.WhitelistMode() {
 			t.Error("whitelist not enabled after /whitelist on")
 		}
 		sendCmd("/whitelist off")
-		if host.auth.WhitelistMode {
+		if host.auth.WhitelistMode() {
 			t.Error("whitelist not disabled after /whitelist off")
 		}
 

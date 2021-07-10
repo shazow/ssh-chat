@@ -700,15 +700,12 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
-		// TODO: find a better name for reverify
 		// TODO: default for reload
-		// TODO: add keys for a specific duration?
 		// TODO: reverify: what about passphrases?
 		//	- make this a different command (why? a passphrase can't change)
 		//	- who cares, kick them? -- after all, they can just reconnect
 		//	- store a flag in users that authenticated via passphrase and skip here (much more complicated)
 		//  - in which cases does this situation actually happen?
-		// TODO: "panic" (?) command for (import + on + reverify)?
 		// TODO: "print" command with a format for saving to the whitelist file?
 		//   -> hard because the whitelist set only saves fingerprints
 		Op:         true,
@@ -796,9 +793,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				sendMsg("reverify: kick all users not in the whitelist if whitelisting is enabled")
 				sendMsg("status: show status information")
 			case "on":
-				h.auth.WhitelistMode = true
+				h.auth.SetWhitelistMode(true)
 			case "off":
-				h.auth.WhitelistMode = false
+				h.auth.SetWhitelistMode(false)
 			case "add":
 				forPubkeyUser(func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) })
 			case "remove":
@@ -839,7 +836,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 					return err
 				}
 			case "reverify":
-				if !h.auth.WhitelistMode {
+				if !h.auth.WhitelistMode() {
 					sendMsg("whitelist is disabled, so nobody will be kicked")
 					break
 				}
@@ -850,7 +847,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 					return nil
 				})
 			case "status":
-				if h.auth.WhitelistMode {
+				if h.auth.WhitelistMode() {
 					sendMsg("The whitelist is currently enabled.")
 				} else {
 					sendMsg("The whitelist is currently disabled.")

@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shazow/ssh-chat/set"
@@ -53,7 +54,8 @@ func newAuthAddr(addr net.Addr) string {
 // If the contained passphrase is not empty, it complements a whitelist.
 type Auth struct {
 	passphraseHash []byte
-	WhitelistMode  bool
+	whitelistModeMu sync.RWMutex
+	whitelistMode  bool
 	bannedAddr     *set.Set
 	bannedClient   *set.Set
 	banned         *set.Set
@@ -74,6 +76,18 @@ func NewAuth() *Auth {
 	}
 }
 
+func (a *Auth)WhitelistMode() bool{
+	a.whitelistModeMu.RLock()
+	defer a.whitelistModeMu.RUnlock()
+	return a.whitelistMode
+}
+
+func (a *Auth) SetWhitelistMode(value bool){
+	a.whitelistModeMu.Lock()
+	defer a.whitelistModeMu.Unlock()
+	a.whitelistMode = value
+}
+
 // SetPassphrase enables passphrase authentication with the given passphrase.
 // If an empty passphrase is given, disable passphrase authentication.
 func (a *Auth) SetPassphrase(passphrase string) {
@@ -87,7 +101,7 @@ func (a *Auth) SetPassphrase(passphrase string) {
 
 // AllowAnonymous determines if anonymous users are permitted.
 func (a *Auth) AllowAnonymous() bool {
-	return !a.WhitelistMode && a.passphraseHash == nil
+	return !a.WhitelistMode() && a.passphraseHash == nil
 }
 
 // AcceptPassphrase determines if passphrase authentication is accepted.

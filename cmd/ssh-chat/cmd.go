@@ -145,7 +145,7 @@ func main() {
 	if err != nil {
 		fail(6, "Failed to load whitelist: %v\n", err)
 	}
-	auth.WhitelistMode = options.Whitelist != ""
+	auth.SetWhitelistMode(options.Whitelist != "")
 
 	if options.Motd != "" {
 		host.GetMOTD = func() (string, error) {
