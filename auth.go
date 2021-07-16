@@ -1,13 +1,16 @@
 package sshchat
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shazow/ssh-chat/set"
@@ -51,11 +54,15 @@ func newAuthAddr(addr net.Addr) string {
 // If the contained passphrase is not empty, it complements a whitelist.
 type Auth struct {
 	passphraseHash []byte
+	whitelistModeMu sync.RWMutex
+	whitelistMode  bool
 	bannedAddr     *set.Set
 	bannedClient   *set.Set
 	banned         *set.Set
 	whitelist      *set.Set
 	ops            *set.Set
+	opFile         string
+	whitelistFile  string
 }
 
 // NewAuth creates a new empty Auth.
@@ -67,6 +74,18 @@ func NewAuth() *Auth {
 		whitelist:    set.New(),
 		ops:          set.New(),
 	}
+}
+
+func (a *Auth)WhitelistMode() bool{
+	a.whitelistModeMu.RLock()
+	defer a.whitelistModeMu.RUnlock()
+	return a.whitelistMode
+}
+
+func (a *Auth) SetWhitelistMode(value bool){
+	a.whitelistModeMu.Lock()
+	defer a.whitelistModeMu.Unlock()
+	a.whitelistMode = value
 }
 
 // SetPassphrase enables passphrase authentication with the given passphrase.
@@ -82,7 +101,7 @@ func (a *Auth) SetPassphrase(passphrase string) {
 
 // AllowAnonymous determines if anonymous users are permitted.
 func (a *Auth) AllowAnonymous() bool {
-	return a.whitelist.Len() == 0 && a.passphraseHash == nil
+	return !a.WhitelistMode() && a.passphraseHash == nil
 }
 
 // AcceptPassphrase determines if passphrase authentication is accepted.
@@ -158,18 +177,38 @@ func (a *Auth) IsOp(key ssh.PublicKey) bool {
 	return a.ops.In(authkey)
 }
 
+// TODO: the *FromFile could be replaced by a single LoadFromFile taking the function (i.e. auth.Op/auth.Whitelist)
+// TODO: consider reloading on empty path
+
+// LoadOpsFromFile reads a file in authorized_keys format and makes public keys operators
+func (a *Auth) LoadOpsFromFile(path string) error {
+	a.opFile = path
+	return fromFile(path, func(key ssh.PublicKey) { a.Op(key, 0) })
+}
+
 // Whitelist will set a public key as a whitelisted user.
 func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
+	var err error
 	authItem := newAuthItem(key)
 	if d != 0 {
-		a.whitelist.Set(set.Expire(authItem, d))
+		err = a.whitelist.Set(set.Expire(authItem, d))
 	} else {
-		a.whitelist.Set(authItem)
+		err = a.whitelist.Set(authItem)
 	}
-	logger.Debugf("Added to whitelist: %q (for %s)", authItem.Key(), d)
+	if err == nil {
+		logger.Debugf("Added to whitelist: %q (for %s)", authItem.Key(), d)
+	} else {
+		logger.Errorf("Error adding %q to whitelist for %s: %s", authItem.Key(), d, err)
+	}
+}
+
+// LoadWhitelistFromFile reads a file in authorized_keys format and whitelists public keys
+func (a *Auth) LoadWhitelistFromFile(path string) error {
+	a.whitelistFile = path
+	return fromFile(path, func(key ssh.PublicKey) { a.Whitelist(key, 0) })
 }
 
 // Ban will set a public key as banned.
@@ -274,5 +313,31 @@ func (a *Auth) BanQuery(q string) error {
 		}
 	}
 
+	return nil
+}
+
+func fromFile(path string, handler func(ssh.PublicKey)) error {
+	if path == "" {
+		return nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		key, _, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
+		if err != nil {
+			if err.Error() == "ssh: no key found" {
+				// TODO: do we really want to always ignore this?
+				continue // Skip line
+			}
+			return err
+		}
+		handler(key)
+	}
 	return nil
 }
