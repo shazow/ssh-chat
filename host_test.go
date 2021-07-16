@@ -201,7 +201,7 @@ func TestHostWhitelist(t *testing.T) {
 	}
 }
 
-func TestHostWhitelistCommand(t *testing.T) {
+func TestHostAllowlistCommand(t *testing.T) {
 	s, host := getHost(t, NewAuth())
 	defer s.Close()
 	go host.Serve()
@@ -233,10 +233,10 @@ func TestHostWhitelistCommand(t *testing.T) {
 			host.HandleMsg(message.ParseInput(fmt.Sprintf(cmd, formatting...), m.User))
 		}
 
-		sendCmd("/whitelist")
+		sendCmd("/allowlist")
 		assertLineEq("Err: must be op\r")
 		m.IsOp = true
-		sendCmd("/whitelist")
+		sendCmd("/allowlist")
 		for _, expected := range [...]string{"Usage", "help", "on, off", "add, remove", "import", "reload", "reverify", "status"} {
 			if !scanner.Scan() {
 				t.Error("no line available")
@@ -246,13 +246,13 @@ func TestHostWhitelistCommand(t *testing.T) {
 			}
 		}
 
-		sendCmd("/whitelist on")
+		sendCmd("/allowlist on")
 		if !host.auth.WhitelistMode() {
-			t.Error("whitelist not enabled after /whitelist on")
+			t.Error("allowlist not enabled after /allowlist on")
 		}
-		sendCmd("/whitelist off")
+		sendCmd("/allowlist off")
 		if host.auth.WhitelistMode() {
-			t.Error("whitelist not disabled after /whitelist off")
+			t.Error("allowlist not disabled after /allowlist off")
 		}
 
 		// TODO: can we pass a public key when connecting?
@@ -263,49 +263,49 @@ func TestHostWhitelistCommand(t *testing.T) {
 		testKey2 := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINDnlvlhBf4Jx7RlqTO6C5iOUhsBk2CHOpwPgPUbo8vb"
 		testKey2FP := "SHA256:tMBXmUCPMxbSNj1pzQlGR+N2RiAIvcnqT18vX0r2rrM="
 
-		sendCmd("/whitelist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo %s %s", testKey1, testKey2)
+		sendCmd("/allowlist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo %s %s", testKey1, testKey2)
 		assertLineEq("users without a public key: [foo]\r")
 		assertLineEq("invalid users: [invalid]\r")
 		assertLineEq("invalid keys: [ssh-invalid blah ssh-rsa wrongAsWell]\r")
 		if !host.auth.whitelist.In(testKey1FP) || !host.auth.whitelist.In(testKey2FP) {
-			t.Error("failed to add keys to whitelist")
+			t.Error("failed to add keys to allowlist")
 		}
-		sendCmd("/whitelist remove invalid %s", testKey1)
+		sendCmd("/allowlist remove invalid %s", testKey1)
 		assertLineEq("invalid users: [invalid]\r")
 		if host.auth.whitelist.In(testKey1FP) {
-			t.Error("failed to remove key from whitelist")
+			t.Error("failed to remove key from allowlist")
 		}
 		if !host.auth.whitelist.In(testKey2FP) {
 			t.Error("removed wrong key")
 		}
 
 		// TODO: to test the AGE arg, we need another connection and possibly a sleep
-		sendCmd("/whitelist import")
+		sendCmd("/allowlist import")
 		assertLineEq("users without a public key: [foo]\r")
 
 		// TODO: test reload with files?
-		sendCmd("/whitelist reload keep")
+		sendCmd("/allowlist reload keep")
 		if !host.auth.whitelist.In(testKey2FP) {
-			t.Error("cleared whitelist to be kept")
+			t.Error("cleared allowlist to be kept")
 		}
-		sendCmd("/whitelist reload flush")
+		sendCmd("/allowlist reload flush")
 		if host.auth.whitelist.In(testKey2FP) {
-			t.Error("kept whitelist to be cleared")
+			t.Error("kept allowlist to be cleared")
 		}
-		sendCmd("/whitelist reload thisIsWrong")
+		sendCmd("/allowlist reload thisIsWrong")
 		assertLineEq("Err: must specify whether to keep or flush current entries\r")
-		sendCmd("/whitelist reload")
+		sendCmd("/allowlist reload")
 		assertLineEq("Err: must specify whether to keep or flush current entries\r")
 
-		sendCmd("/whitelist reverify")
-		assertLineEq("whitelist is disabled, so nobody will be kicked\r")
+		sendCmd("/allowlist reverify")
+		assertLineEq("allowlist is disabled, so nobody will be kicked\r")
 
-		sendCmd("/whitelist add " + testKey1)
-		sendCmd("/whitelist status")
-		assertLineEq("The whitelist is currently disabled.\r")
-		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the whitelist: [%s]\r", testKey1FP))
+		sendCmd("/allowlist add " + testKey1)
+		sendCmd("/allowlist status")
+		assertLineEq("The allowlist is currently disabled.\r")
+		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKey1FP))
 
-		sendCmd("/whitelist invalidSubcommand")
+		sendCmd("/allowlist invalidSubcommand")
 		assertLineEq("Err: invalid subcommand: invalidSubcommand\r")
 		return nil
 	})

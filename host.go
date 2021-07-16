@@ -699,19 +699,67 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		},
 	})
 
+	forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error) error {
+		return h.Members.Each(func(key string, item set.Item) error {
+			v := item.Value()
+			if v == nil { // expired between Each and here
+				return nil
+			}
+			user := v.(*chat.Member)
+			pk := user.Identifier.(*Identity).PublicKey()
+			return cmd(user, pk)
+		})
+	}
+
+	forPubkeyUser := func(args []string, cmd func(ssh.PublicKey)) (errors []string) {
+		invalidUsers := []string{}
+		invalidKeys := []string{}
+		noKeyUsers := []string{}
+		var keyType string
+		for _, v := range args {
+			switch {
+			case keyType != "":
+				pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyType + " " + v))
+				if err == nil {
+					cmd(pk)
+				} else {
+					invalidKeys = append(invalidKeys, keyType+" "+v)
+				}
+				keyType = ""
+			case strings.HasPrefix(v, "ssh-"):
+				keyType = v
+			default:
+				user, ok := h.GetUser(v)
+				if ok {
+					pk := user.Identifier.(*Identity).PublicKey()
+					if pk == nil {
+						noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+					} else {
+						cmd(pk)
+					}
+				} else {
+					invalidUsers = append(invalidUsers, v)
+				}
+			}
+		}
+		if len(noKeyUsers) != 0 {
+			errors = append(errors, fmt.Sprintf("users without a public key: %v", noKeyUsers))
+		}
+		if len(invalidUsers) != 0 {
+			errors = append(errors, fmt.Sprintf("invalid users: %v", invalidUsers))
+		}
+		if len(invalidKeys) != 0 {
+			errors = append(errors, fmt.Sprintf("invalid keys: %v", invalidKeys))
+		}
+		return
+	}
+
 	c.Add(chat.Command{
 		// TODO: default for reload
-		// TODO: reverify: what about passphrases?
-		//	- make this a different command (why? a passphrase can't change)
-		//	- who cares, kick them? -- after all, they can just reconnect
-		//	- store a flag in users that authenticated via passphrase and skip here (much more complicated)
-		//  - in which cases does this situation actually happen?
-		// TODO: "print" command with a format for saving to the whitelist file?
-		//   -> hard because the whitelist set only saves fingerprints
 		Op:         true,
-		Prefix:     "/whitelist",
+		Prefix:     "/allowlist",
 		PrefixHelp: "COMMAND [ARGS...]",
-		Help:       "Manipulate the whitelist or whitelist state. See /whitelist help for subcommands",
+		Help:       "Modify the allowlist or allowlist state. See /allowlist help for subcommands",
 		Handler: func(room *chat.Room, msg message.CommandMsg) error {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
@@ -728,82 +776,32 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				replyLines = append(replyLines, fmt.Sprintf(content, formatting...))
 			}
 
-			forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error) error {
-				return h.Members.Each(func(key string, item set.Item) error {
-					v := item.Value()
-					if v == nil { // expired between Each and here
-						return nil
-					}
-					user := v.(*chat.Member)
-					pk := user.Identifier.(*Identity).PublicKey()
-					return cmd(user, pk)
-				})
-			}
-
-			forPubkeyUser := func(cmd func(ssh.PublicKey)) {
-				invalidUsers := []string{}
-				invalidKeys := []string{}
-				noKeyUsers := []string{}
-				var keyType string
-				for _, v := range args[1:] {
-					switch {
-					case keyType != "":
-						pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyType + " " + v))
-						if err == nil {
-							cmd(pk)
-						} else {
-							invalidKeys = append(invalidKeys, keyType+" "+v)
-						}
-						keyType = ""
-					case strings.HasPrefix(v, "ssh-"):
-						keyType = v
-					default:
-						user, ok := h.GetUser(v)
-						if ok {
-							pk := user.Identifier.(*Identity).PublicKey()
-							if pk == nil {
-								noKeyUsers = append(noKeyUsers, user.Identifier.Name())
-							} else {
-								cmd(pk)
-							}
-						} else {
-							invalidUsers = append(invalidUsers, v)
-						}
-					}
-				}
-				if len(noKeyUsers) != 0 {
-					sendMsg("users without a public key: %v", noKeyUsers)
-				}
-				if len(invalidUsers) != 0 {
-					sendMsg("invalid users: %v", invalidUsers)
-				}
-				if len(invalidKeys) != 0 {
-					sendMsg("invalid keys: %v", invalidKeys)
-				}
-			}
-
 			switch args[0] {
 			case "help":
-				sendMsg("Usage: /whitelist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status")
+				sendMsg("Usage: /allowlist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status")
 				sendMsg("help: this help message")
-				sendMsg("on, off: set whitelist mode (applies to new connections)")
-				sendMsg("add, remove: add or remove keys from the whitelist")
-				sendMsg("import: add all keys of users connected since AGE (default 0) ago to the whitelist")
-				sendMsg("reload: re-read the whitelist file and keep or discard entries in the current whitelist but not in the file")
-				sendMsg("reverify: kick all users not in the whitelist if whitelisting is enabled")
+				sendMsg("on, off: set allowlist mode (applies to new connections)")
+				sendMsg("add, remove: add or remove keys from the allowlist")
+				sendMsg("import: add all keys of users connected since AGE (default 0) ago to the allowlist")
+				sendMsg("reload: re-read the allowlist file and keep or discard entries in the current allowlist but not in the file")
+				sendMsg("reverify: kick all users not in the allowlist if allowlisting is enabled")
 				sendMsg("status: show status information")
 			case "on":
 				h.auth.SetWhitelistMode(true)
 			case "off":
 				h.auth.SetWhitelistMode(false)
 			case "add":
-				forPubkeyUser(func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) })
+				for _, errLine := range forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) }) {
+					sendMsg(errLine)
+				}
 			case "remove":
-				forPubkeyUser(func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) })
+				for _, errLine := range forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) }) {
+					sendMsg(errLine)
+				}
 			case "import":
 				var since time.Duration
-				var err error
 				if len(args) > 1 {
+					var err error
 					since, err = time.ParseDuration(args[1])
 					if err != nil {
 						return err
@@ -837,7 +835,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				}
 			case "reverify":
 				if !h.auth.WhitelistMode() {
-					sendMsg("whitelist is disabled, so nobody will be kicked")
+					sendMsg("allowlist is disabled, so nobody will be kicked")
 					break
 				}
 				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
@@ -848,9 +846,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				})
 			case "status":
 				if h.auth.WhitelistMode() {
-					sendMsg("The whitelist is currently enabled.")
+					sendMsg("The allowlist is currently enabled.")
 				} else {
-					sendMsg("The whitelist is currently disabled.")
+					sendMsg("The allowlist is currently disabled.")
 				}
 				whitelistedUsers := []string{}
 				whitelistedKeys := []string{}
@@ -870,10 +868,10 @@ func (h *Host) InitCommands(c *chat.Commands) {
 					return nil
 				})
 				if len(whitelistedUsers) != 0 {
-					sendMsg("The following connected users are on the whitelist: %v", whitelistedUsers)
+					sendMsg("The following connected users are on the allowlist: %v", whitelistedUsers)
 				}
 				if len(whitelistedKeys) != 0 {
-					sendMsg("The following keys of not connected users are on the whitelist: %v", whitelistedKeys)
+					sendMsg("The following keys of not connected users are on the allowlist: %v", whitelistedKeys)
 				}
 			default:
 				return errors.New("invalid subcommand: " + args[0])
