@@ -4,4 +4,8 @@ host_key.pub
 ssh-chat
 *.log
 .*
+!.goreleaser.yml
+!.github
 vendor/
+dist
+sshchat

@@ -1,0 +1,6 @@
+FROM scratch
+
+COPY ssh-chat /usr/local/bin/ssh-chat
+WORKDIR /sshchat
+
+ENTRYPOINT [ "/usr/local/bin/ssh-chat" ]

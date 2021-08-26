@@ -1,0 +1,165 @@
+project_name: ssh-chat
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: "ssh-chat"
+    dir: "./cmd/ssh-chat"
+    binary: "ssh-chat"
+    ldflags: -X main.Version={{ .Version }} -extldflags "-static"
+    goos:
+      - linux
+      - windows
+      - freebsd
+      - darwin
+    goarch:
+      - amd64
+      - 386
+      - arm
+      - arm64
+    goarm:
+      - 6
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: darwin
+        goarch: arm
+      - goos: freebsd
+        goarch: 386
+      - goos: freebsd
+        goarch: arm
+      - goos: freebsd
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+
+dockers:
+  - image_templates:
+      - "ghcr.io/shazow/{{ .ProjectName }}:latest-amd64"
+      - "ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-amd64"
+    ids: [ssh-chat]
+    goarch: amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+  - image_templates:
+      - "ghcr.io/shazow/{{ .ProjectName }}:latest-arm64v8"
+      - "ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm64v8"
+    ids: [ssh-chat]
+    goarch: arm64
+    build_flag_templates:
+      - --platform=linux/arm64/v8
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+  - image_templates:
+      - "ghcr.io/shazow/{{ .ProjectName }}:latest-arm32v6"
+      - "ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm32v6"
+    ids: [ssh-chat]
+    goarch: arm
+    goarm: 6
+    build_flag_templates:
+      - --platform=linux/arm/v6
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+  - image_templates:
+      - "ghcr.io/shazow/{{ .ProjectName }}:latest-arm32v7"
+      - "ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm32v7"
+    ids: [ssh-chat]
+    goarch: arm
+    goarm: 7
+    build_flag_templates:
+      - --platform=linux/arm/v7
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shazow/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+
+docker_manifests:
+  - name_template: ghcr.io/shazow/{{ .ProjectName }}:latest
+    image_templates:
+    - ghcr.io/shazow/{{ .ProjectName }}:latest-amd64
+    - ghcr.io/shazow/{{ .ProjectName }}:latest-arm64v8
+    - ghcr.io/shazow/{{ .ProjectName }}:latest-arm32v7
+    - ghcr.io/shazow/{{ .ProjectName }}:latest-arm32v6
+  - name_template: ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}
+    image_templates:
+    - ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-amd64
+    - ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm64v8
+    - ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm32v7
+    - ghcr.io/shazow/{{ .ProjectName }}:{{ .Version }}-arm32v6
+
+nfpms:
+  - maintainer: Andrey Petrov <andrey.petrov@shazow.net>
+    description: "{{ .ProjectName }}"
+    homepage: https://github.com/shazow/{{ .ProjectName }}
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+archives:
+  - id: ssh-chat
+    builds:
+    - ssh-chat
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+release:
+  github:
+    owner: shazow
+    name: ssh-chat
+  ids: [ssh-chat]
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - typo
