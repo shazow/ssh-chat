@@ -25,10 +25,17 @@ func TestAwayCommands(t *testing.T) {
 		// expected output
 		IsUserAway  bool
 		AwayMessage string
+
+		// expected state change
+		ExpectsError func(awayBefore bool) bool
 	}
-	awayStep := step{"/away snorkling", true, "snorkling"}
-	notAwayStep := step{"/away", false, ""}
-	backStep := step{"/back", false, ""}
+	neverError := func(_ bool) bool { return false }
+	// if the user was away before, then the error is expected
+	errorIfAwayBefore := func(awayBefore bool) bool { return awayBefore }
+
+	awayStep := step{"/away snorkling", true, "snorkling", neverError}
+	notAwayStep := step{"/away", false, "", errorIfAwayBefore}
+	backStep := step{"/back", false, "", errorIfAwayBefore}
 
 	steps := []step{awayStep, notAwayStep, backStep}
 	cases := [][]int{
@@ -42,7 +49,12 @@ func TestAwayCommands(t *testing.T) {
 			for _, s := range []step{steps[c[0]], steps[c[1]], steps[c[2]]} {
 				msg, _ := message.NewPublicMsg(s.Msg, u).ParseCommand()
 
-				cmds.Run(room, *msg)
+				awayBeforeCommand, _, _ := u.GetAway()
+
+				err := cmds.Run(room, *msg)
+				if err != nil && s.ExpectsError(awayBeforeCommand) {
+					t.Fatalf("unexpected error running the command: %+v", err)
+				}
 
 				isAway, _, awayMsg := u.GetAway()
 				if isAway != s.IsUserAway {
