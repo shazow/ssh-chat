@@ -469,12 +469,13 @@ func InitCommands(c *Commands) {
 			msg.From().SetAway(awayMsg)
 			if awayMsg != "" {
 				room.Send(message.NewEmoteMsg("has gone away: "+awayMsg, msg.From()))
-			} else if !isAway {
-				room.Send(message.NewSystemMsg("Not away. Append a reason message to set away.", msg.From()))
-			} else {
-				room.Send(message.NewEmoteMsg("is back.", msg.From()))
+				return nil
 			}
-			return nil
+			if isAway {
+				room.Send(message.NewEmoteMsg("is back.", msg.From()))
+				return nil
+			}
+			return errors.New("not away. Append a reason message to set away")
 		},
 	})
 
@@ -486,8 +487,9 @@ func InitCommands(c *Commands) {
 			if isAway {
 				msg.From().SetAway("")
 				room.Send(message.NewEmoteMsg("is back.", msg.From()))
+				return nil
 			}
-			return nil
+			return errors.New("must be away to be back")
 		},
 	})
 
