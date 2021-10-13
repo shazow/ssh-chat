@@ -264,6 +264,10 @@ func (t *Terminal) moveCursorToPos(pos int) {
 		return
 	}
 
+	if pos > len(t.line) {
+		pos = len(t.line)
+	}
+
 	x := visualLength(t.prompt) + visualLength(t.line[:pos])
 	y := x / t.termWidth
 	x = x % t.termWidth
