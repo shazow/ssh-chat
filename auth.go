@@ -53,16 +53,16 @@ func newAuthAddr(addr net.Addr) string {
 // Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
 // If the contained passphrase is not empty, it complements a whitelist.
 type Auth struct {
-	passphraseHash []byte
+	passphraseHash  []byte
 	whitelistModeMu sync.RWMutex
-	whitelistMode  bool
-	bannedAddr     *set.Set
-	bannedClient   *set.Set
-	banned         *set.Set
-	whitelist      *set.Set
-	ops            *set.Set
-	opFile         string
-	whitelistFile  string
+	whitelistMode   bool
+	bannedAddr      *set.Set
+	bannedClient    *set.Set
+	banned          *set.Set
+	whitelist       *set.Set
+	ops             *set.Set
+	opFile          string
+	whitelistFile   string
 }
 
 // NewAuth creates a new empty Auth.
@@ -76,13 +76,13 @@ func NewAuth() *Auth {
 	}
 }
 
-func (a *Auth)WhitelistMode() bool{
+func (a *Auth) WhitelistMode() bool {
 	a.whitelistModeMu.RLock()
 	defer a.whitelistModeMu.RUnlock()
 	return a.whitelistMode
 }
 
-func (a *Auth) SetWhitelistMode(value bool){
+func (a *Auth) SetWhitelistMode(value bool) {
 	a.whitelistModeMu.Lock()
 	defer a.whitelistModeMu.Unlock()
 	a.whitelistMode = value
@@ -135,7 +135,7 @@ func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string)
 func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
 	authkey := newAuthKey(key)
 	whitelisted := a.whitelist.In(authkey)
-	if a.AllowAnonymous() || whitelisted {
+	if a.AllowAnonymous() || whitelisted || a.IsOp(key) {
 		return nil
 	} else {
 		return ErrNotWhitelisted
@@ -170,9 +170,6 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 
 // IsOp checks if a public key is an op.
 func (a *Auth) IsOp(key ssh.PublicKey) bool {
-	if key == nil {
-		return false
-	}
 	authkey := newAuthKey(key)
 	return a.ops.In(authkey)
 }

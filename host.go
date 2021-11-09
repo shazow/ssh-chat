@@ -754,13 +754,104 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		return
 	}
 
+	allowlistHelptext := []string{
+		"Usage: /allowlist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status",
+		"help: this help message",
+		"on, off: set allowlist mode (applies to new connections)",
+		"add, remove: add or remove keys from the allowlist",
+		"import: add all keys of users connected since AGE (default 0) ago to the allowlist",
+		"reload: re-read the allowlist file and keep or discard entries in the current allowlist but not in the file",
+		"reverify: kick all users not in the allowlist if allowlisting is enabled",
+		"status: show status information",
+	}
+
+	allowlistImport := func(args []string) (msgs []string, err error) {
+		var since time.Duration
+		if len(args) > 0 {
+			since, err = time.ParseDuration(args[0])
+			if err != nil {
+				return
+			}
+		}
+		cutoff := time.Now().Add(-since)
+		noKeyUsers := []string{}
+		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+			if user.Joined().Before(cutoff) {
+				if pk == nil {
+					noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+				} else {
+					h.auth.Whitelist(pk, 0)
+				}
+			}
+			return nil
+		})
+		if len(noKeyUsers) != 0 {
+			msgs = []string{fmt.Sprintf("users without a public key: %v", noKeyUsers)}
+		}
+		return
+	}
+
+	allowlistReload := func(args []string) error {
+		if !(len(args) > 0 && (args[0] == "keep" || args[0] == "flush")) {
+			return errors.New("must specify whether to keep or flush current entries")
+		}
+		if args[0] == "flush" {
+			h.auth.whitelist.Clear()
+		}
+		return h.auth.LoadWhitelistFromFile(h.auth.whitelistFile)
+	}
+
+	allowlistReverify := func() []string {
+		if !h.auth.WhitelistMode() {
+			return []string{"allowlist is disabled, so nobody will be kicked"}
+		}
+		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+			if h.auth.CheckPublicKey(pk) != nil {
+				user.Close() // TODO: some message anywhere?
+			}
+			return nil
+		})
+		return nil
+	}
+
+	allowlistStatus := func() (msgs []string) {
+		if h.auth.WhitelistMode() {
+			msgs = []string{"The allowlist is currently enabled."}
+		} else {
+			msgs = []string{"The allowlist is currently disabled."}
+		}
+		whitelistedUsers := []string{}
+		whitelistedKeys := []string{}
+		// TODO: this can probably be optimized
+		h.auth.whitelist.Each(func(key string, item set.Item) error {
+			keyFP := item.Key()
+			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+				if pk != nil && sshd.Fingerprint(pk) == keyFP {
+					whitelistedUsers = append(whitelistedUsers, user.Name())
+					return errors.New("not an actual error, but exit early because we found the key")
+				}
+				return nil
+			}) == nil {
+				// if we land here, the key matches no users
+				whitelistedKeys = append(whitelistedKeys, keyFP)
+			}
+			return nil
+		})
+		if len(whitelistedUsers) != 0 {
+			msgs = append(msgs, fmt.Sprintf("The following connected users are on the allowlist: %v", whitelistedUsers))
+		}
+		if len(whitelistedKeys) != 0 {
+			msgs = append(msgs, fmt.Sprintf("The following keys of not connected users are on the allowlist: %v", whitelistedKeys))
+		}
+		return
+	}
+
 	c.Add(chat.Command{
-		// TODO: default for reload
 		Op:         true,
 		Prefix:     "/allowlist",
 		PrefixHelp: "COMMAND [ARGS...]",
 		Help:       "Modify the allowlist or allowlist state. See /allowlist help for subcommands",
-		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+		Handler: func(room *chat.Room, msg message.CommandMsg) (err error) {
 			if !room.IsOp(msg.From()) {
 				return errors.New("must be op")
 			}
@@ -771,115 +862,34 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			}
 
 			// send exactly one message to preserve order
-			replyLines := []string{}
-			sendMsg := func(content string, formatting ...interface{}) {
-				replyLines = append(replyLines, fmt.Sprintf(content, formatting...))
-			}
+			var replyLines []string
 
 			switch args[0] {
 			case "help":
-				sendMsg("Usage: /allowlist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status")
-				sendMsg("help: this help message")
-				sendMsg("on, off: set allowlist mode (applies to new connections)")
-				sendMsg("add, remove: add or remove keys from the allowlist")
-				sendMsg("import: add all keys of users connected since AGE (default 0) ago to the allowlist")
-				sendMsg("reload: re-read the allowlist file and keep or discard entries in the current allowlist but not in the file")
-				sendMsg("reverify: kick all users not in the allowlist if allowlisting is enabled")
-				sendMsg("status: show status information")
+				replyLines = allowlistHelptext
 			case "on":
 				h.auth.SetWhitelistMode(true)
 			case "off":
 				h.auth.SetWhitelistMode(false)
 			case "add":
-				for _, errLine := range forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) }) {
-					sendMsg(errLine)
-				}
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) })
 			case "remove":
-				for _, errLine := range forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) }) {
-					sendMsg(errLine)
-				}
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) })
 			case "import":
-				var since time.Duration
-				if len(args) > 1 {
-					var err error
-					since, err = time.ParseDuration(args[1])
-					if err != nil {
-						return err
-					}
-				}
-				cutoff := time.Now().Add(-since)
-				noKeyUsers := []string{}
-				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
-					if user.Joined().Before(cutoff) {
-						if pk == nil {
-							noKeyUsers = append(noKeyUsers, user.Identifier.Name())
-						} else {
-							h.auth.Whitelist(pk, 0)
-						}
-					}
-					return nil
-				})
-				if len(noKeyUsers) != 0 {
-					sendMsg("users without a public key: %v", noKeyUsers)
-				}
+				replyLines, err = allowlistImport(args[1:])
 			case "reload":
-				if !(len(args) > 1 && (args[1] == "keep" || args[1] == "flush")) {
-					return errors.New("must specify whether to keep or flush current entries")
-				}
-				if args[1] == "flush" {
-					h.auth.whitelist.Clear()
-				}
-				err := h.auth.LoadWhitelistFromFile(h.auth.whitelistFile)
-				if err != nil {
-					return err
-				}
+				err = allowlistReload(args[1:])
 			case "reverify":
-				if !h.auth.WhitelistMode() {
-					sendMsg("allowlist is disabled, so nobody will be kicked")
-					break
-				}
-				forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
-					if !h.auth.IsOp(pk) && h.auth.CheckPublicKey(pk) != nil { // TODO: why doesn't CheckPublicKey do this?
-						user.Close() // TODO: some message anywhere?
-					}
-					return nil
-				})
+				replyLines = allowlistReverify()
 			case "status":
-				if h.auth.WhitelistMode() {
-					sendMsg("The allowlist is currently enabled.")
-				} else {
-					sendMsg("The allowlist is currently disabled.")
-				}
-				whitelistedUsers := []string{}
-				whitelistedKeys := []string{}
-				// TODO: this can probably be optimized
-				h.auth.whitelist.Each(func(key string, item set.Item) error {
-					keyFP := item.Key()
-					if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
-						if pk != nil && sshd.Fingerprint(pk) == keyFP {
-							whitelistedUsers = append(whitelistedUsers, user.Name())
-							return errors.New("not an actual error, but exit early because we found the key")
-						}
-						return nil
-					}) == nil {
-						// if we land here, the key matches no users
-						whitelistedKeys = append(whitelistedKeys, keyFP)
-					}
-					return nil
-				})
-				if len(whitelistedUsers) != 0 {
-					sendMsg("The following connected users are on the allowlist: %v", whitelistedUsers)
-				}
-				if len(whitelistedKeys) != 0 {
-					sendMsg("The following keys of not connected users are on the allowlist: %v", whitelistedKeys)
-				}
+				replyLines = allowlistStatus()
 			default:
-				return errors.New("invalid subcommand: " + args[0])
+				err = errors.New("invalid subcommand: " + args[0])
 			}
-			if len(replyLines) != 0 {
+			if err == nil && replyLines != nil {
 				room.Send(message.NewSystemMsg(strings.Join(replyLines, "\r\n"), msg.From()))
 			}
-			return nil
+			return
 		},
 	})
 }
