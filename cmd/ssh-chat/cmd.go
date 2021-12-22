@@ -26,16 +26,16 @@ var Version string = "dev"
 
 // Options contains the flag options
 type Options struct {
-	Admin      string `long:"admin" description:"File of public keys who are admins."`
-	Bind       string `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
-	Identity   string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
-	Log        string `long:"log" description:"Write chat log to this file."`
-	Motd       string `long:"motd" description:"Optional Message of the Day file."`
-	Pprof      int    `long:"pprof" description:"Enable pprof http server for profiling."`
-	Verbose    []bool `short:"v" long:"verbose" description:"Show verbose logging."`
-	Version    bool   `long:"version" description:"Print version and exit."`
-	Whitelist  string `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
-	Passphrase string `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
+	Admin      string   `long:"admin" description:"File of public keys who are admins."`
+	Bind       string   `long:"bind" description:"Host and port to listen on." default:"0.0.0.0:2022"`
+	Identity   []string `short:"i" long:"identity" description:"Private key to identify server with." default:"~/.ssh/id_rsa"`
+	Log        string   `long:"log" description:"Write chat log to this file."`
+	Motd       string   `long:"motd" description:"Optional Message of the Day file."`
+	Pprof      int      `long:"pprof" description:"Enable pprof http server for profiling."`
+	Verbose    []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
+	Version    bool     `long:"version" description:"Print version and exit."`
+	Whitelist  string   `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
+	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -100,24 +100,27 @@ func main() {
 		message.SetLogger(os.Stderr)
 	}
 
-	privateKeyPath := options.Identity
-	if strings.HasPrefix(privateKeyPath, "~/") {
-		user, err := user.Current()
-		if err == nil {
-			privateKeyPath = strings.Replace(privateKeyPath, "~", user.HomeDir, 1)
-		}
-	}
-
-	signer, err := ReadPrivateKey(privateKeyPath)
-	if err != nil {
-		fail(3, "Failed to read identity private key: %v\n", err)
-	}
-
 	auth := sshchat.NewAuth()
 	config := sshd.MakeAuth(auth)
-	config.AddHostKey(signer)
 	config.ServerVersion = "SSH-2.0-Go ssh-chat"
 	// FIXME: Should we be using config.NoClientAuth = true by default?
+
+	for _, privateKeyPath := range options.Identity {
+		if strings.HasPrefix(privateKeyPath, "~/") {
+			user, err := user.Current()
+			if err == nil {
+				privateKeyPath = strings.Replace(privateKeyPath, "~", user.HomeDir, 1)
+			}
+		}
+
+		signer, err := ReadPrivateKey(privateKeyPath)
+		if err != nil {
+			fail(3, "Failed to read identity private key: %v\n", err)
+		}
+
+		config.AddHostKey(signer)
+		fmt.Printf("Added server identity: %s\n", sshd.Fingerprint(signer.PublicKey()))
+	}
 
 	s, err := sshd.ListenSSH(options.Bind, config)
 	if err != nil {

@@ -43,4 +43,4 @@ release:
 deploy: build/ssh-chat-linux_amd64.tgz
 	ssh -p 2022 ssh.chat tar xvz < build/ssh-chat-linux_amd64.tgz
 	@echo " --- Ready to deploy ---"
-	@echo "Run: ssh -p 2022 ssh.chat sudo systemctl restart ssh-chat"
+	@echo "Run: ssh -t -p 2022 ssh.chat sudo systemctl restart ssh-chat"
