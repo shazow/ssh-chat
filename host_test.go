@@ -108,11 +108,9 @@ func TestHostNameCollision(t *testing.T) {
 	s, host := getHost(t, nil)
 	defer s.Close()
 
-	newUsers1 := make(chan *message.User)
-	newUsers2 := make(chan *message.User)
+	newUsers := make(chan *message.User)
 	host.OnUserJoined = func(u *message.User) {
-		newUsers1 <- u
-		newUsers2 <- u
+		newUsers <- u
 	}
 	go host.Serve()
 
@@ -121,7 +119,6 @@ func TestHostNameCollision(t *testing.T) {
 	// First client
 	g.Go(func() error {
 		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			<-newUsers1
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -133,7 +130,7 @@ func TestHostNameCollision(t *testing.T) {
 			}
 
 			// wait for the second client
-			<-newUsers1
+			<-newUsers
 
 			scanner.Scan()
 			actual = scanner.Text()
@@ -155,9 +152,8 @@ func TestHostNameCollision(t *testing.T) {
 	// Second client
 	g.Go(func() error {
 		// wait for the first client
-		<-newUsers2
+		<-newUsers
 		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			<-newUsers2
 			scanner := bufio.NewScanner(r)
 			// Consume the initial buffer
 			scanner.Scan()
