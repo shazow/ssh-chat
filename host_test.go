@@ -85,7 +85,7 @@ func TestHostGetPrompt(t *testing.T) {
 }
 
 func getHost(t *testing.T, auth *Auth) (*sshd.SSHListener, *Host) {
-	key, err := sshd.NewRandomSigner(512)
+	key, err := sshd.NewRandomSigner(1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,22 +312,8 @@ func TestHostAllowlistCommand(t *testing.T) {
 }
 
 func TestHostKick(t *testing.T) {
-	key, err := sshd.NewRandomSigner(512)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	auth := NewAuth()
-	config := sshd.MakeAuth(auth)
-	config.AddHostKey(key)
-
-	s, err := sshd.ListenSSH("localhost:0", config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s, host := getHost(t, NewAuth())
 	defer s.Close()
-	addr := s.Addr().String()
-	host := NewHost(s, nil)
 	go host.Serve()
 
 	g := errgroup.Group{}
@@ -336,7 +322,7 @@ func TestHostKick(t *testing.T) {
 
 	g.Go(func() error {
 		// First client
-		return sshd.ConnectShell(addr, "foo", func(r io.Reader, w io.WriteCloser) error {
+		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 
 			// Consume the initial buffer
@@ -373,7 +359,7 @@ func TestHostKick(t *testing.T) {
 
 	g.Go(func() error {
 		// Second client
-		return sshd.ConnectShell(addr, "bar", func(r io.Reader, w io.WriteCloser) error {
+		return sshd.ConnectShell(s.Addr().String(), "bar", func(r io.Reader, w io.WriteCloser) error {
 			scanner := bufio.NewScanner(r)
 			<-connected
 			scanner.Scan()
@@ -411,12 +397,9 @@ func TestTimestampEnvConfig(t *testing.T) {
 		{"datetime +8h", strptr("2006-01-02 15:04:05")},
 	}
 	for _, tc := range cases {
-		u, err := connectUserWithConfig("dingus", map[string]string{
+		u := connectUserWithConfig(t, "dingus", map[string]string{
 			"SSHCHAT_TIMESTAMP": tc.input,
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
 		userConfig := u.Config()
 		if userConfig.Timeformat != nil && tc.timeformat != nil {
 			if *userConfig.Timeformat != *tc.timeformat {
@@ -430,20 +413,9 @@ func strptr(s string) *string {
 	return &s
 }
 
-func connectUserWithConfig(name string, envConfig map[string]string) (*message.User, error) {
-	key, err := sshd.NewRandomSigner(512)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create signer: %w", err)
-	}
-	config := sshd.MakeNoAuth()
-	config.AddHostKey(key)
-
-	s, err := sshd.ListenSSH("localhost:0", config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create a test server: %w", err)
-	}
+func connectUserWithConfig(t *testing.T, name string, envConfig map[string]string) *message.User {
+	s, host := getHost(t, nil)
 	defer s.Close()
-	host := NewHost(s, nil)
 
 	newUsers := make(chan *message.User)
 	host.OnUserJoined = func(u *message.User) {
@@ -454,13 +426,13 @@ func connectUserWithConfig(name string, envConfig map[string]string) (*message.U
 	clientConfig := sshd.NewClientConfig(name)
 	conn, err := ssh.Dial("tcp", s.Addr().String(), clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to test ssh-chat server: %w", err)
+		t.Fatal("unable to connect to test ssh-chat server:", err)
 	}
 	defer conn.Close()
 
 	session, err := conn.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("unable to open session: %w", err)
+		t.Fatal("unable to open session:", err)
 	}
 	defer session.Close()
 
@@ -470,13 +442,14 @@ func connectUserWithConfig(name string, envConfig map[string]string) (*message.U
 
 	err = session.Shell()
 	if err != nil {
-		return nil, fmt.Errorf("unable to open shell: %w", err)
+		t.Fatal("unable to open shell:", err)
 	}
 
 	for u := range newUsers {
 		if u.Name() == name {
-			return u, nil
+			return u
 		}
 	}
-	return nil, fmt.Errorf("user %s not found in the host", name)
+	t.Fatalf("user %s not found in the host", name)
+    return nil
 }
