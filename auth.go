@@ -174,9 +174,6 @@ func (a *Auth) IsOp(key ssh.PublicKey) bool {
 	return a.ops.In(authkey)
 }
 
-// TODO: the *FromFile could be replaced by a single LoadFromFile taking the function (i.e. auth.Op/auth.Whitelist)
-// TODO: consider reloading on empty path
-
 // LoadOpsFromFile reads a file in authorized_keys format and makes public keys operators
 func (a *Auth) LoadOpsFromFile(path string) error {
 	a.opFile = path

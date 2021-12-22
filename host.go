@@ -801,16 +801,21 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		return h.auth.LoadWhitelistFromFile(h.auth.whitelistFile)
 	}
 
-	allowlistReverify := func() []string {
+	allowlistReverify := func(room *chat.Room) []string {
 		if !h.auth.WhitelistMode() {
 			return []string{"allowlist is disabled, so nobody will be kicked"}
 		}
+		var kicked []string
 		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
-			if h.auth.CheckPublicKey(pk) != nil {
-				user.Close() // TODO: some message anywhere?
+			if h.auth.CheckPublicKey(pk) != nil && !user.IsOp { // we do this check here as well for ops without keys
+				kicked = append(kicked, user.Name())
+				user.Close()
 			}
 			return nil
 		})
+		if kicked != nil {
+			room.Send(message.NewAnnounceMsg(fmt.Sprintf("%v were kicked during pubkey reverification.", kicked)))
+		}
 		return nil
 	}
 
@@ -822,7 +827,6 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		}
 		whitelistedUsers := []string{}
 		whitelistedKeys := []string{}
-		// TODO: this can probably be optimized
 		h.auth.whitelist.Each(func(key string, item set.Item) error {
 			keyFP := item.Key()
 			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
@@ -880,7 +884,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			case "reload":
 				err = allowlistReload(args[1:])
 			case "reverify":
-				replyLines = allowlistReverify()
+				replyLines = allowlistReverify(room)
 			case "status":
 				replyLines = allowlistStatus()
 			default:

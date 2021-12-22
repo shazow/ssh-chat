@@ -211,7 +211,18 @@ func TestHostAllowlistCommand(t *testing.T) {
 		users <- u
 	}
 
+	kickSignal := make(chan struct{})
+	go sshd.ConnectShell(s.Addr().String(), "toBeKicked", func(r io.Reader, w io.WriteCloser) error {
+		<-kickSignal
+		n, err := w.Write([]byte("alive and well"))
+		if n != 0 || err == nil {
+			t.Error("could write after being kicked")
+		}
+		return nil
+	})
+
 	sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
+		<-users
 		<-users
 		m, ok := host.MemberByID("foo")
 		if !ok {
@@ -220,6 +231,7 @@ func TestHostAllowlistCommand(t *testing.T) {
 
 		scanner := bufio.NewScanner(r)
 		scanner.Scan() // Joined
+		scanner.Scan()
 
 		assertLineEq := func(expected string) {
 			if !scanner.Scan() {
@@ -281,9 +293,13 @@ func TestHostAllowlistCommand(t *testing.T) {
 
 		// TODO: to test the AGE arg, we need another connection and possibly a sleep
 		sendCmd("/allowlist import")
-		assertLineEq("users without a public key: [foo]\r")
+		if !scanner.Scan() {
+			t.Error("no line available")
+		}
+		if actual := stripPrompt(scanner.Text()); !strings.HasSuffix(actual, "[foo toBeKicked]\r") && !strings.HasSuffix(actual, "[toBeKicked foo]\r") {
+			t.Errorf("expected \"foo\" and \"toBeKicked\", got %q", actual)
+		}
 
-		// TODO: test reload with files?
 		sendCmd("/allowlist reload keep")
 		if !host.auth.whitelist.In(testKey2FP) {
 			t.Error("cleared allowlist to be kept")
@@ -299,10 +315,15 @@ func TestHostAllowlistCommand(t *testing.T) {
 
 		sendCmd("/allowlist reverify")
 		assertLineEq("allowlist is disabled, so nobody will be kicked\r")
+		sendCmd("/allowlist on")
+		sendCmd("/allowlist reverify")
+		kickSignal <- struct{}{}
+		assertLineEq(" * [toBeKicked] were kicked during pubkey reverification.\r")
+		assertLineEq(" * toBeKicked left. (After 0 seconds)\r")
 
 		sendCmd("/allowlist add " + testKey1)
 		sendCmd("/allowlist status")
-		assertLineEq("The allowlist is currently disabled.\r")
+		assertLineEq("The allowlist is currently enabled.\r")
 		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKey1FP))
 
 		sendCmd("/allowlist invalidSubcommand")
@@ -451,5 +472,5 @@ func connectUserWithConfig(t *testing.T, name string, envConfig map[string]strin
 		}
 	}
 	t.Fatalf("user %s not found in the host", name)
-    return nil
+	return nil
 }
