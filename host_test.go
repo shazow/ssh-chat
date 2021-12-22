@@ -238,13 +238,17 @@ func TestHostAllowlistCommand(t *testing.T) {
 		scanner.Scan() // Joined
 		scanner.Scan()
 
-		assertLineEq := func(expected string) {
+		assertLineEq := func(expected ...string) {
 			if !scanner.Scan() {
 				t.Error("no line available")
 			}
-			if actual := stripPrompt(scanner.Text()); actual != expected {
-				t.Errorf("expected %q, got %q", expected, actual)
+			actual := stripPrompt(scanner.Text())
+			for _, exp := range expected {
+				if exp == actual {
+					return
+				}
 			}
+			t.Errorf("expected %#v, got %q", expected, actual)
 		}
 		sendCmd := func(cmd string, formatting ...interface{}) {
 			host.HandleMsg(message.ParseInput(fmt.Sprintf(cmd, formatting...), m.User))
@@ -321,9 +325,9 @@ func TestHostAllowlistCommand(t *testing.T) {
 		assertLineEq("allowlist is disabled, so nobody will be kicked\r")
 		sendCmd("/allowlist on")
 		sendCmd("/allowlist reverify")
+		assertLineEq(" * [bar] were kicked during pubkey reverification.\r", " * bar left. (After 0 seconds)\r")
+		assertLineEq(" * [bar] were kicked during pubkey reverification.\r", " * bar left. (After 0 seconds)\r")
 		kickSignal <- struct{}{}
-		assertLineEq(" * [bar] were kicked during pubkey reverification.\r")
-		assertLineEq(" * bar left. (After 0 seconds)\r")
 
 		sendCmd("/allowlist add " + testKey)
 		sendCmd("/allowlist status")
