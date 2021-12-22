@@ -30,9 +30,24 @@ func NewClientConfig(name string) *ssh.ClientConfig {
 	}
 }
 
+func NewClientConfigWithKey(name string, key ssh.Signer) *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User:            name,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(key)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+}
+
 // ConnectShell makes a barebones SSH client session, used for testing.
 func ConnectShell(host string, name string, handler func(r io.Reader, w io.WriteCloser) error) error {
-	config := NewClientConfig(name)
+	return connectShell(host, NewClientConfig(name), handler)
+}
+
+func ConnectShellWithKey(host string, name string, key ssh.Signer, handler func(r io.Reader, w io.WriteCloser) error) error {
+	return connectShell(host, NewClientConfigWithKey(name, key), handler)
+}
+
+func connectShell(host string, config *ssh.ClientConfig, handler func(r io.Reader, w io.WriteCloser) error) error {
 	conn, err := ssh.Dial("tcp", host, config)
 	if err != nil {
 		return err

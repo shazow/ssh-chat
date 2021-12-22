@@ -212,7 +212,12 @@ func TestHostAllowlistCommand(t *testing.T) {
 	}
 
 	kickSignal := make(chan struct{})
-	go sshd.ConnectShell(s.Addr().String(), "toBeKicked", func(r io.Reader, w io.WriteCloser) error {
+	clientKey, err := sshd.NewRandomSigner(1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientKeyFP := sshd.Fingerprint(clientKey.PublicKey())
+	go sshd.ConnectShellWithKey(s.Addr().String(), "bar", clientKey, func(r io.Reader, w io.WriteCloser) error {
 		<-kickSignal
 		n, err := w.Write([]byte("alive and well"))
 		if n != 0 || err == nil {
@@ -267,45 +272,44 @@ func TestHostAllowlistCommand(t *testing.T) {
 			t.Error("allowlist not disabled after /allowlist off")
 		}
 
-		// TODO: can we pass a public key when connecting?
-		// useful for add, remove, import, reverify, status
+		testKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUiNw0nQku4pcUCbZcJlIEAIf5bXJYTy/DKI1vh5b+P"
+		testKeyFP := "SHA256:GJNSl9NUcOS2pZYALn0C5Qgfh5deT+R+FfqNIUvpM9s="
 
-		testKey1 := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUiNw0nQku4pcUCbZcJlIEAIf5bXJYTy/DKI1vh5b+P"
-		testKey1FP := "SHA256:GJNSl9NUcOS2pZYALn0C5Qgfh5deT+R+FfqNIUvpM9s="
-		testKey2 := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINDnlvlhBf4Jx7RlqTO6C5iOUhsBk2CHOpwPgPUbo8vb"
-		testKey2FP := "SHA256:tMBXmUCPMxbSNj1pzQlGR+N2RiAIvcnqT18vX0r2rrM="
-
-		sendCmd("/allowlist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo %s %s", testKey1, testKey2)
+		if host.auth.whitelist.Len() != 0 {
+			t.Error("allowlist not empty before adding anyone")
+		}
+		sendCmd("/allowlist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo bar %s", testKey)
 		assertLineEq("users without a public key: [foo]\r")
 		assertLineEq("invalid users: [invalid]\r")
 		assertLineEq("invalid keys: [ssh-invalid blah ssh-rsa wrongAsWell]\r")
-		if !host.auth.whitelist.In(testKey1FP) || !host.auth.whitelist.In(testKey2FP) {
+		if !host.auth.whitelist.In(testKeyFP) || !host.auth.whitelist.In(clientKeyFP) {
 			t.Error("failed to add keys to allowlist")
 		}
-		sendCmd("/allowlist remove invalid %s", testKey1)
+		sendCmd("/allowlist remove invalid bar")
 		assertLineEq("invalid users: [invalid]\r")
-		if host.auth.whitelist.In(testKey1FP) {
+		if host.auth.whitelist.In(clientKeyFP) {
 			t.Error("failed to remove key from allowlist")
 		}
-		if !host.auth.whitelist.In(testKey2FP) {
+		if !host.auth.whitelist.In(testKeyFP) {
 			t.Error("removed wrong key")
 		}
 
-		// TODO: to test the AGE arg, we need another connection and possibly a sleep
-		sendCmd("/allowlist import")
-		if !scanner.Scan() {
-			t.Error("no line available")
+		sendCmd("/allowlist import 5h")
+		if host.auth.whitelist.In(clientKeyFP) {
+			t.Error("imporrted key not seen long enough")
 		}
-		if actual := stripPrompt(scanner.Text()); !strings.HasSuffix(actual, "[foo toBeKicked]\r") && !strings.HasSuffix(actual, "[toBeKicked foo]\r") {
-			t.Errorf("expected \"foo\" and \"toBeKicked\", got %q", actual)
+		sendCmd("/allowlist import")
+		assertLineEq("users without a public key: [foo]\r")
+		if !host.auth.whitelist.In(clientKeyFP) {
+			t.Error("failed to import key")
 		}
 
 		sendCmd("/allowlist reload keep")
-		if !host.auth.whitelist.In(testKey2FP) {
+		if !host.auth.whitelist.In(testKeyFP) {
 			t.Error("cleared allowlist to be kept")
 		}
 		sendCmd("/allowlist reload flush")
-		if host.auth.whitelist.In(testKey2FP) {
+		if host.auth.whitelist.In(testKeyFP) {
 			t.Error("kept allowlist to be cleared")
 		}
 		sendCmd("/allowlist reload thisIsWrong")
@@ -318,13 +322,13 @@ func TestHostAllowlistCommand(t *testing.T) {
 		sendCmd("/allowlist on")
 		sendCmd("/allowlist reverify")
 		kickSignal <- struct{}{}
-		assertLineEq(" * [toBeKicked] were kicked during pubkey reverification.\r")
-		assertLineEq(" * toBeKicked left. (After 0 seconds)\r")
+		assertLineEq(" * [bar] were kicked during pubkey reverification.\r")
+		assertLineEq(" * bar left. (After 0 seconds)\r")
 
-		sendCmd("/allowlist add " + testKey1)
+		sendCmd("/allowlist add " + testKey)
 		sendCmd("/allowlist status")
 		assertLineEq("The allowlist is currently enabled.\r")
-		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKey1FP))
+		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKeyFP))
 
 		sendCmd("/allowlist invalidSubcommand")
 		assertLineEq("Err: invalid subcommand: invalidSubcommand\r")
