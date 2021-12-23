@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/alexcesaro/log"
 	"github.com/alexcesaro/log/golog"
 	flags "github.com/jessevdk/go-flags"
+	"golang.org/x/crypto/ssh"
 
 	sshchat "github.com/shazow/ssh-chat"
 	"github.com/shazow/ssh-chat/chat"
@@ -139,12 +141,12 @@ func main() {
 		auth.SetPassphrase(options.Passphrase)
 	}
 
-	err = auth.LoadOpsFromFile(options.Admin)
+	err = auth.LoadOps(loaderFromFile(options.Admin, logger))
 	if err != nil {
 		fail(5, "Failed to load admins: %v\n", err)
 	}
 
-	err = auth.LoadAllowlistFromFile(options.Allowlist)
+	err = auth.LoadAllowlist(loaderFromFile(options.Allowlist, logger))
 	if err != nil {
 		fail(6, "Failed to load allowlist: %v\n", err)
 	}
@@ -187,4 +189,34 @@ func main() {
 
 	<-sig // Wait for ^C signal
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
+}
+
+func loaderFromFile(path string, logger *golog.Logger) sshchat.KeyLoader {
+	if path == "" {
+		return nil
+	}
+	return func() ([]ssh.PublicKey, error) {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		var keys []ssh.PublicKey
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			key, _, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
+			if err != nil {
+				if err.Error() == "ssh: no key found" {
+					continue // Skip line
+				}
+				return nil, err
+			}
+			keys = append(keys, key)
+		}
+		if keys == nil {
+			logger.Warning("file", path, "contained no keys")
+		}
+		return keys, nil
+	}
 }

@@ -798,7 +798,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		if args[0] == "flush" {
 			h.auth.allowlist.Clear()
 		}
-		return h.auth.LoadAllowlistFromFile(h.auth.allowlistFile)
+		return h.auth.ReloadAllowlist()
 	}
 
 	allowlistReverify := func(room *chat.Room) []string {

@@ -1,14 +1,12 @@
 package sshchat
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +15,10 @@ import (
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
 )
+
+// KeyLoader loads public keys, e.g. from an authorized_keys file.
+// It must return a nil slice on error.
+type KeyLoader func() ([]ssh.PublicKey, error)
 
 // ErrNotAllowlisted Is the error returned when a key is checked that is not allowlisted,
 // when allowlisting is enabled.
@@ -53,16 +55,17 @@ func newAuthAddr(addr net.Addr) string {
 // Auth stores lookups for bans, allowlists, and ops. It implements the sshd.Auth interface.
 // If the contained passphrase is not empty, it complements a allowlist.
 type Auth struct {
-	passphraseHash  []byte
-	allowlistModeMu sync.RWMutex
+	passphraseHash []byte
+	bannedAddr     *set.Set
+	bannedClient   *set.Set
+	banned         *set.Set
+	allowlist      *set.Set
+	ops            *set.Set
+
+	settingsMu      sync.RWMutex
 	allowlistMode   bool
-	bannedAddr      *set.Set
-	bannedClient    *set.Set
-	banned          *set.Set
-	allowlist       *set.Set
-	ops             *set.Set
-	opFile          string
-	allowlistFile   string
+	opLoader        KeyLoader
+	allowlistLoader KeyLoader
 }
 
 // NewAuth creates a new empty Auth.
@@ -77,14 +80,14 @@ func NewAuth() *Auth {
 }
 
 func (a *Auth) AllowlistMode() bool {
-	a.allowlistModeMu.RLock()
-	defer a.allowlistModeMu.RUnlock()
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
 	return a.allowlistMode
 }
 
 func (a *Auth) SetAllowlistMode(value bool) {
-	a.allowlistModeMu.Lock()
-	defer a.allowlistModeMu.Unlock()
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
 	a.allowlistMode = value
 }
 
@@ -174,10 +177,19 @@ func (a *Auth) IsOp(key ssh.PublicKey) bool {
 	return a.ops.In(authkey)
 }
 
-// LoadOpsFromFile reads a file in authorized_keys format and makes public keys operators
-func (a *Auth) LoadOpsFromFile(path string) error {
-	a.opFile = path
-	return fromFile(path, func(key ssh.PublicKey) { a.Op(key, 0) })
+// LoadOps sets the public keys form loader to operators and saves the loader for later use
+func (a *Auth) LoadOps(loader KeyLoader) error {
+	a.settingsMu.Lock()
+	a.opLoader = loader
+	a.settingsMu.Unlock()
+	return a.ReloadOps()
+}
+
+// ReloadOps sets the public keys from a loader saved in the last call to operators
+func (a *Auth) ReloadOps() error {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return addFromLoader(a.opLoader, a.Op)
 }
 
 // Allowlist will set a public key as a allowlisted user.
@@ -199,10 +211,30 @@ func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
 	}
 }
 
-// LoadAllowlistFromFile reads a file in authorized_keys format and allowlists public keys
-func (a *Auth) LoadAllowlistFromFile(path string) error {
-	a.allowlistFile = path
-	return fromFile(path, func(key ssh.PublicKey) { a.Allowlist(key, 0) })
+// LoadAllowlist adds the public keys from the loader to the allowlist and saves the loader for later use
+func (a *Auth) LoadAllowlist(loader KeyLoader) error {
+	a.settingsMu.Lock()
+	a.allowlistLoader = loader
+	a.settingsMu.Unlock()
+	return a.ReloadAllowlist()
+}
+
+//  LoadAllowlist adds the public keys from a loader saved in a previous call to the allowlist
+func (a *Auth) ReloadAllowlist() error {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return addFromLoader(a.allowlistLoader, a.Allowlist)
+}
+
+func addFromLoader(loader KeyLoader, adder func(ssh.PublicKey, time.Duration)) error {
+	if loader == nil {
+		return nil
+	}
+	keys, err := loader()
+	for _, key := range keys {
+		adder(key, 0)
+	}
+	return err
 }
 
 // Ban will set a public key as banned.
@@ -307,31 +339,5 @@ func (a *Auth) BanQuery(q string) error {
 		}
 	}
 
-	return nil
-}
-
-func fromFile(path string, handler func(ssh.PublicKey)) error {
-	if path == "" {
-		return nil
-	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		key, _, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
-		if err != nil {
-			if err.Error() == "ssh: no key found" {
-				// TODO: do we really want to always ignore this?
-				continue // Skip line
-			}
-			return err
-		}
-		handler(key)
-	}
 	return nil
 }
