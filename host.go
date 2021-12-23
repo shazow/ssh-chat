@@ -780,7 +780,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				if pk == nil {
 					noKeyUsers = append(noKeyUsers, user.Identifier.Name())
 				} else {
-					h.auth.Whitelist(pk, 0)
+					h.auth.Allowlist(pk, 0)
 				}
 			}
 			return nil
@@ -796,13 +796,13 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			return errors.New("must specify whether to keep or flush current entries")
 		}
 		if args[0] == "flush" {
-			h.auth.whitelist.Clear()
+			h.auth.allowlist.Clear()
 		}
-		return h.auth.LoadWhitelistFromFile(h.auth.whitelistFile)
+		return h.auth.LoadAllowlistFromFile(h.auth.allowlistFile)
 	}
 
 	allowlistReverify := func(room *chat.Room) []string {
-		if !h.auth.WhitelistMode() {
+		if !h.auth.AllowlistMode() {
 			return []string{"allowlist is disabled, so nobody will be kicked"}
 		}
 		var kicked []string
@@ -820,32 +820,32 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	}
 
 	allowlistStatus := func() (msgs []string) {
-		if h.auth.WhitelistMode() {
+		if h.auth.AllowlistMode() {
 			msgs = []string{"The allowlist is currently enabled."}
 		} else {
 			msgs = []string{"The allowlist is currently disabled."}
 		}
-		whitelistedUsers := []string{}
-		whitelistedKeys := []string{}
-		h.auth.whitelist.Each(func(key string, item set.Item) error {
+		allowlistedUsers := []string{}
+		allowlistedKeys := []string{}
+		h.auth.allowlist.Each(func(key string, item set.Item) error {
 			keyFP := item.Key()
 			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
 				if pk != nil && sshd.Fingerprint(pk) == keyFP {
-					whitelistedUsers = append(whitelistedUsers, user.Name())
+					allowlistedUsers = append(allowlistedUsers, user.Name())
 					return errors.New("not an actual error, but exit early because we found the key")
 				}
 				return nil
 			}) == nil {
 				// if we land here, the key matches no users
-				whitelistedKeys = append(whitelistedKeys, keyFP)
+				allowlistedKeys = append(allowlistedKeys, keyFP)
 			}
 			return nil
 		})
-		if len(whitelistedUsers) != 0 {
-			msgs = append(msgs, fmt.Sprintf("The following connected users are on the allowlist: %v", whitelistedUsers))
+		if len(allowlistedUsers) != 0 {
+			msgs = append(msgs, fmt.Sprintf("The following connected users are on the allowlist: %v", allowlistedUsers))
 		}
-		if len(whitelistedKeys) != 0 {
-			msgs = append(msgs, fmt.Sprintf("The following keys of not connected users are on the allowlist: %v", whitelistedKeys))
+		if len(allowlistedKeys) != 0 {
+			msgs = append(msgs, fmt.Sprintf("The following keys of not connected users are on the allowlist: %v", allowlistedKeys))
 		}
 		return
 	}
@@ -872,13 +872,13 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			case "help":
 				replyLines = allowlistHelptext
 			case "on":
-				h.auth.SetWhitelistMode(true)
+				h.auth.SetAllowlistMode(true)
 			case "off":
-				h.auth.SetWhitelistMode(false)
+				h.auth.SetAllowlistMode(false)
 			case "add":
-				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 0) })
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 0) })
 			case "remove":
-				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Whitelist(pk, 1) })
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 1) })
 			case "import":
 				replyLines, err = allowlistImport(args[1:])
 			case "reload":

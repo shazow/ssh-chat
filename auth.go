@@ -18,9 +18,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// ErrNotWhitelisted Is the error returned when a key is checked that is not whitelisted,
-// when whitelisting is enabled.
-var ErrNotWhitelisted = errors.New("not whitelisted")
+// ErrNotAllowlisted Is the error returned when a key is checked that is not allowlisted,
+// when allowlisting is enabled.
+var ErrNotAllowlisted = errors.New("not allowlisted")
 
 // ErrBanned is the error returned when a client is banned.
 var ErrBanned = errors.New("banned")
@@ -50,19 +50,19 @@ func newAuthAddr(addr net.Addr) string {
 	return host
 }
 
-// Auth stores lookups for bans, whitelists, and ops. It implements the sshd.Auth interface.
-// If the contained passphrase is not empty, it complements a whitelist.
+// Auth stores lookups for bans, allowlists, and ops. It implements the sshd.Auth interface.
+// If the contained passphrase is not empty, it complements a allowlist.
 type Auth struct {
 	passphraseHash  []byte
-	whitelistModeMu sync.RWMutex
-	whitelistMode   bool
+	allowlistModeMu sync.RWMutex
+	allowlistMode   bool
 	bannedAddr      *set.Set
 	bannedClient    *set.Set
 	banned          *set.Set
-	whitelist       *set.Set
+	allowlist       *set.Set
 	ops             *set.Set
 	opFile          string
-	whitelistFile   string
+	allowlistFile   string
 }
 
 // NewAuth creates a new empty Auth.
@@ -71,21 +71,21 @@ func NewAuth() *Auth {
 		bannedAddr:   set.New(),
 		bannedClient: set.New(),
 		banned:       set.New(),
-		whitelist:    set.New(),
+		allowlist:    set.New(),
 		ops:          set.New(),
 	}
 }
 
-func (a *Auth) WhitelistMode() bool {
-	a.whitelistModeMu.RLock()
-	defer a.whitelistModeMu.RUnlock()
-	return a.whitelistMode
+func (a *Auth) AllowlistMode() bool {
+	a.allowlistModeMu.RLock()
+	defer a.allowlistModeMu.RUnlock()
+	return a.allowlistMode
 }
 
-func (a *Auth) SetWhitelistMode(value bool) {
-	a.whitelistModeMu.Lock()
-	defer a.whitelistModeMu.Unlock()
-	a.whitelistMode = value
+func (a *Auth) SetAllowlistMode(value bool) {
+	a.allowlistModeMu.Lock()
+	defer a.allowlistModeMu.Unlock()
+	a.allowlistMode = value
 }
 
 // SetPassphrase enables passphrase authentication with the given passphrase.
@@ -101,7 +101,7 @@ func (a *Auth) SetPassphrase(passphrase string) {
 
 // AllowAnonymous determines if anonymous users are permitted.
 func (a *Auth) AllowAnonymous() bool {
-	return !a.WhitelistMode() && a.passphraseHash == nil
+	return !a.AllowlistMode() && a.passphraseHash == nil
 }
 
 // AcceptPassphrase determines if passphrase authentication is accepted.
@@ -134,11 +134,11 @@ func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string)
 // CheckPubkey determines if a pubkey fingerprint is permitted.
 func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
 	authkey := newAuthKey(key)
-	whitelisted := a.whitelist.In(authkey)
-	if a.AllowAnonymous() || whitelisted || a.IsOp(key) {
+	allowlisted := a.allowlist.In(authkey)
+	if a.AllowAnonymous() || allowlisted || a.IsOp(key) {
 		return nil
 	} else {
-		return ErrNotWhitelisted
+		return ErrNotAllowlisted
 	}
 }
 
@@ -180,29 +180,29 @@ func (a *Auth) LoadOpsFromFile(path string) error {
 	return fromFile(path, func(key ssh.PublicKey) { a.Op(key, 0) })
 }
 
-// Whitelist will set a public key as a whitelisted user.
-func (a *Auth) Whitelist(key ssh.PublicKey, d time.Duration) {
+// Allowlist will set a public key as a allowlisted user.
+func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
 	if key == nil {
 		return
 	}
 	var err error
 	authItem := newAuthItem(key)
 	if d != 0 {
-		err = a.whitelist.Set(set.Expire(authItem, d))
+		err = a.allowlist.Set(set.Expire(authItem, d))
 	} else {
-		err = a.whitelist.Set(authItem)
+		err = a.allowlist.Set(authItem)
 	}
 	if err == nil {
-		logger.Debugf("Added to whitelist: %q (for %s)", authItem.Key(), d)
+		logger.Debugf("Added to allowlist: %q (for %s)", authItem.Key(), d)
 	} else {
-		logger.Errorf("Error adding %q to whitelist for %s: %s", authItem.Key(), d, err)
+		logger.Errorf("Error adding %q to allowlist for %s: %s", authItem.Key(), d, err)
 	}
 }
 
-// LoadWhitelistFromFile reads a file in authorized_keys format and whitelists public keys
-func (a *Auth) LoadWhitelistFromFile(path string) error {
-	a.whitelistFile = path
-	return fromFile(path, func(key ssh.PublicKey) { a.Whitelist(key, 0) })
+// LoadAllowlistFromFile reads a file in authorized_keys format and allowlists public keys
+func (a *Auth) LoadAllowlistFromFile(path string) error {
+	a.allowlistFile = path
+	return fromFile(path, func(key ssh.PublicKey) { a.Allowlist(key, 0) })
 }
 
 // Ban will set a public key as banned.

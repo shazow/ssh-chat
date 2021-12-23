@@ -173,7 +173,7 @@ func TestHostNameCollision(t *testing.T) {
 	}
 }
 
-func TestHostWhitelist(t *testing.T) {
+func TestHostAllowlist(t *testing.T) {
 	auth := NewAuth()
 	s, host := getHost(t, auth)
 	defer s.Close()
@@ -192,12 +192,12 @@ func TestHostWhitelist(t *testing.T) {
 	}
 
 	clientpubkey, _ := ssh.NewPublicKey(clientkey.Public())
-	auth.Whitelist(clientpubkey, 0)
-	auth.SetWhitelistMode(true)
+	auth.Allowlist(clientpubkey, 0)
+	auth.SetAllowlistMode(true)
 
 	err = sshd.ConnectShell(target, "foo", func(r io.Reader, w io.WriteCloser) error { return nil })
 	if err == nil {
-		t.Error("Failed to block unwhitelisted connection.")
+		t.Error("Failed to block unallowlisted connection.")
 	}
 }
 
@@ -268,52 +268,52 @@ func TestHostAllowlistCommand(t *testing.T) {
 		}
 
 		sendCmd("/allowlist on")
-		if !host.auth.WhitelistMode() {
+		if !host.auth.AllowlistMode() {
 			t.Error("allowlist not enabled after /allowlist on")
 		}
 		sendCmd("/allowlist off")
-		if host.auth.WhitelistMode() {
+		if host.auth.AllowlistMode() {
 			t.Error("allowlist not disabled after /allowlist off")
 		}
 
 		testKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUiNw0nQku4pcUCbZcJlIEAIf5bXJYTy/DKI1vh5b+P"
 		testKeyFP := "SHA256:GJNSl9NUcOS2pZYALn0C5Qgfh5deT+R+FfqNIUvpM9s="
 
-		if host.auth.whitelist.Len() != 0 {
+		if host.auth.allowlist.Len() != 0 {
 			t.Error("allowlist not empty before adding anyone")
 		}
 		sendCmd("/allowlist add ssh-invalid blah ssh-rsa wrongAsWell invalid foo bar %s", testKey)
 		assertLineEq("users without a public key: [foo]\r")
 		assertLineEq("invalid users: [invalid]\r")
 		assertLineEq("invalid keys: [ssh-invalid blah ssh-rsa wrongAsWell]\r")
-		if !host.auth.whitelist.In(testKeyFP) || !host.auth.whitelist.In(clientKeyFP) {
+		if !host.auth.allowlist.In(testKeyFP) || !host.auth.allowlist.In(clientKeyFP) {
 			t.Error("failed to add keys to allowlist")
 		}
 		sendCmd("/allowlist remove invalid bar")
 		assertLineEq("invalid users: [invalid]\r")
-		if host.auth.whitelist.In(clientKeyFP) {
+		if host.auth.allowlist.In(clientKeyFP) {
 			t.Error("failed to remove key from allowlist")
 		}
-		if !host.auth.whitelist.In(testKeyFP) {
+		if !host.auth.allowlist.In(testKeyFP) {
 			t.Error("removed wrong key")
 		}
 
 		sendCmd("/allowlist import 5h")
-		if host.auth.whitelist.In(clientKeyFP) {
+		if host.auth.allowlist.In(clientKeyFP) {
 			t.Error("imporrted key not seen long enough")
 		}
 		sendCmd("/allowlist import")
 		assertLineEq("users without a public key: [foo]\r")
-		if !host.auth.whitelist.In(clientKeyFP) {
+		if !host.auth.allowlist.In(clientKeyFP) {
 			t.Error("failed to import key")
 		}
 
 		sendCmd("/allowlist reload keep")
-		if !host.auth.whitelist.In(testKeyFP) {
+		if !host.auth.allowlist.In(testKeyFP) {
 			t.Error("cleared allowlist to be kept")
 		}
 		sendCmd("/allowlist reload flush")
-		if host.auth.whitelist.In(testKeyFP) {
+		if host.auth.allowlist.In(testKeyFP) {
 			t.Error("kept allowlist to be cleared")
 		}
 		sendCmd("/allowlist reload thisIsWrong")

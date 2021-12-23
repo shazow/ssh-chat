@@ -34,8 +34,8 @@ type Options struct {
 	Pprof      int      `long:"pprof" description:"Enable pprof http server for profiling."`
 	Verbose    []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
 	Version    bool     `long:"version" description:"Print version and exit."`
-	Whitelist  string   `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
-	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
+	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
+	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -144,11 +144,11 @@ func main() {
 		fail(5, "Failed to load admins: %v\n", err)
 	}
 
-	err = auth.LoadWhitelistFromFile(options.Whitelist)
+	err = auth.LoadAllowlistFromFile(options.Allowlist)
 	if err != nil {
-		fail(6, "Failed to load whitelist: %v\n", err)
+		fail(6, "Failed to load allowlist: %v\n", err)
 	}
-	auth.SetWhitelistMode(options.Whitelist != "")
+	auth.SetAllowlistMode(options.Allowlist != "")
 
 	if options.Motd != "" {
 		host.GetMOTD = func() (string, error) {
