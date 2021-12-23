@@ -85,7 +85,7 @@ func main() {
 
 	// Figure out the log level
 	numVerbose := len(options.Verbose)
-	if numVerbose > len(logLevels) {
+	if numVerbose >= len(logLevels) {
 		numVerbose = len(logLevels) - 1
 	}
 
