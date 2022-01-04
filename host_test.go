@@ -124,51 +124,23 @@ func TestHostNameCollision(t *testing.T) {
 	// First client
 	g.Go(func() error {
 		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			scanner := bufio.NewScanner(r)
-
-			// Consume the initial buffer
-			scanner.Scan()
-			actual := stripPrompt(scanner.Text())
-			expected := " * foo joined. (Connected: 1)\r"
-			if actual != expected {
-				t.Errorf("Got %q; expected %q", actual, expected)
+			// second client
+			name := (<-newUsers).Name()
+			if name != "Guest1" {
+				t.Errorf("Second client did not get Guest1 name: %q", name)
 			}
-
-			// wait for the second client
-			<-newUsers
-
-			scanner.Scan()
-			actual = scanner.Text()
-			// This check has to happen second because prompt doesn't always
-			// get set before the first message.
-			if !strings.HasPrefix(actual, "[foo] ") {
-				t.Errorf("First client failed to get 'foo' name: %q", actual)
-			}
-			actual = stripPrompt(actual)
-			expected = " * Guest1 joined. (Connected: 2)\r"
-			if actual != expected {
-				t.Errorf("Got %q; expected %q", actual, expected)
-			}
-
 			return nil
 		})
 	})
 
 	// Second client
 	g.Go(func() error {
-		// wait for the first client
-		<-newUsers
+		// first client
+		name := (<-newUsers).Name()
+		if name != "foo" {
+			t.Errorf("First client did not get foo name: %q", name)
+		}
 		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			scanner := bufio.NewScanner(r)
-			// Consume the initial buffer
-			scanner.Scan()
-			scanner.Scan()
-			scanner.Scan()
-
-			actual := scanner.Text()
-			if !strings.HasPrefix(actual, "[Guest1] ") {
-				t.Errorf("Second client did not get Guest1 name: %q", actual)
-			}
 			return nil
 		})
 	})
