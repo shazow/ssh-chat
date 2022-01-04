@@ -814,25 +814,26 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			return nil
 		})
 		if kicked != nil {
-			room.Send(message.NewAnnounceMsg(fmt.Sprintf("%v were kicked during pubkey reverification.", kicked)))
+			room.Send(message.NewAnnounceMsg("Kicked during pubkey reverification: " + strings.Join(kicked, ", ")))
 		}
 		return nil
 	}
 
 	allowlistStatus := func() (msgs []string) {
 		if h.auth.AllowlistMode() {
-			msgs = []string{"The allowlist is currently enabled."}
+			msgs = []string{"allowlist enabled"}
 		} else {
-			msgs = []string{"The allowlist is currently disabled."}
+			msgs = []string{"allowlist disabled"}
 		}
 		allowlistedUsers := []string{}
 		allowlistedKeys := []string{}
+		// TODO: if we switch the loops, we can get unlisted users instead of unconnected keys easily
 		h.auth.allowlist.Each(func(key string, item set.Item) error {
 			keyFP := item.Key()
 			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
 				if pk != nil && sshd.Fingerprint(pk) == keyFP {
 					allowlistedUsers = append(allowlistedUsers, user.Name())
-					return errors.New("not an actual error, but exit early because we found the key")
+					return io.EOF
 				}
 				return nil
 			}) == nil {
@@ -842,7 +843,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			return nil
 		})
 		if len(allowlistedUsers) != 0 {
-			msgs = append(msgs, fmt.Sprintf("The following connected users are on the allowlist: %v", allowlistedUsers))
+			msgs = append(msgs, "Connected users on the allowlist: "+strings.Join(allowlistedUsers, ", "))
 		}
 		if len(allowlistedKeys) != 0 {
 			msgs = append(msgs, fmt.Sprintf("The following keys of not connected users are on the allowlist: %v", allowlistedKeys))
