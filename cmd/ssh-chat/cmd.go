@@ -37,6 +37,7 @@ type Options struct {
 	Verbose    []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
 	Version    bool     `long:"version" description:"Print version and exit."`
 	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
+	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
 }
 
@@ -146,6 +147,10 @@ func main() {
 		fail(5, "Failed to load admins: %v\n", err)
 	}
 
+	if options.Allowlist == "" && options.Whitelist != "" {
+		fmt.Println("--whitelist was renamed to --allowlist.")
+		options.Allowlist = options.Whitelist
+	}
 	err = auth.LoadAllowlist(loaderFromFile(options.Allowlist, logger))
 	if err != nil {
 		fail(6, "Failed to load allowlist: %v\n", err)

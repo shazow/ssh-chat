@@ -340,13 +340,13 @@ func TestHostAllowlistCommand(t *testing.T) {
 		assertLineEq("allowlist is disabled, so nobody will be kicked\r")
 		sendCmd("/allowlist on")
 		sendCmd("/allowlist reverify")
-		assertLineEq(" * [bar] were kicked during pubkey reverification.\r", " * bar left. (After 0 seconds)\r")
-		assertLineEq(" * [bar] were kicked during pubkey reverification.\r", " * bar left. (After 0 seconds)\r")
+		assertLineEq(" * Kicked during pubkey reverification: bar\r", " * bar left. (After 0 seconds)\r")
+		assertLineEq(" * Kicked during pubkey reverification: bar\r", " * bar left. (After 0 seconds)\r")
 		kickSignal <- struct{}{}
 
 		sendCmd("/allowlist add " + testKey)
 		sendCmd("/allowlist status")
-		assertLineEq("The allowlist is currently enabled.\r")
+		assertLineEq("allowlist enabled\r")
 		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKeyFP))
 
 		sendCmd("/allowlist invalidSubcommand")
