@@ -29,6 +29,9 @@ func stripPrompt(s string) string {
 	if endPos := strings.Index(s, "] "); endPos > 0 {
 		return s[endPos+2:]
 	}
+	if strings.HasPrefix(s, "-> ") {
+		return s[3:]
+	}
 	return s
 }
 
@@ -48,6 +51,10 @@ func TestStripPrompt(t *testing.T) {
 		{
 			Input: "[foo] \x1b[6D\x1b[K-> From your friendly system.\r",
 			Want:  "From your friendly system.\r",
+		},
+		{
+			Input: "-> Err: must be op.\r",
+			Want:  "Err: must be op.\r",
 		},
 	}
 
