@@ -20,9 +20,9 @@ import (
 // It must return a nil slice on error.
 type KeyLoader func() ([]ssh.PublicKey, error)
 
-// ErrNotAllowlisted Is the error returned when a key is checked that is not allowlisted,
+// ErrNotAllowed Is the error returned when a key is checked that is not allowlisted,
 // when allowlisting is enabled.
-var ErrNotAllowlisted = errors.New("not allowlisted")
+var ErrNotAllowed = errors.New("not allowed")
 
 // ErrBanned is the error returned when a client is banned.
 var ErrBanned = errors.New("banned")
@@ -141,7 +141,7 @@ func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
 	if a.AllowAnonymous() || allowlisted || a.IsOp(key) {
 		return nil
 	} else {
-		return ErrNotAllowlisted
+		return ErrNotAllowed
 	}
 }
 
