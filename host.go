@@ -827,7 +827,6 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		}
 		allowlistedUsers := []string{}
 		allowlistedKeys := []string{}
-		// TODO: if we switch the loops, we can get unlisted users instead of unconnected keys easily
 		h.auth.allowlist.Each(func(key string, item set.Item) error {
 			keyFP := item.Key()
 			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
@@ -846,7 +845,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			msgs = append(msgs, "Connected users on the allowlist: "+strings.Join(allowlistedUsers, ", "))
 		}
 		if len(allowlistedKeys) != 0 {
-			msgs = append(msgs, fmt.Sprintf("The following keys of not connected users are on the allowlist: %v", allowlistedKeys))
+			msgs = append(msgs, "Keys on the allowlist without connected user: "+strings.Join(allowlistedKeys, ", "))
 		}
 		return
 	}
