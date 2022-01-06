@@ -326,7 +326,7 @@ func TestHostAllowlistCommand(t *testing.T) {
 		sendCmd("/allowlist add " + testKey)
 		sendCmd("/allowlist status")
 		assertLineEq("allowlist enabled\r")
-		assertLineEq(fmt.Sprintf("The following keys of not connected users are on the allowlist: [%s]\r", testKeyFP))
+		assertLineEq(fmt.Sprintf("Keys on the allowlist without connected user: %s\r", testKeyFP))
 
 		sendCmd("/allowlist invalidSubcommand")
 		assertLineEq("Err: invalid subcommand: invalidSubcommand\r")
