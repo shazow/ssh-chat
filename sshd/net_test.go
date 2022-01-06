@@ -25,7 +25,7 @@ func TestServerInit(t *testing.T) {
 }
 
 func TestServeTerminals(t *testing.T) {
-	signer, err := NewRandomSigner(512)
+	signer, err := NewRandomSigner(1024)
 	if err != nil {
 		t.Fatal(err)
 	}

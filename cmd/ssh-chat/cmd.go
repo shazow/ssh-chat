@@ -36,8 +36,9 @@ type Options struct {
 	Pprof      int      `long:"pprof" description:"Enable pprof http server for profiling."`
 	Verbose    []bool   `short:"v" long:"verbose" description:"Show verbose logging."`
 	Version    bool     `long:"version" description:"Print version and exit."`
-	Whitelist  string   `long:"whitelist" description:"Optional file of public keys who are allowed to connect."`
-	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Whitelist feature is more secure."`
+	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
+	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
+	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -87,7 +88,7 @@ func main() {
 
 	// Figure out the log level
 	numVerbose := len(options.Verbose)
-	if numVerbose > len(logLevels) {
+	if numVerbose >= len(logLevels) {
 		numVerbose = len(logLevels) - 1
 	}
 
@@ -141,35 +142,20 @@ func main() {
 		auth.SetPassphrase(options.Passphrase)
 	}
 
-	err = fromFile(options.Admin, func(line []byte) error {
-		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
-		if err != nil {
-			if err.Error() == "ssh: no key found" {
-				return nil // Skip line
-			}
-			return err
-		}
-		auth.Op(key, 0)
-		return nil
-	})
+	err = auth.LoadOps(loaderFromFile(options.Admin, logger))
 	if err != nil {
 		fail(5, "Failed to load admins: %v\n", err)
 	}
 
-	err = fromFile(options.Whitelist, func(line []byte) error {
-		key, _, _, _, err := ssh.ParseAuthorizedKey(line)
-		if err != nil {
-			if err.Error() == "ssh: no key found" {
-				return nil // Skip line
-			}
-			return err
-		}
-		auth.Whitelist(key, 0)
-		return nil
-	})
-	if err != nil {
-		fail(6, "Failed to load whitelist: %v\n", err)
+	if options.Allowlist == "" && options.Whitelist != "" {
+		fmt.Println("--whitelist was renamed to --allowlist.")
+		options.Allowlist = options.Whitelist
 	}
+	err = auth.LoadAllowlist(loaderFromFile(options.Allowlist, logger))
+	if err != nil {
+		fail(6, "Failed to load allowlist: %v\n", err)
+	}
+	auth.SetAllowlistMode(options.Allowlist != "")
 
 	if options.Motd != "" {
 		host.GetMOTD = func() (string, error) {
@@ -210,24 +196,32 @@ func main() {
 	fmt.Fprintln(os.Stderr, "Interrupt signal detected, shutting down.")
 }
 
-func fromFile(path string, handler func(line []byte) error) error {
+func loaderFromFile(path string, logger *golog.Logger) sshchat.KeyLoader {
 	if path == "" {
-		// Skip
 		return nil
 	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		err := handler(scanner.Bytes())
+	return func() ([]ssh.PublicKey, error) {
+		file, err := os.Open(path)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		defer file.Close()
+
+		var keys []ssh.PublicKey
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			key, _, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
+			if err != nil {
+				if err.Error() == "ssh: no key found" {
+					continue // Skip line
+				}
+				return nil, err
+			}
+			keys = append(keys, key)
+		}
+		if keys == nil {
+			logger.Warning("file", path, "contained no keys")
+		}
+		return keys, nil
 	}
-	return nil
 }

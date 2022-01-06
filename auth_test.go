@@ -21,7 +21,7 @@ func ClonePublicKey(key ssh.PublicKey) (ssh.PublicKey, error) {
 	return ssh.ParsePublicKey(key.Marshal())
 }
 
-func TestAuthWhitelist(t *testing.T) {
+func TestAuthAllowlist(t *testing.T) {
 	key, err := NewRandomPublicKey(512)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,8 @@ func TestAuthWhitelist(t *testing.T) {
 		t.Error("Failed to permit in default state:", err)
 	}
 
-	auth.Whitelist(key, 0)
+	auth.Allowlist(key, 0)
+	auth.SetAllowlistMode(true)
 
 	keyClone, err := ClonePublicKey(key)
 	if err != nil {
@@ -46,7 +47,7 @@ func TestAuthWhitelist(t *testing.T) {
 
 	err = auth.CheckPublicKey(keyClone)
 	if err != nil {
-		t.Error("Failed to permit whitelisted:", err)
+		t.Error("Failed to permit allowlisted:", err)
 	}
 
 	key2, err := NewRandomPublicKey(512)
@@ -56,7 +57,7 @@ func TestAuthWhitelist(t *testing.T) {
 
 	err = auth.CheckPublicKey(key2)
 	if err == nil {
-		t.Error("Failed to restrict not whitelisted:", err)
+		t.Error("Failed to restrict not allowlisted:", err)
 	}
 }
 

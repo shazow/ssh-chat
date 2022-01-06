@@ -9,11 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/shazow/rateio"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/internal/sanitize"
+	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -693,6 +696,204 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			room.Send(message.NewAnnounceMsg(body))
 
 			return nil
+		},
+	})
+
+	forConnectedUsers := func(cmd func(*chat.Member, ssh.PublicKey) error) error {
+		return h.Members.Each(func(key string, item set.Item) error {
+			v := item.Value()
+			if v == nil { // expired between Each and here
+				return nil
+			}
+			user := v.(*chat.Member)
+			pk := user.Identifier.(*Identity).PublicKey()
+			return cmd(user, pk)
+		})
+	}
+
+	forPubkeyUser := func(args []string, cmd func(ssh.PublicKey)) (errors []string) {
+		invalidUsers := []string{}
+		invalidKeys := []string{}
+		noKeyUsers := []string{}
+		var keyType string
+		for _, v := range args {
+			switch {
+			case keyType != "":
+				pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyType + " " + v))
+				if err == nil {
+					cmd(pk)
+				} else {
+					invalidKeys = append(invalidKeys, keyType+" "+v)
+				}
+				keyType = ""
+			case strings.HasPrefix(v, "ssh-"):
+				keyType = v
+			default:
+				user, ok := h.GetUser(v)
+				if ok {
+					pk := user.Identifier.(*Identity).PublicKey()
+					if pk == nil {
+						noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+					} else {
+						cmd(pk)
+					}
+				} else {
+					invalidUsers = append(invalidUsers, v)
+				}
+			}
+		}
+		if len(noKeyUsers) != 0 {
+			errors = append(errors, fmt.Sprintf("users without a public key: %v", noKeyUsers))
+		}
+		if len(invalidUsers) != 0 {
+			errors = append(errors, fmt.Sprintf("invalid users: %v", invalidUsers))
+		}
+		if len(invalidKeys) != 0 {
+			errors = append(errors, fmt.Sprintf("invalid keys: %v", invalidKeys))
+		}
+		return
+	}
+
+	allowlistHelptext := []string{
+		"Usage: /allowlist help | on | off | add {PUBKEY|USER}... | remove {PUBKEY|USER}... | import [AGE] | reload {keep|flush} | reverify | status",
+		"help: this help message",
+		"on, off: set allowlist mode (applies to new connections)",
+		"add, remove: add or remove keys from the allowlist",
+		"import: add all keys of users connected since AGE (default 0) ago to the allowlist",
+		"reload: re-read the allowlist file and keep or discard entries in the current allowlist but not in the file",
+		"reverify: kick all users not in the allowlist if allowlisting is enabled",
+		"status: show status information",
+	}
+
+	allowlistImport := func(args []string) (msgs []string, err error) {
+		var since time.Duration
+		if len(args) > 0 {
+			since, err = time.ParseDuration(args[0])
+			if err != nil {
+				return
+			}
+		}
+		cutoff := time.Now().Add(-since)
+		noKeyUsers := []string{}
+		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+			if user.Joined().Before(cutoff) {
+				if pk == nil {
+					noKeyUsers = append(noKeyUsers, user.Identifier.Name())
+				} else {
+					h.auth.Allowlist(pk, 0)
+				}
+			}
+			return nil
+		})
+		if len(noKeyUsers) != 0 {
+			msgs = []string{fmt.Sprintf("users without a public key: %v", noKeyUsers)}
+		}
+		return
+	}
+
+	allowlistReload := func(args []string) error {
+		if !(len(args) > 0 && (args[0] == "keep" || args[0] == "flush")) {
+			return errors.New("must specify whether to keep or flush current entries")
+		}
+		if args[0] == "flush" {
+			h.auth.allowlist.Clear()
+		}
+		return h.auth.ReloadAllowlist()
+	}
+
+	allowlistReverify := func(room *chat.Room) []string {
+		if !h.auth.AllowlistMode() {
+			return []string{"allowlist is disabled, so nobody will be kicked"}
+		}
+		var kicked []string
+		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+			if h.auth.CheckPublicKey(pk) != nil && !user.IsOp { // we do this check here as well for ops without keys
+				kicked = append(kicked, user.Name())
+				user.Close()
+			}
+			return nil
+		})
+		if kicked != nil {
+			room.Send(message.NewAnnounceMsg("Kicked during pubkey reverification: " + strings.Join(kicked, ", ")))
+		}
+		return nil
+	}
+
+	allowlistStatus := func() (msgs []string) {
+		if h.auth.AllowlistMode() {
+			msgs = []string{"allowlist enabled"}
+		} else {
+			msgs = []string{"allowlist disabled"}
+		}
+		allowlistedUsers := []string{}
+		allowlistedKeys := []string{}
+		h.auth.allowlist.Each(func(key string, item set.Item) error {
+			keyFP := item.Key()
+			if forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
+				if pk != nil && sshd.Fingerprint(pk) == keyFP {
+					allowlistedUsers = append(allowlistedUsers, user.Name())
+					return io.EOF
+				}
+				return nil
+			}) == nil {
+				// if we land here, the key matches no users
+				allowlistedKeys = append(allowlistedKeys, keyFP)
+			}
+			return nil
+		})
+		if len(allowlistedUsers) != 0 {
+			msgs = append(msgs, "Connected users on the allowlist: "+strings.Join(allowlistedUsers, ", "))
+		}
+		if len(allowlistedKeys) != 0 {
+			msgs = append(msgs, "Keys on the allowlist without connected user: "+strings.Join(allowlistedKeys, ", "))
+		}
+		return
+	}
+
+	c.Add(chat.Command{
+		Op:         true,
+		Prefix:     "/allowlist",
+		PrefixHelp: "COMMAND [ARGS...]",
+		Help:       "Modify the allowlist or allowlist state. See /allowlist help for subcommands",
+		Handler: func(room *chat.Room, msg message.CommandMsg) (err error) {
+			if !room.IsOp(msg.From()) {
+				return errors.New("must be op")
+			}
+
+			args := msg.Args()
+			if len(args) == 0 {
+				args = []string{"help"}
+			}
+
+			// send exactly one message to preserve order
+			var replyLines []string
+
+			switch args[0] {
+			case "help":
+				replyLines = allowlistHelptext
+			case "on":
+				h.auth.SetAllowlistMode(true)
+			case "off":
+				h.auth.SetAllowlistMode(false)
+			case "add":
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 0) })
+			case "remove":
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 1) })
+			case "import":
+				replyLines, err = allowlistImport(args[1:])
+			case "reload":
+				err = allowlistReload(args[1:])
+			case "reverify":
+				replyLines = allowlistReverify(room)
+			case "status":
+				replyLines = allowlistStatus()
+			default:
+				err = errors.New("invalid subcommand: " + args[0])
+			}
+			if err == nil && replyLines != nil {
+				room.Send(message.NewSystemMsg(strings.Join(replyLines, "\r\n"), msg.From()))
+			}
+			return
 		},
 	})
 }
