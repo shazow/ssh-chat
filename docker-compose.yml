@@ -1,7 +1,15 @@
-version: '3'
+version: '3.7'
 services:
-  app:
-    build: .
+  ssh-chat:
+    image: ghcr.io/shazow/ssh-chat:latest
     ports:
         - 2022:2022
     restart: always
+    volumes:
+      - ./sshchat:/sshchat
+    command:
+      - --verbose
+      - --identity=id
+      - --bind=":2022"
+      - --admin=admins
+      - --motd=motd
