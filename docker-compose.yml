@@ -1,7 +1,13 @@
-version: '3'
+version: '3.2'
 services:
   app:
+    container_name: ssh-chat
     build: .
     ports:
-        - 2022:2022
-    restart: always
+      - 2022:2022
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ~/.ssh/
+        target: /root/.ssh/
+        read_only: true
