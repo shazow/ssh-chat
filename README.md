@@ -12,7 +12,7 @@ Custom SSH server written in Go. Instead of a shell, you get a chat prompt.
 
 Join the party:
 
-```
+``` console
 $ ssh ssh.chat
 ```
 
@@ -52,7 +52,7 @@ Additionally, `make debug` runs the server with an http `pprof` server. This all
 
 ## Quick Start
 
-```
+``` console
 Usage:
   ssh-chat [OPTIONS]
 
@@ -74,7 +74,7 @@ Help Options:
 After doing `go get github.com/shazow/ssh-chat/...` on this repo, you should be able
 to run a command like:
 
-```
+``` console
 $ ssh-chat --verbose --bind ":22" --identity ~/.ssh/id_dsa
 ```
 
