@@ -123,7 +123,7 @@ func (m PublicMsg) RenderFor(cfg UserConfig) string {
 	}
 
 	body := cfg.Highlight.ReplaceAllString(m.body, cfg.Theme.Highlight("${1}"))
-	if cfg.Bell {
+	if cfg.Bell != 0 {
 		body += Bel
 	}
 	return fmt.Sprintf("%s: %s", cfg.Theme.ColorName(m.from), body)
