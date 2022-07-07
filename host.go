@@ -169,6 +169,16 @@ func (h *Host) Connect(term *sshd.Terminal) {
 			if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
 				h.Room.HandleMsg(msg)
 			}
+		case "SSHCHAT_SYSTEMBELL":
+			if e.Value != "" && e.Value != "0" {
+				cmd := "/systembell"
+				if e.Value != "1" {
+					cmd += " " + e.Value
+				}
+				if msg, ok := message.NewPublicMsg(cmd, user).ParseCommand(); ok {
+					h.Room.HandleMsg(msg)
+				}
+			}
 		}
 	}
 
