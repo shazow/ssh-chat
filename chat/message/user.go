@@ -215,6 +215,9 @@ func (u *User) render(m Message) string {
 			return ""
 		} else {
 			out += m.RenderFor(cfg)
+			if cfg.Systembell {
+				out += Bel
+			}
 		}
 	case *PrivateMsg:
 		out += m.Render(cfg.Theme)
@@ -273,6 +276,7 @@ func (u *User) Send(m Message) error {
 type UserConfig struct {
 	Highlight  *regexp.Regexp
 	Bell       bool
+	Systembell bool
 	Quiet      bool
 	Echo       bool // Echo shows your own messages after sending, disabled for bots
 	Timeformat *string
@@ -285,9 +289,10 @@ var DefaultUserConfig UserConfig
 
 func init() {
 	DefaultUserConfig = UserConfig{
-		Bell:  true,
-		Echo:  true,
-		Quiet: false,
+		Bell:       true,
+		Systembell: false,
+		Echo:       true,
+		Quiet:      false,
 	}
 
 	// TODO: Seed random?
