@@ -265,6 +265,26 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix:     "/systembell",
+		Help:       "Toggle system bell for all messages.",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			u := msg.From()
+			cfg := u.Config()
+			cfg.Systembell = !cfg.Systembell
+			u.SetConfig(cfg)
+
+			var body string
+			if cfg.Systembell {
+				body = "System bell is toggled ON"
+			} else {
+				body = "System bell is toggled OFF"
+			}
+			room.Send(message.NewSystemMsg(body, u))
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Prefix:     "/slap",
 		PrefixHelp: "NAME",
 		Handler: func(room *Room, msg message.CommandMsg) error {
