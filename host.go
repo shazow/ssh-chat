@@ -132,7 +132,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 	h.mu.Unlock()
 
 	// Send MOTD
-	if motd != "" {
+	if motd != "" && !apiMode {
 		user.Send(message.NewAnnounceMsg(motd))
 	}
 
