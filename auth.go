@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shazow/ssh-chat/internal/sanitize"
 	"github.com/shazow/ssh-chat/set"
 	"github.com/shazow/ssh-chat/sshd"
 	"golang.org/x/crypto/ssh"
@@ -18,7 +19,7 @@ import (
 
 // KeyLoader loads public keys, e.g. from an authorized_keys file.
 // It must return a nil slice on error.
-type KeyLoader func() ([]ssh.PublicKey, error)
+type KeyLoader func() ([]ssh.PublicKey, []string, error)
 
 // ErrNotAllowed Is the error returned when a key is checked that is not allowlisted,
 // when allowlisting is enabled.
@@ -61,6 +62,8 @@ type Auth struct {
 	banned         *set.Set
 	allowlist      *set.Set
 	ops            *set.Set
+	keynamesByFingerprint map[string]string
+	fingerprintsByKeyname map[string]string
 
 	settingsMu      sync.RWMutex
 	allowlistMode   bool
@@ -76,6 +79,8 @@ func NewAuth() *Auth {
 		banned:       set.New(),
 		allowlist:    set.New(),
 		ops:          set.New(),
+		keynamesByFingerprint: make(map[string]string),
+		fingerprintsByKeyname: make(map[string]string),
 	}
 }
 
@@ -158,7 +163,8 @@ func (a *Auth) CheckPassphrase(passphrase string) error {
 }
 
 // Op sets a public key as a known operator.
-func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
+// comment is the string that follows the public key in openssh authorized_keys format
+func (a *Auth) Op(key ssh.PublicKey, comment string, d time.Duration) {
 	if key == nil {
 		return
 	}
@@ -168,6 +174,17 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.ops.Set(authItem)
 	}
+
+	// nick registration
+	fields := strings.Fields(comment)
+	if len(fields) >0 {
+		keyname := sanitize.Name(fields[0])
+		if len(a.fingerprintsByKeyname[keyname]) <1 {
+			a.fingerprintsByKeyname[ keyname ] = authItem.Key()
+			a.keynamesByFingerprint[ authItem.Key() ] = keyname
+		}
+	}
+
 	logger.Debugf("Added to ops: %q (for %s)", authItem.Key(), d)
 }
 
@@ -193,7 +210,8 @@ func (a *Auth) ReloadOps() error {
 }
 
 // Allowlist will set a public key as a allowlisted user.
-func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
+// comment is the string that follows the public key in openssh authorized_keys format
+func (a *Auth) Allowlist(key ssh.PublicKey, comment string, d time.Duration) {
 	if key == nil {
 		return
 	}
@@ -204,6 +222,18 @@ func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
 	} else {
 		err = a.allowlist.Set(authItem)
 	}
+
+	// nick registration
+	fields := strings.Fields(comment)
+	if len(fields) >0 {
+		keyname := sanitize.Name(fields[0])
+		if len(a.fingerprintsByKeyname[keyname]) <1 {
+			a.fingerprintsByKeyname[ keyname ] = authItem.Key()
+			a.keynamesByFingerprint[ authItem.Key() ] = keyname
+		}
+	}
+
+
 	if err == nil {
 		logger.Debugf("Added to allowlist: %q (for %s)", authItem.Key(), d)
 	} else {
@@ -226,13 +256,18 @@ func (a *Auth) ReloadAllowlist() error {
 	return addFromLoader(a.allowlistLoader, a.Allowlist)
 }
 
-func addFromLoader(loader KeyLoader, adder func(ssh.PublicKey, time.Duration)) error {
+func addFromLoader(loader KeyLoader, adder func(ssh.PublicKey, string, time.Duration)) error {
 	if loader == nil {
 		return nil
 	}
-	keys, err := loader()
-	for _, key := range keys {
-		adder(key, 0)
+	keys, comments, err := loader()
+	var comment string
+	for index, key := range keys {
+		comment = ""
+		if len(comments) > index {
+			comment = comments[index]
+		}
+		adder(key, comment, 0)
 	}
 	return err
 }

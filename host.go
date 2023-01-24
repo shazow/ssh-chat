@@ -626,7 +626,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			member.IsOp = opValue
 
 			id := member.Identifier.(*Identity)
-			h.auth.Op(id.PublicKey(), until)
+			h.auth.Op(id.PublicKey(), "", until)
 
 			var body string
 			if opValue {
@@ -780,7 +780,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				if pk == nil {
 					noKeyUsers = append(noKeyUsers, user.Identifier.Name())
 				} else {
-					h.auth.Allowlist(pk, 0)
+					h.auth.Allowlist(pk, "", 0)
 				}
 			}
 			return nil
@@ -876,9 +876,9 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			case "off":
 				h.auth.SetAllowlistMode(false)
 			case "add":
-				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 0) })
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, "", 0) })
 			case "remove":
-				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, 1) })
+				replyLines = forPubkeyUser(args[1:], func(pk ssh.PublicKey) { h.auth.Allowlist(pk, "", 1) })
 			case "import":
 				replyLines, err = allowlistImport(args[1:])
 			case "reload":
