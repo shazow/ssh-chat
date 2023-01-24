@@ -18,7 +18,7 @@ import (
 
 // KeyLoader loads public keys, e.g. from an authorized_keys file.
 // It must return a nil slice on error.
-type KeyLoader func() ([]ssh.PublicKey, error)
+type KeyLoader func() ([]ssh.PublicKey, []string, error)
 
 // ErrNotAllowed Is the error returned when a key is checked that is not allowlisted,
 // when allowlisting is enabled.
@@ -55,12 +55,14 @@ func newAuthAddr(addr net.Addr) string {
 // Auth stores lookups for bans, allowlists, and ops. It implements the sshd.Auth interface.
 // If the contained passphrase is not empty, it complements a allowlist.
 type Auth struct {
-	passphraseHash []byte
-	bannedAddr     *set.Set
-	bannedClient   *set.Set
-	banned         *set.Set
-	allowlist      *set.Set
-	ops            *set.Set
+	passphraseHash    []byte
+	bannedAddr        *set.Set
+	bannedClient      *set.Set
+	banned            *set.Set
+	allowlist         *set.Set
+	ops               *set.Set
+	allowlistComments map[string]string
+	adminComments     map[string]string
 
 	settingsMu      sync.RWMutex
 	allowlistMode   bool
@@ -71,11 +73,13 @@ type Auth struct {
 // NewAuth creates a new empty Auth.
 func NewAuth() *Auth {
 	return &Auth{
-		bannedAddr:   set.New(),
-		bannedClient: set.New(),
-		banned:       set.New(),
-		allowlist:    set.New(),
-		ops:          set.New(),
+		bannedAddr:        set.New(),
+		bannedClient:      set.New(),
+		banned:            set.New(),
+		allowlist:         set.New(),
+		ops:               set.New(),
+		allowlistComments: make(map[string]string),
+		adminComments:     make(map[string]string),
 	}
 }
 
@@ -158,7 +162,8 @@ func (a *Auth) CheckPassphrase(passphrase string) error {
 }
 
 // Op sets a public key as a known operator.
-func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
+// comment is the string that follows the public key in openssh authorized_keys format
+func (a *Auth) Op(key ssh.PublicKey, comment string, d time.Duration) {
 	if key == nil {
 		return
 	}
@@ -168,6 +173,12 @@ func (a *Auth) Op(key ssh.PublicKey, d time.Duration) {
 	} else {
 		a.ops.Set(authItem)
 	}
+
+	fingerprint := sshd.Fingerprint(key)
+	if len(a.adminComments[fingerprint]) == 0 {
+		a.adminComments[fingerprint] = comment
+	}
+
 	logger.Debugf("Added to ops: %q (for %s)", authItem.Key(), d)
 }
 
@@ -189,11 +200,13 @@ func (a *Auth) LoadOps(loader KeyLoader) error {
 func (a *Auth) ReloadOps() error {
 	a.settingsMu.RLock()
 	defer a.settingsMu.RUnlock()
+	a.adminComments = make(map[string]string)
 	return addFromLoader(a.opLoader, a.Op)
 }
 
 // Allowlist will set a public key as a allowlisted user.
-func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
+// comment is the string that follows the public key in openssh authorized_keys format
+func (a *Auth) Allowlist(key ssh.PublicKey, comment string, d time.Duration) {
 	if key == nil {
 		return
 	}
@@ -204,6 +217,12 @@ func (a *Auth) Allowlist(key ssh.PublicKey, d time.Duration) {
 	} else {
 		err = a.allowlist.Set(authItem)
 	}
+
+	fingerprint := sshd.Fingerprint(key)
+	if len(a.allowlistComments[fingerprint]) == 0 {
+		a.allowlistComments[fingerprint] = comment
+	}
+
 	if err == nil {
 		logger.Debugf("Added to allowlist: %q (for %s)", authItem.Key(), d)
 	} else {
@@ -223,16 +242,22 @@ func (a *Auth) LoadAllowlist(loader KeyLoader) error {
 func (a *Auth) ReloadAllowlist() error {
 	a.settingsMu.RLock()
 	defer a.settingsMu.RUnlock()
+	a.allowlistComments = make(map[string]string)
 	return addFromLoader(a.allowlistLoader, a.Allowlist)
 }
 
-func addFromLoader(loader KeyLoader, adder func(ssh.PublicKey, time.Duration)) error {
+func addFromLoader(loader KeyLoader, adder func(ssh.PublicKey, string, time.Duration)) error {
 	if loader == nil {
 		return nil
 	}
-	keys, err := loader()
-	for _, key := range keys {
-		adder(key, 0)
+	keys, comments, err := loader()
+	var comment string
+	for index, key := range keys {
+		comment = ""
+		if len(comments) > index {
+			comment = comments[index]
+		}
+		adder(key, comment, 0)
 	}
 	return err
 }

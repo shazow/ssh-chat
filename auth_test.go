@@ -33,7 +33,7 @@ func TestAuthAllowlist(t *testing.T) {
 		t.Error("Failed to permit in default state:", err)
 	}
 
-	auth.Allowlist(key, 0)
+	auth.Allowlist(key, "", 0)
 	auth.SetAllowlistMode(true)
 
 	keyClone, err := ClonePublicKey(key)

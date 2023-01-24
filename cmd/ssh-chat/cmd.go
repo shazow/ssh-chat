@@ -200,28 +200,30 @@ func loaderFromFile(path string, logger *golog.Logger) sshchat.KeyLoader {
 	if path == "" {
 		return nil
 	}
-	return func() ([]ssh.PublicKey, error) {
+	return func() ([]ssh.PublicKey, []string, error) {
 		file, err := os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		defer file.Close()
 
 		var keys []ssh.PublicKey
+		var comments []string
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			key, _, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
+			key, comment, _, _, err := ssh.ParseAuthorizedKey(scanner.Bytes())
 			if err != nil {
 				if err.Error() == "ssh: no key found" {
 					continue // Skip line
 				}
-				return nil, err
+				return nil, nil, err
 			}
 			keys = append(keys, key)
+			comments = append(comments, comment)
 		}
 		if keys == nil {
 			logger.Warning("file", path, "contained no keys")
 		}
-		return keys, nil
+		return keys, comments, nil
 	}
 }

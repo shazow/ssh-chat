@@ -164,12 +164,12 @@ func TestHostAllowlist(t *testing.T) {
 	}
 	clientKey := clientPrivateKey.PublicKey()
 	loadCount := -1
-	loader := func() ([]ssh.PublicKey, error) {
+	loader := func() ([]ssh.PublicKey, []string, error) {
 		loadCount++
 		return [][]ssh.PublicKey{
 			{},
 			{clientKey},
-		}[loadCount], nil
+		}[loadCount], []string{}, nil
 	}
 	auth.LoadAllowlist(loader)
 
