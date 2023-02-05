@@ -723,6 +723,30 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				return errors.New("user not found")
 			}
 
+			oldID := member.ID()
+			newID := sanitize.Name(args[1])
+
+			// check nick registration
+			if h.auth.keynamesMode {
+				identity, identified := member.Identifier.(*Identity)
+				if identified {
+					identity.SetSymbol(strings.Replace(identity.symbol, "✓", "", -1 ))
+				}
+				registeredFingerprint := h.auth.KeynameFingerprint(newID)
+				if registeredFingerprint != "" {
+					if ! identified {
+						errors.New("this nick is registered to different key")
+					}
+					fingerprint := sshd.Fingerprint(identity.PublicKey())
+					if registeredFingerprint != fingerprint {
+						return errors.New("this nick is registered to different key")
+					}
+					if identified {
+						identity.SetSymbol("✓"+ identity.symbol)
+					}
+				}
+			}
+
 			symbolSet := false
 			if len(args) == 3 {
 				s := args[2]
@@ -737,8 +761,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 				symbolSet = true
 			}
 
-			oldID := member.ID()
-			newID := sanitize.Name(args[1])
+
 			if newID == oldID && !symbolSet {
 				return errors.New("new name is the same as the original")
 			} else if (newID == "" || newID == oldID) && symbolSet {
