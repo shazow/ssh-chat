@@ -109,6 +109,11 @@ func (a *Auth) Keyname(key ssh.PublicKey) string {
 	return name
 }
 
+func (a *Auth) KeynameFingerprint(keyname string) string {
+	fingerprint := a.fingerprintsByKeyname[keyname]
+	return fingerprint
+}
+
 // SetPassphrase enables passphrase authentication with the given passphrase.
 // If an empty passphrase is given, disable passphrase authentication.
 func (a *Auth) SetPassphrase(passphrase string) {

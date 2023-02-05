@@ -388,6 +388,60 @@ func (h *Host) InitCommands(c *chat.Commands) {
 	})
 
 	c.Add(chat.Command{
+		Prefix:     "/nick",
+		PrefixHelp: "NAME",
+		Help:       "Rename yourself.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			args := msg.Args()
+			if len(args) != 1 {
+				return errors.New("missing argument")
+			}
+			u := msg.From()
+
+			member, ok := room.MemberByID(u.ID())
+			if !ok {
+				return errors.New("failed to find member")
+			}
+
+			oldID := member.ID()
+			newID := sanitize.Name(args[0])
+
+			if newID == oldID {
+				return errors.New("new name is the same as the original")
+			}
+
+			// check nick registration
+			if h.auth.keynamesMode {
+				identity, identified := member.Identifier.(*Identity)
+				if identified {
+					identity.SetSymbol(strings.Replace(identity.symbol, "✓", "", -1 ))
+				}
+				registeredFingerprint := h.auth.KeynameFingerprint(newID)
+				if registeredFingerprint != "" {
+					if ! identified {
+						errors.New("this nick is registered to different key")
+					}
+					fingerprint := sshd.Fingerprint(identity.PublicKey())
+					if registeredFingerprint != fingerprint {
+						return errors.New("this nick is registered to different key")
+					}
+					if identified {
+						identity.SetSymbol("✓"+ identity.symbol)
+					}
+				}
+			}
+
+			member.SetID(newID)
+			err := room.Rename(oldID, member)
+			if err != nil {
+				member.SetID(oldID)
+				return err
+			}
+			return nil
+		},
+	})
+
+	c.Add(chat.Command{
 		Prefix:     "/reply",
 		PrefixHelp: "MESSAGE",
 		Help:       "Reply with MESSAGE to the previous private message.",

@@ -142,36 +142,6 @@ func InitCommands(c *Commands) {
 	})
 	c.Alias("/exit", "/quit")
 
-	c.Add(Command{
-		Prefix:     "/nick",
-		PrefixHelp: "NAME",
-		Help:       "Rename yourself.",
-		Handler: func(room *Room, msg message.CommandMsg) error {
-			args := msg.Args()
-			if len(args) != 1 {
-				return ErrMissingArg
-			}
-			u := msg.From()
-
-			member, ok := room.MemberByID(u.ID())
-			if !ok {
-				return errors.New("failed to find member")
-			}
-
-			oldID := member.ID()
-			newID := sanitize.Name(args[0])
-			if newID == oldID {
-				return errors.New("new name is the same as the original")
-			}
-			member.SetID(newID)
-			err := room.Rename(oldID, member)
-			if err != nil {
-				member.SetID(oldID)
-				return err
-			}
-			return nil
-		},
-	})
 
 	c.Add(Command{
 		Prefix: "/names",
