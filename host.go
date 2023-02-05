@@ -101,6 +101,15 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
 	id := NewIdentity(term.Conn)
+
+	if h.auth.keynamesMode {
+		name := h.auth.Keyname(id.PublicKey())
+		if len(name) >0 {
+			id.SetName(name)
+			id.SetSymbol("✓")
+		}
+	}
+
 	user := message.NewUserScreen(id, term)
 	user.OnChange = func() {
 		term.SetPrompt(GetPrompt(user))

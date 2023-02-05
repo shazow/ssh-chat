@@ -67,6 +67,7 @@ type Auth struct {
 
 	settingsMu      sync.RWMutex
 	allowlistMode   bool
+	keynamesMode    bool
 	opLoader        KeyLoader
 	allowlistLoader KeyLoader
 }
@@ -94,6 +95,18 @@ func (a *Auth) SetAllowlistMode(value bool) {
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
 	a.allowlistMode = value
+}
+
+func (a *Auth) SetKeynamesMode(value bool) {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	a.keynamesMode = value
+}
+
+func (a *Auth) Keyname(key ssh.PublicKey) string {
+	fingerprint := sshd.Fingerprint(key)
+	name := a.keynamesByFingerprint[fingerprint]
+	return name
 }
 
 // SetPassphrase enables passphrase authentication with the given passphrase.
