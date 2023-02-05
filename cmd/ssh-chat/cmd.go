@@ -38,6 +38,7 @@ type Options struct {
 	Version    bool     `long:"version" description:"Print version and exit."`
 	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
 	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
+	Keynames   bool     `long:"keynames" description:"Reserve usernames by appending them (after a space) to their keys in the admin or allowlist files."`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
 }
 
@@ -156,6 +157,8 @@ func main() {
 		fail(6, "Failed to load allowlist: %v\n", err)
 	}
 	auth.SetAllowlistMode(options.Allowlist != "")
+
+	auth.SetKeynamesMode(options.Keynames)
 
 	if options.Motd != "" {
 		host.GetMOTD = func() (string, error) {
