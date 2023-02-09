@@ -58,7 +58,30 @@ type Host struct {
 
 // NewHost creates a Host on top of an existing listener.
 func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
-	room := chat.NewRoom()
+
+	checkName := func(user *message.User) error {
+		id := user.Identifier.(*Identity)
+		publicKey := id.PublicKey()
+		if publicKey == nil {
+			return nil
+		}
+		connectedFingerprint := sshd.Fingerprint(id.PublicKey())
+		var fields []string
+		for _, comments := range []map[string]string{auth.adminComments, auth.allowlistComments} {
+			for fingerprint, comment := range comments {
+				fields = strings.Fields(comment)
+				if len(fields) > 0 {
+					keyname := sanitize.Name(fields[0])
+					if len(fields) > 0 && id.ID() == keyname && connectedFingerprint != fingerprint {
+						return errors.New("This name is registered to a different key")
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	room := chat.NewRoom(checkName)
 	h := Host{
 		Room:     room,
 		listener: listener,

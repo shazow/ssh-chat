@@ -54,18 +54,20 @@ type Room struct {
 	commands  Commands
 	closed    bool
 	closeOnce sync.Once
+	checkName func( *message.User ) error
 
 	Members *set.Set
 }
 
 // NewRoom creates a new room.
-func NewRoom() *Room {
+func NewRoom( checkName func( *message.User ) error ) *Room {
 	broadcast := make(chan message.Message, roomBuffer)
 
 	return &Room{
 		broadcast: broadcast,
 		history:   message.NewHistory(historyLen),
 		commands:  *defaultCommands,
+		checkName: checkName,
 
 		Members: set.New(),
 	}
@@ -176,8 +178,12 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	if u.ID() == "" {
 		return nil, ErrInvalidName
 	}
+	err := r.checkName(u)
+	if err != nil {
+		return nil, err
+	}
 	member := &Member{User: u}
-	err := r.Members.Add(set.Itemize(u.ID(), member))
+	err = r.Members.Add(set.Itemize(u.ID(), member))
 	if err != nil {
 		return nil, err
 	}
@@ -200,11 +206,15 @@ func (r *Room) Leave(u *message.User) error {
 }
 
 // Rename member with a new identity. This will not call rename on the member.
-func (r *Room) Rename(oldID string, u message.Identifier) error {
+func (r *Room) Rename(oldID string, u *Member) error {
 	if u.ID() == "" {
 		return ErrInvalidName
 	}
-	err := r.Members.Replace(oldID, set.Itemize(u.ID(), u))
+	err := r.checkName(u.User)
+	if err != nil {
+		return err
+	}
+	err = r.Members.Replace(oldID, set.Itemize(u.ID(), u))
 	if err != nil {
 		return err
 	}
