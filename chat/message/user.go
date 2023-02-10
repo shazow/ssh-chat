@@ -215,10 +215,14 @@ func (u *User) render(m Message) string {
 			return ""
 		} else {
 			out += m.RenderFor(cfg)
+			if cfg.Bell == 2 {
+				out += Bel
+			}
 		}
 	case *PrivateMsg:
 		out += m.Render(cfg.Theme)
-		if cfg.Bell {
+		//if u != m.From() && m.Command() != "reply" && cfg.Bell != 0 {
+		if u != m.From() && cfg.Bell != 0 {
 			out += Bel
 		}
 	case *CommandMsg:
@@ -272,7 +276,7 @@ func (u *User) Send(m Message) error {
 // Container for per-user configurations.
 type UserConfig struct {
 	Highlight  *regexp.Regexp
-	Bell       bool
+	Bell       int
 	Quiet      bool
 	Echo       bool // Echo shows your own messages after sending, disabled for bots
 	Timeformat *string
@@ -285,9 +289,9 @@ var DefaultUserConfig UserConfig
 
 func init() {
 	DefaultUserConfig = UserConfig{
-		Bell:  true,
-		Echo:  true,
-		Quiet: false,
+		Bell:       1,
+		Echo:       true,
+		Quiet:      false,
 	}
 
 	// TODO: Seed random?

@@ -265,6 +265,55 @@ func InitCommands(c *Commands) {
 	})
 
 	c.Add(Command{
+		Prefix:     "/bell",
+		PrefixHelp: "[off|pm|all]",
+		Help:       "Set system bell off, only for pm, or for all messages",
+		Handler: func(room *Room, msg message.CommandMsg) error {
+			u := msg.From()
+			cfg := u.Config()
+
+			args := msg.Args()
+			mode := ""
+			if len(args) >= 1 {
+				mode = args[0]
+			}
+
+			switch mode {
+			case "":
+				// Toggle 0 and 1
+				if cfg.Bell != 0 {
+					cfg.Bell = 0
+				} else {
+					cfg.Bell = 1
+				}
+			case "off":
+				cfg.Bell = 0
+			case "pm":
+				cfg.Bell = 1
+			case "all":
+				cfg.Bell = 2
+			default:
+				return errors.New("bell value must be one of: off, pm, all")
+			}
+
+			u.SetConfig(cfg)
+
+			var body string
+			if cfg.Bell != 0 {
+				if cfg.Bell == 1 {
+					body = "Bell is toggled ON for private messages"
+				} else {
+					body = "Bell is toggled ON for all messages"
+				}
+			} else {
+				body = "Bell is toggled OFF"
+			}
+			room.Send(message.NewSystemMsg(body, u))
+			return nil
+		},
+	})
+
+	c.Add(Command{
 		Prefix:     "/slap",
 		PrefixHelp: "NAME",
 		Handler: func(room *Room, msg message.CommandMsg) error {
