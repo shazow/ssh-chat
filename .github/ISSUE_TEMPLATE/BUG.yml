@@ -39,7 +39,7 @@ body:
     id: reproduce
     attributes:
       label: To Reproduce
-      description: Steps to reproduce the behavior:
+      description: Steps to reproduce the behavior
       placeholder: |
         1. Full command to run...
         2. Resulting output...
