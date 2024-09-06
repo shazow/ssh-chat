@@ -3,7 +3,7 @@ description: Create a report to fix something that is broken
 title: "[Bug]: "
 labels: ["bug", "needs-triage"]
 body:
-  - type: markdown
+  - type: textarea
     id: summary
     validations:
       required: true
