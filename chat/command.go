@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -191,13 +192,27 @@ func InitCommands(c *Commands) {
 
 			names := room.Members.ListPrefix("")
 			sort.Slice(names, func(i, j int) bool { return names[i].Key() < names[j].Key() })
-			colNames := make([]string, len(names))
-			for i, uname := range names {
-				colNames[i] = colorize(uname.Value().(*Member).User)
+			activeColNames := []string{}
+			awayColNames := []string{}
+			for _, uname := range names {
+				user := uname.Value().(*Member).User
+				colUser := colorize(user)
+				if isAway, _, _ := user.GetAway(); isAway {
+					awayColNames = append(awayColNames, colUser)
+				} else {
+					activeColNames = append(activeColNames, colUser)
+				}
+			}
+			numPeople := strconv.Itoa(len(names))
+			activePeople := strings.Join(activeColNames, ", ")
+
+			if len(awayColNames) > 0 {
+				awayPeople := strings.Join(awayColNames, ",")
+				room.Send(message.NewSystemMsgP(msg.From(), numPeople, " connected: ", activePeople, "; away: ", awayPeople))
+			} else {
+				room.Send(message.NewSystemMsgP(msg.From(), numPeople, " connected: ", activePeople))
 			}
 
-			body := fmt.Sprintf("%d connected: %s", len(colNames), strings.Join(colNames, ", "))
-			room.Send(message.NewSystemMsg(body, msg.From()))
 			return nil
 		},
 	})
