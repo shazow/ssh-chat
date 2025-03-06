@@ -62,7 +62,7 @@ Application Options:
   -i, --identity=  Private key to identify server with. (default: ~/.ssh/id_rsa)
       --bind=      Host and port to listen on. (default: 0.0.0.0:2022)
       --admin=     File of public keys who are admins.
-      --whitelist= Optional file of public keys who are allowed to connect.
+      --allowlist= Optional file of public keys who are allowed to connect.
       --motd=      Optional Message of the Day file.
       --log=       Write chat log to this file.
       --pprof=     Enable pprof http server for profiling.
