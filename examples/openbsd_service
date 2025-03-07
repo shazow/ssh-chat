@@ -12,11 +12,12 @@ rc_reload=NO
 
 rc_cmd $1
 
-# 1. Copy this file to `/etc/rc.d`
+# 1. Copy this file to `/etc/rc.d` and make sure it's executable.
 #    $ cp ssh-chat/examples/openbsd_service /etc/rc.d/ssh_chat
+#    $ chmod +x /etc/rc.d/ssh_chat
 #
 # 2. Point the variable `daemon` to the executable, e.g., /usr/local/bin/ssh-chat
-#    $ cp ~/ssh-chat/ssh-chat /usr/local/bin/ssh-chat
+#    $ ln -s ~/ssh-chat/ssh-chat /usr/local/bin/ssh-chat
 #
 # 3. Modify the values in daemon_flags and daemon_user based on your liking.
 #    Alternatively, you can delete that line and set the flags using rcctl instead:
