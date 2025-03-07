@@ -15,15 +15,18 @@ rc_cmd $1
 # 1. Copy this file to `/etc/rc.d`
 #    $ cp ssh-chat/examples/openbsd_service /etc/rc.d/ssh_chat
 #
-# 2. Modify the values in daemon_flags and daemon_user based on your liking.
-#    You can also set the flags using rcctl:
+# 2. Point the variable `daemon` to the executable, e.g., /usr/local/bin/ssh-chat
+#    $ cp ~/ssh-chat/ssh-chat /usr/local/bin/ssh-chat
+#
+# 3. Modify the values in daemon_flags and daemon_user based on your liking.
+#    Alternatively, you can delete that line and set the flags using rcctl instead:
 #    $ rcctl set ssh_chat flags --verbose --bind [...] --identity [...]
 #
-# 3. Create the user that will run this service (see `man useradd` or `man adduser`)
+# 4. Create the user that will run this service (see `man useradd` or `man adduser`)
 #    $ useradd -m chat
 #
-# 4. Enable and start the service
+# 5. Enable and start the service
 #    $ rcctl enable ssh_chat
 #    $ rcctl start ssh_chat
 #
-# 5. Check the logs in `/var/log/daemon`
+# 6. Check the logs in `/var/log/daemon`
