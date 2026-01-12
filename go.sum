@@ -2,6 +2,8 @@ github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58 h1:MkpmYfld/S8kXqTY
 github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58/go.mod h1:YNfsMyWSs+h+PaYkxGeMVmVCX75Zj/pqdjbu12ciCYE=
 github.com/jessevdk/go-flags v1.5.0 h1:1jKYvbxEjfUl0fmqTCOfonvskHHXMjBySTLW4y9LFvc=
 github.com/jessevdk/go-flags v1.5.0/go.mod h1:Fw0T6WPc1dYxT4mKEZRfG5kJhaTDP9pj1c2EWnYs/m4=
+github.com/sethvargo/go-limiter v1.1.0 h1:eLeZVQ2zqJOiEs03GguqmBVG6/T6lsZB+6PP1t7J6fA=
+github.com/sethvargo/go-limiter v1.1.0/go.mod h1:01b6tW25Ap+MeLYBuD4aHunMrJoNO5PVUFdS9rac3II=
 github.com/shazow/rateio v0.0.0-20200113175441-4461efc8bdc4 h1:zwQ1HBo5FYwn1ksMd19qBCKO8JAWE9wmHivEpkw/DvE=
 github.com/shazow/rateio v0.0.0-20200113175441-4461efc8bdc4/go.mod h1:vt2jWY/3Qw1bIzle5thrJWucsLuuX9iUNnp20CqCciI=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
