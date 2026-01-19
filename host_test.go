@@ -432,6 +432,42 @@ func TestTimestampEnvConfig(t *testing.T) {
 	}
 }
 
+func TestClientVersionOverflow(t *testing.T) {
+	var addr string
+	{
+		key, err := sshd.NewRandomSigner(512)
+		if err != nil {
+		t.Fatal(err)
+		}
+		auth := NewAuth()
+		config := sshd.MakeAuth(auth)
+		config.AddHostKey(key)
+
+		s, err := sshd.ListenSSH("localhost:0", config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer s.Close()
+		addr = s.Addr().String()
+		host := NewHost(s, nil)
+		go host.Serve()
+	}
+
+	config := sshd.NewClientConfig("foo")
+	config.ClientVersion = strings.Repeat("a", 300) // 256 is overflow
+	conn, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		t.Error(err)
+	}
+	defer conn.Close()
+
+	session, err := conn.NewSession()
+	if err != nil {
+		t.Error(err)
+	}
+	defer session.Close()
+}
+
 func strptr(s string) *string {
 	return &s
 }
