@@ -203,36 +203,68 @@ func (m PrivateMsg) String() string {
 	return m.Render(nil)
 }
 
+var _ Message = &SystemMsg{}
+
 // SystemMsg is a response sent from the server directly to a user, not shown
 // to anyone else. Usually in response to something, like /help.
 type SystemMsg struct {
-	Msg
-	to *User
+	parts     []string
+	timestamp time.Time
+	to        *User
 }
+
+var systemMessagePrefix = []string{"-> "}
 
 func NewSystemMsg(body string, to *User) *SystemMsg {
 	return &SystemMsg{
-		Msg: Msg{
-			body:      body,
-			timestamp: time.Now(),
-		},
-		to: to,
+		parts:     append(systemMessagePrefix, body),
+		timestamp: time.Now(),
+		to:        to,
 	}
+}
+
+func NewSystemMsgP(to *User, parts ...string) *SystemMsg {
+	return &SystemMsg{
+		to:        to,
+		parts:     append(systemMessagePrefix, parts...),
+		timestamp: time.Now(),
+	}
+}
+
+func (m *SystemMsg) renderPlain() string {
+	spArgs := make([]interface{}, len(m.parts))
+	for i, arg := range m.parts {
+		spArgs[i] = arg
+	}
+	return fmt.Sprint(spArgs...)
 }
 
 func (m *SystemMsg) Render(t *Theme) string {
 	if t == nil {
 		return m.String()
 	}
-	return t.ColorSys(m.String())
+
+	colPart := make([]interface{}, len(m.parts))
+	for i, part := range m.parts {
+		colPart[i] = t.ColorSys(part)
+	}
+	return fmt.Sprint(colPart...)
 }
 
 func (m *SystemMsg) String() string {
-	return fmt.Sprintf("-> %s", m.body)
+	return fmt.Sprintf("-> %s", m.renderPlain())
 }
 
 func (m *SystemMsg) To() *User {
 	return m.to
+}
+
+func (m *SystemMsg) Command() string {
+	return ""
+}
+
+func (m *SystemMsg) Timestamp() time.Time {
+	return m.timestamp
 }
 
 // AnnounceMsg is a message sent from the server to everyone, like a join or
