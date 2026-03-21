@@ -39,6 +39,9 @@ type Options struct {
 	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
 	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
+	OpHubris   bool     `long:"op-hubris" description:"Enable arrogant join/leave messages for operators."`
+	AnnounceJoin  string `long:"announce-join" description:"Custom join message. Use %s for username." default:"%s joined."`
+	AnnounceLeave string `long:"announce-leave" description:"Custom leave message. Use %s for username." default:"%s left."`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -134,7 +137,13 @@ func main() {
 
 	fmt.Printf("Listening for connections on %v\n", s.Addr().String())
 
-	host := sshchat.NewHost(s, auth)
+	host := sshchat.NewHost(
+		s, 
+		auth, 
+		options.OpHubris, 
+		options.AnnounceJoin, 
+		options.AnnounceLeave,
+	)
 	host.SetTheme(message.Themes[0])
 	host.Version = Version
 

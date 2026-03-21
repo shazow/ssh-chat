@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/shazow/ssh-chat/chat/message"
-	"github.com/shazow/ssh-chat/internal/humantime"
+	//"github.com/shazow/ssh-chat/internal/humantime"
 	"github.com/shazow/ssh-chat/set"
 )
 
@@ -34,6 +34,14 @@ type Member struct {
 	isMuted bool // When true, messages should not be broadcasted.
 }
 
+func (m *Member) Key() string {
+	return m.ID()
+}
+
+func (m *Member) Value() interface{} {
+	return m
+}
+
 func (m *Member) IsMuted() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -54,7 +62,9 @@ type Room struct {
 	commands  Commands
 	closed    bool
 	closeOnce sync.Once
-
+	OpHubris      bool
+    AnnounceJoin  string
+    AnnounceLeave string
 	Members *set.Set
 }
 
@@ -183,22 +193,39 @@ func (r *Room) Join(u *message.User) (*Member, error) {
 	}
 	// TODO: Remove user ID from sets, probably referring to a prior user.
 	r.History(u)
-	s := fmt.Sprintf("%s joined. (Connected: %d)", u.Name(), r.Members.Len())
+	var s string
+    if r.OpHubris && member.IsOp {
+        s = fmt.Sprintf(" [OP] " + r.AnnounceJoin, u.Name())
+    } else {
+        s = fmt.Sprintf(r.AnnounceJoin, u.Name())
+    }
+	s += fmt.Sprintf(" (Connected: %d)", r.Members.Len())
 	r.Send(message.NewAnnounceMsg(s))
 	return member, nil
 }
 
 // Leave the room as a user, will announce. Mostly used during setup.
 func (r *Room) Leave(u *message.User) error {
-	err := r.Members.Remove(u.ID())
-	if err != nil {
-		return err
-	}
-	s := fmt.Sprintf("%s left. (After %s)", u.Name(), humantime.Since(u.Joined()))
-	r.Send(message.NewAnnounceMsg(s))
-	return nil
-}
+    item, err := r.Members.Get(u.ID())
+    if err != nil {
+        return nil 
+    }
+    member := item.Value().(*Member) 
 
+    r.Members.Remove(u.ID())
+
+    var s string
+    if r.OpHubris && member.IsOp {
+        s = fmt.Sprintf("⚡ [OP] " + r.AnnounceLeave, u.Name())
+    } else {
+        s = fmt.Sprintf(r.AnnounceLeave, u.Name())
+    }
+
+    s += fmt.Sprintf(" (Connected: %d)", r.Members.Len())
+    r.Send(message.NewAnnounceMsg(s))
+
+    return nil
+}
 // Rename member with a new identity. This will not call rename on the member.
 func (r *Room) Rename(oldID string, u message.Identifier) error {
 	if u.ID() == "" {
