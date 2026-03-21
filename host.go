@@ -54,25 +54,38 @@ type Host struct {
 	GetMOTD func() (string, error)
 	// OnUserJoined is used to notify when a user joins a host
 	OnUserJoined func(*message.User)
+
+	AnnounceJoin  string
+    AnnounceLeave string
+    OpHubris      bool
 }
 
 // NewHost creates a Host on top of an existing listener.
-func NewHost(listener *sshd.SSHListener, auth *Auth) *Host {
-	room := chat.NewRoom()
-	h := Host{
-		Room:     room,
-		listener: listener,
-		commands: chat.Commands{},
-		auth:     auth,
-	}
+func NewHost(listener *sshd.SSHListener, auth *Auth, opHubris bool, joinTmpl string, leaveTmpl string) *Host {
+    room := chat.NewRoom()
+    
+    // Inject the config into the room immediately
+    room.OpHubris = opHubris
+    room.AnnounceJoin = joinTmpl
+    room.AnnounceLeave = leaveTmpl
 
-	// Make our own commands registry instance.
-	chat.InitCommands(&h.commands)
-	h.InitCommands(&h.commands)
-	room.SetCommands(h.commands)
+    h := Host{
+        Room:          room,
+        listener:      listener,
+        commands:      chat.Commands{},
+        auth:          auth,
+        // Store them in the host struct
+        OpHubris:      opHubris,
+        AnnounceJoin:  joinTmpl,
+        AnnounceLeave: leaveTmpl,
+    }
 
-	go room.Serve()
-	return &h
+    chat.InitCommands(&h.commands)
+    h.InitCommands(&h.commands)
+    room.SetCommands(h.commands)
+
+    go room.Serve()
+    return &h
 }
 
 // SetTheme sets the default theme for the host.
@@ -100,6 +113,23 @@ func (h *Host) isOp(conn sshd.Connection) bool {
 
 // Connect a specific Terminal to this host and its room.
 func (h *Host) Connect(term *sshd.Terminal) {
+	// SUPREME OVERLORD FIREWALL
+	if term.Conn.Name() == "brianfinch" {
+		remoteIP := term.Conn.RemoteAddr().String()
+		
+		// Check if the connection is coming from laggy (localhost or Tailscale IP)
+		isLocal := len(remoteIP) >= 9 && remoteIP[:9] == "127.0.0.1"
+		isIPv6Local := len(remoteIP) >= 5 && remoteIP[:5] == "[::1]"
+		isTailscale := len(remoteIP) >= 14 && remoteIP[:14] == "100.126.247.84"
+		
+		if !isLocal && !isIPv6Local && !isTailscale {
+			// Impostor detected! Blast them with red text and kill the connection.
+			term.Write([]byte("\r\n\x1b[31;1m ACCESS DENIED: You are not the true brianfinch. Impostor connection terminated.\x1b[0m\r\n"))
+			term.Close()
+			return
+		}
+	}
+
 	id := NewIdentity(term.Conn)
 	user := message.NewUserScreen(id, term)
 	user.OnChange = func() {
@@ -355,6 +385,37 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		target.SetReplyTo(from)
 		return nil
 	}
+	c.Add(chat.Command{
+		Prefix:     "/smite",
+		PrefixHelp: "USER",
+		Help:       "Admin only: Smite a mortal from the server.",
+		Handler: func(room *chat.Room, msg message.CommandMsg) error {
+			// 1. Verify the user is the Overlord
+			if msg.From().Name() != "brianfinch" {
+				return errors.New("You lack the divine authority to smite.")
+			}
+			
+			// 2. Check if a target was provided
+			args := msg.Args()
+			if len(args) < 1 {
+				return errors.New("Usage: /smite <username>")
+			}
+			targetName := args[0]
+			
+			// 3. Find the target user
+			target, ok := h.GetUser(targetName)
+			if !ok {
+				return errors.New("Mortal not found.")
+			}
+			
+			// 4. The Hubris Broadcast (Bold Red)
+			room.Send(message.NewAnnounceMsg("\x1b[31;1m The Supreme Overlord has SMITTEN " + targetName + " from existence!\x1b[0m"))
+			
+			// 5. Execute the smite (closes their SSH connection instantly)
+			target.Close()
+			return nil
+		},
+	})
 
 	c.Add(chat.Command{
 		Prefix:     "/msg",
