@@ -63,6 +63,8 @@ Application Options:
       --bind=      Host and port to listen on. (default: 0.0.0.0:2022)
       --admin=     File of public keys who are admins.
       --allowlist= Optional file of public keys who are allowed to connect.
+      --require-pubkey
+                   Refuse connections that do not present a public key. Any key is accepted.
       --motd=      Optional Message of the Day file.
       --log=       Write chat log to this file.
       --pprof=     Enable pprof http server for profiling.

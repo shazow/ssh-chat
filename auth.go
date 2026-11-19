@@ -64,6 +64,7 @@ type Auth struct {
 
 	settingsMu      sync.RWMutex
 	allowlistMode   bool
+	requirePubkey   bool
 	opLoader        KeyLoader
 	allowlistLoader KeyLoader
 }
@@ -91,6 +92,24 @@ func (a *Auth) SetAllowlistMode(value bool) {
 	a.allowlistMode = value
 }
 
+// RequirePubkey returns whether connections without a public key are refused.
+func (a *Auth) RequirePubkey() bool {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return a.requirePubkey
+}
+
+// SetRequirePubkey sets whether clients must present a public key. When
+// enabled, clients that present none (for example keyboard-interactive
+// without a passphrase) are refused, so every user has a key fingerprint that
+// can be used for bans. Any public key is still accepted, unless an
+// allowlist is in use. It has no effect on passphrase authentication.
+func (a *Auth) SetRequirePubkey(value bool) {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	a.requirePubkey = value
+}
+
 // SetPassphrase enables passphrase authentication with the given passphrase.
 // If an empty passphrase is given, disable passphrase authentication.
 func (a *Auth) SetPassphrase(passphrase string) {
@@ -102,9 +121,15 @@ func (a *Auth) SetPassphrase(passphrase string) {
 	}
 }
 
-// AllowAnonymous determines if anonymous users are permitted.
-func (a *Auth) AllowAnonymous() bool {
+// allowAnyKey determines if any public key is accepted, i.e. neither an
+// allowlist nor a passphrase is in use.
+func (a *Auth) allowAnyKey() bool {
 	return !a.AllowlistMode() && a.passphraseHash == nil
+}
+
+// AllowAnonymous determines if anonymous users (without a public key) are permitted.
+func (a *Auth) AllowAnonymous() bool {
+	return a.allowAnyKey() && !a.RequirePubkey()
 }
 
 // AcceptPassphrase determines if passphrase authentication is accepted.
@@ -138,7 +163,7 @@ func (a *Auth) CheckBans(addr net.Addr, key ssh.PublicKey, clientVersion string)
 func (a *Auth) CheckPublicKey(key ssh.PublicKey) error {
 	authkey := newAuthKey(key)
 	allowlisted := a.allowlist.In(authkey)
-	if a.AllowAnonymous() || allowlisted || a.IsOp(key) {
+	if a.allowAnyKey() || allowlisted || a.IsOp(key) {
 		return nil
 	} else {
 		return ErrNotAllowed
