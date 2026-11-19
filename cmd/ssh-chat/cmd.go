@@ -39,6 +39,8 @@ type Options struct {
 	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
 	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
+
+	RequirePubkey bool `long:"require-pubkey" description:"Refuse connections that do not present a public key, so every user has a key fingerprint. Any key is accepted. Has no effect with --unsafe-passphrase."`
 }
 
 const extraHelp = `There are hidden options and easter eggs in ssh-chat. The source code is a good
@@ -141,6 +143,7 @@ func main() {
 	if options.Passphrase != "" {
 		auth.SetPassphrase(options.Passphrase)
 	}
+	auth.SetRequirePubkey(options.RequirePubkey)
 
 	err = auth.LoadOps(loaderFromFile(options.Admin, logger))
 	if err != nil {
