@@ -31,7 +31,7 @@ func (a RejectAuth) CheckPassphrase(string) error {
 func (a RejectAuth) BanAddr(net.Addr, time.Duration) {}
 
 func TestClientReject(t *testing.T) {
-	signer, err := NewRandomSigner(512)
+	signer, err := NewRandomSigner(2048)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	mathRand "math/rand"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -68,9 +68,6 @@ func TestStripPrompt(t *testing.T) {
 func TestHostGetPrompt(t *testing.T) {
 	var expected, actual string
 
-	// Make the random colors consistent across tests
-	mathRand.Seed(1)
-
 	u := message.NewUser(&Identity{id: "foo"})
 
 	actual = GetPrompt(u)
@@ -83,9 +80,10 @@ func TestHostGetPrompt(t *testing.T) {
 		Theme: &message.Themes[0],
 	})
 	actual = GetPrompt(u)
-	expected = "[\033[38;05;88mfoo\033[0m] "
-	if actual != expected {
-		t.Errorf("Invalid host prompt:\n Got: %q;\nWant: %q", actual, expected)
+	// The name color is picked at random, so check the shape of the prompt
+	// instead of one specific palette index.
+	if !regexp.MustCompile(`^\[\x1b\[38;05;\d+mfoo\x1b\[0m\] $`).MatchString(actual) {
+		t.Errorf("Invalid host prompt: got %q, want a colored \"foo\" in brackets", actual)
 	}
 }
 
@@ -158,7 +156,7 @@ func TestHostAllowlist(t *testing.T) {
 
 	target := s.Addr().String()
 
-	clientPrivateKey, err := sshd.NewRandomSigner(512)
+	clientPrivateKey, err := sshd.NewRandomSigner(2048)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +321,7 @@ func TestHostAllowlistCommand(t *testing.T) {
 		assertLineEq(" * Kicked during pubkey reverification: bar\r", " * bar left. (After 0 seconds)\r")
 		kickSignal <- struct{}{}
 
-		sendCmd("/allowlist add " + testKey)
+		sendCmd("/allowlist add %s", testKey)
 		sendCmd("/allowlist status")
 		assertLineEq("allowlist enabled\r")
 		assertLineEq(fmt.Sprintf("Keys on the allowlist without connected user: %s\r", testKeyFP))
