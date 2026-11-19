@@ -32,10 +32,10 @@ func TestMakeUser(t *testing.T) {
 func TestRenderTimestamp(t *testing.T) {
 	var actual, expected []byte
 
-	// Reset seed for username color
-	rand.Seed(1)
 	s := &MockScreen{}
 	u := NewUserScreen(SimpleID("foo"), s)
+	// Deterministic username color from a local source
+	u.setColorIdx(rand.New(rand.NewSource(1)).Int())
 
 	cfg := u.Config()
 	timefmt := "AA:BB"

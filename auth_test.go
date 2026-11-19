@@ -22,7 +22,7 @@ func ClonePublicKey(key ssh.PublicKey) (ssh.PublicKey, error) {
 }
 
 func TestAuthAllowlist(t *testing.T) {
-	key, err := NewRandomPublicKey(512)
+	key, err := NewRandomPublicKey(2048)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestAuthAllowlist(t *testing.T) {
 		t.Error("Failed to permit allowlisted:", err)
 	}
 
-	key2, err := NewRandomPublicKey(512)
+	key2, err := NewRandomPublicKey(2048)
 	if err != nil {
 		t.Fatal(err)
 	}
