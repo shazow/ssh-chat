@@ -241,11 +241,18 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 	}
 
 	// Delivery starts before the join, which sends the room's history; what
-	// it sends now goes out after the auth result (§3.2.2).
+	// it sends now goes out after the auth result (§3.2.2), or, when the
+	// sign-in fails, not at all. Once the member has joined, its end, as by
+	// /kick or /exit, ends the connection; a member that never joined
+	// leaves the connection as it was, for another auth.
+	joined := make(chan bool, 1)
+	delivered := make(chan struct{})
 	go func() {
+		defer close(delivered)
 		user.ConsumeFunc(func(m message.Message) { g.deliver(c, m) })
-		// The member was closed, as by /kick or /exit.
-		c.CloseWithError(errDisconnected)
+		if <-joined {
+			c.CloseWithError(errDisconnected)
+		}
 	}()
 	if motd := g.host.Motd(); motd != "" {
 		c.Notify(wire.Notice(Room, plain(motd)))
@@ -256,9 +263,13 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 		_, err = g.host.Join(user)
 	}
 	if err != nil {
+		joined <- false
 		user.Close()
+		// Nothing more is delivered once Auth returns.
+		<-delivered
 		return wire.Denied("Could not join the chat: " + err.Error())
 	}
+	joined <- true
 	c.SetData(&session{user: user, limit: g.limiter()})
 	if err := g.settle(ctx, user); err != nil {
 		return err

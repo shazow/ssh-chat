@@ -795,6 +795,35 @@ func TestSignInSeesChangesMadeDuringAuth(t *testing.T) {
 	}
 }
 
+// A guest who cannot join, as when the name and the guest name are both
+// taken, gets the error as the auth reply, and nothing of the sign-in: the
+// connection stays open for another try.
+func TestFailedJoinLeavesTheConnectionOpen(t *testing.T) {
+	c := newChat(t)
+	c.host.SetMotd("welcome")
+	c.ssh("ada", nil).expect("ada joined")
+	c.ssh("Guest1", nil).expect("Guest1 joined")
+
+	ada := c.dial()
+	if err := ada.auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+		t.Fatalf("auth with both names taken: %v", err)
+	}
+	// Nothing the failed sign-in sent goes out: not the welcome, not the
+	// history; a request before sign-in is refused.
+	if _, e := ada.call("history", map[string]any{}); e == nil {
+		t.Fatal("history before sign-in")
+	}
+	if pending := ada.c.Pending(); len(pending) != 0 {
+		t.Fatalf("frames of a failed sign-in: %s", pending[0].Raw)
+	}
+	if err := ada.auth("ada_too"); err != nil {
+		t.Fatalf("a second auth: %v", err)
+	}
+	ada.expect(text("welcome"))
+	ada.ok("message", map[string]any{"body": map[string]any{"text": "made it"}})
+	ada.expect(text("made it"))
+}
+
 func TestOrigins(t *testing.T) {
 	for _, tc := range []struct {
 		origins []string
