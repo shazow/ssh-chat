@@ -151,7 +151,7 @@ func (g *Gateway) syncLocked() {
 		// Its log_id is the latest yet, after every message of the
 		// buffer's, so the log's records stay in order, and its lower
 		// bound, the buffer's oldest, never moves back.
-		snapshot := wire.Membership{LogID: g.clock.Next(), RoomID: Room}
+		snapshot := wire.Membership{LogID: g.clock.Next(), RoomID: g.room}
 		for _, member := range members {
 			snapshot.Members = append(snapshot.Members, wire.Member{User: g.recordedLocked(member.User), Joined: true})
 		}
@@ -221,7 +221,7 @@ func (g *Gateway) classifyLocked(id wire.LogID, text string, members []*chat.Mem
 	if user.UserID == "" {
 		return // An announcement of something else, or of someone unknown.
 	}
-	g.log.memberships[id] = &wire.Membership{LogID: id, RoomID: Room, Members: []wire.Member{{
+	g.log.memberships[id] = &wire.Membership{LogID: id, RoomID: g.room, Members: []wire.Member{{
 		User: wire.User{UserID: user.UserID, Name: user.Name}, Joined: joined,
 	}}}
 }
@@ -230,7 +230,7 @@ func (g *Gateway) classifyLocked(id wire.LogID, text string, members []*chat.Mem
 func (g *Gateway) recordLocked(m message.Message, id wire.LogID) (wire.Record, bool) {
 	snapshot := func(from wire.User, body *wire.Body, ext wire.Ext) (wire.Record, bool) {
 		return wire.Record{LogID: id, Message: &wire.Message{
-			MessageID: id, LogID: id, RoomID: Room, From: from, Body: body,
+			MessageID: id, LogID: id, RoomID: g.room, From: from, Body: body,
 			ReplyTo: g.log.replyTo[keyOf(m)], Ext: ext,
 		}}, true
 	}

@@ -248,7 +248,7 @@ func TestHostAllowlistCommand(t *testing.T) {
 
 		sendCmd("/allowlist")
 		assertLineEq("Err: must be op\r")
-		m.IsOp.Store(true)
+		m.SetOp(true)
 		sendCmd("/allowlist")
 		for _, expected := range [...]string{"Usage", "help", "on, off", "add, remove", "import", "reload", "reverify", "status"} {
 			if !scanner.Scan() {
@@ -354,7 +354,7 @@ func TestHostKick(t *testing.T) {
 			if member == nil {
 				return errors.New("failed to load MemberByID")
 			}
-			member.IsOp.Store(true)
+			member.SetOp(true)
 
 			// Change nicks, make sure op sticks
 			w.Write([]byte("/nick quux\r\n"))

@@ -195,7 +195,7 @@ func TestMute(t *testing.T) {
 	muted := users[1]
 	other := users[2]
 
-	members[0].IsOp.Store(true)
+	members[0].SetOp(true)
 
 	// test muting unexisting user
 	if err := sendCommand("/mute test", muter, ch, &buffer); err != nil {

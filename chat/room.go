@@ -6,7 +6,6 @@ import (
 	"io"
 	"sort"
 	"sync"
-	"sync/atomic"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
@@ -27,12 +26,24 @@ var ErrInvalidName = errors.New("invalid name")
 // Member is a User with per-Room metadata attached to it.
 type Member struct {
 	*message.User
-	// IsOp is set while the member is an operator; other members' commands
-	// read it as it changes.
-	IsOp atomic.Bool
 
 	mu      sync.Mutex
+	isOp    bool // When true, the member is an operator.
 	isMuted bool // When true, messages should not be broadcasted.
+}
+
+// IsOp returns whether the member is an operator.
+func (m *Member) IsOp() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.isOp
+}
+
+// SetOp makes the member an operator, or not.
+func (m *Member) SetOp(op bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.isOp = op
 }
 
 func (m *Member) IsMuted() bool {
@@ -250,7 +261,7 @@ func (r *Room) IsOp(u *message.User) bool {
 	if !ok {
 		return false
 	}
-	return m.IsOp.Load()
+	return m.IsOp()
 }
 
 // Topic of the room.

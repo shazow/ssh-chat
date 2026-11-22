@@ -10,7 +10,7 @@
 //
 // What maps where:
 //
-//   - The room is the server's one room, Room, and its log is the room's
+//   - The room is the server's one room, Config.Room, and its log is the room's
 //     history buffer: history pages it, and it ends where the buffer does,
 //     with a membership record of everyone in the room once the buffer
 //     has dropped the joins.
@@ -51,8 +51,9 @@ import (
 	"github.com/shazow/ssh-chat/internal/sanitize"
 )
 
-// Room is the room_id of ssh-chat's room.
-const Room = "chat"
+// DefaultRoom is the room_id of ssh-chat's room, unless Config.Room names
+// another.
+const DefaultRoom = "ssh-chat"
 
 // maxInputLength is ssh-chat's limit on one line of input.
 const maxInputLength = 1024
@@ -69,6 +70,9 @@ type Config struct {
 	History *message.History
 	// Version is ssh-chat's, for the server frame.
 	Version string
+	// Room is the room_id of ssh-chat's room: DefaultRoom when empty, and
+	// else a valid ID (wire.ValidID).
+	Room string
 	// Origins are the web origins whose pages may open an Apron WebSocket,
 	// such as https://web.apron.chat, as patterns of wire.OriginPatterns;
 	// "*" allows any. Clients that are not browsers send no origin, and
@@ -85,6 +89,10 @@ type Gateway struct {
 	server  *wire.Server
 	clock   wire.Clock
 	ids     wire.IDs[msgKey]
+	// room is the room_id of ssh-chat's room, and errOneRoom the error of a
+	// request that names another.
+	room       string
+	errOneRoom *wire.Error
 	// roomLogID is the log_id of the room's record, issued when the gateway
 	// started, before any message's.
 	roomLogID wire.LogID
@@ -117,6 +125,14 @@ func New(config Config) *Gateway {
 	if g.history == nil {
 		g.history = message.NewHistory(0)
 	}
+	g.room = config.Room
+	if g.room == "" {
+		g.room = DefaultRoom
+	}
+	if !wire.ValidID(g.room) {
+		panic("apron: Config.Room is not a valid room_id: " + g.room)
+	}
+	g.errOneRoom = wire.InvalidParams("This server has one room, " + g.room)
 	g.ids.Clock = &g.clock
 	g.roomLogID = g.clock.Next()
 	g.log.init()
@@ -194,7 +210,6 @@ type session struct {
 
 // Errors the gateway answers with in more than one place.
 var (
-	errOneRoom      = wire.InvalidParams("This server has one room, " + Room)
 	errDisconnected = wire.Denied("Disconnected from the chat")
 )
 
@@ -257,7 +272,7 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 		}
 	}()
 	if motd := g.host.Motd(); motd != "" {
-		c.Notify(wire.Notice(Room, plain(motd)))
+		c.Notify(wire.Notice(g.room, plain(motd)))
 	}
 	_, err := g.host.Join(user)
 	if err != nil {
@@ -320,8 +335,8 @@ func (g *Gateway) disconnected(c *wire.Conn) {
 }
 
 func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParams, reply wire.Reply[wire.MessageResult]) error {
-	if p.RoomID != "" && p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != "" && p.RoomID != g.room {
+		return g.errOneRoom
 	}
 	if p.ReplyTo != nil {
 		if _, ok := g.ids.Key(p.ReplyTo.MessageID); !ok {
@@ -518,11 +533,11 @@ func (g *Gateway) deliver(c *wire.Conn, m message.Message) {
 	defer g.mu.Unlock()
 	switch m := m.(type) {
 	case *message.SystemMsg:
-		c.Notify(wire.Notice(Room, plain(m.Body())))
+		c.Notify(wire.Notice(g.room, plain(m.Body())))
 	case *message.PrivateMsg:
 		from, to := g.userIDLocked(m.From()), g.userIDLocked(m.To())
 		c.Notify(wire.Message{
-			RoomID: Room, From: wire.User{UserID: from, Name: m.From().Name()}, Body: &wire.Body{Text: m.Body()},
+			RoomID: g.room, From: wire.User{UserID: from, Name: m.From().Name()}, Body: &wire.Body{Text: m.Body()},
 			Ext: wire.MustExt("ssh-chat", map[string]any{"private": true, "to": to}),
 		})
 	case message.PublicMsg, *message.EmoteMsg, *message.AnnounceMsg:

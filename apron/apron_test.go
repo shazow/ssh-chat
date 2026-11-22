@@ -309,7 +309,7 @@ func TestChatBothWays(t *testing.T) {
 	// SSH to Apron, with the sender as a stable user.
 	alice.say("hello from ssh")
 	got := ada.expect(text("hello from ssh"))
-	if from(got)["name"] != "alice" || params(got)["message_id"] == nil || params(got)["room_id"] != Room {
+	if from(got)["name"] != "alice" || params(got)["message_id"] == nil || params(got)["room_id"] != DefaultRoom {
 		t.Fatalf("snapshot: %v", got)
 	}
 	aliceID := from(got)["user_id"]
@@ -446,7 +446,7 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	op.say("said before anyone used Apron")
 
 	ada := c.apron("ada")
-	if !strings.Contains(fmt.Sprint(ada.ok("room_list", map[string]any{})), Room) {
+	if !strings.Contains(fmt.Sprint(ada.ok("room_list", map[string]any{})), DefaultRoom) {
 		t.Fatal("room_list without the room")
 	}
 
@@ -454,7 +454,7 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	list := ada.ok("room_list", map[string]any{"filter": "joined", "members": true})
 	joined := list["joined"].([]any)
 	room := joined[0].(map[string]any)
-	if len(joined) != 1 || room["room_id"] != Room || room["latest_log_id"] == nil || room["history_log_id"] == nil {
+	if len(joined) != 1 || room["room_id"] != DefaultRoom || room["latest_log_id"] == nil || room["history_log_id"] == nil {
 		t.Fatalf("room_list: %v", list)
 	}
 	users := map[string]map[string]any{}
@@ -470,7 +470,7 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	// as live delivery.
 	op.say("said while ada is here")
 	live := ada.expect(text("said while ada is here"))
-	page := ada.ok("history", map[string]any{"room_id": Room})
+	page := ada.ok("history", map[string]any{"room_id": DefaultRoom})
 	var texts []string
 	for _, m := range page["messages"].([]any) {
 		msg := m.(map[string]any)
@@ -509,20 +509,20 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	bob := c.ssh("bob", nil)
 	bob.expect("bob joined")
 	bobUser := membership(ada, "bob", true)
-	if _, e := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]}); e == nil || e.Code != wire.CodeDenied {
+	if _, e := ada.call("room_leave", map[string]any{"room_id": DefaultRoom, "user_id": bobUser["user_id"]}); e == nil || e.Code != wire.CodeDenied {
 		t.Fatalf("a non-op removed someone: %v", e)
 	}
 	time.Sleep(3 * time.Second) // ssh-chat lets an SSH user say three lines in three seconds.
 	op.say("/op ada")
 	ada.expect(text("Made op"))
-	ada.ok("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]})
+	ada.ok("room_leave", map[string]any{"room_id": DefaultRoom, "user_id": bobUser["user_id"]})
 	op.expect("bob was kicked by ada")
 	membership(ada, "bob", false)
 
 	// One room: creating others is refused; leaving it is disconnecting.
 	for method, p := range map[string]map[string]any{
 		"room_set":   {"title": "another"},
-		"room_leave": {"room_id": Room},
+		"room_leave": {"room_id": DefaultRoom},
 	} {
 		if _, e := ada.call(method, p); e == nil || e.Code != wire.CodeDenied {
 			t.Errorf("%s: %v", method, e)
@@ -534,7 +534,7 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	if _, e := ada.call("room_join", map[string]any{"room_id": "elsewhere"}); e == nil || e.Code != wire.CodeInvalidParams {
 		t.Errorf("room_join of another room: %v", e)
 	}
-	ada.ok("room_join", map[string]any{"room_id": Room})
+	ada.ok("room_join", map[string]any{"room_id": DefaultRoom})
 }
 
 func TestJoinsWhileNobodyIsConnectedOverApron(t *testing.T) {
@@ -826,7 +826,7 @@ func TestSignInSeesChangesMadeDuringAuth(t *testing.T) {
 	op.expect("op joined")
 	c.gateway.afterAuth = func(*wire.Conn) {
 		member, _ := c.host.MemberByID("op")
-		member.IsOp.Store(false)
+		member.SetOp(false)
 		c.gateway.mu.Lock()
 		c.gateway.syncLocked()
 		c.gateway.mu.Unlock()

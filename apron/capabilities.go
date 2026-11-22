@@ -39,7 +39,7 @@ func (g *Gateway) userLocked(user *message.User) wire.User {
 	if away, _, _ := user.GetAway(); away {
 		u.Status = statusAway
 	}
-	if member, ok := g.host.Member(user); ok && member.IsOp.Load() {
+	if member, ok := g.host.Member(user); ok && member.IsOp() {
 		u.Roles = []string{"op"}
 	}
 	return u
@@ -65,15 +65,15 @@ func (g *Gateway) membersLocked() []wire.User {
 // Rooms (§4.2): the one room, whose members are everyone connected.
 
 func (g *Gateway) roomLocked() wire.Room {
-	return wire.Room{RoomID: Room, LogID: g.roomLogID, Description: g.host.Topic()}
+	return wire.Room{RoomID: g.room, LogID: g.roomLogID, Description: g.host.Topic()}
 }
 
 func (g *Gateway) RoomList(_ context.Context, _ *wire.Conn, p wire.RoomListParams, reply wire.Reply[wire.RoomListResult]) error {
-	if p.RoomID != "" && p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != "" && p.RoomID != g.room {
+		return g.errOneRoom
 	}
-	if p.ParentRoomID != "" && p.ParentRoomID != Room {
-		return errOneRoom
+	if p.ParentRoomID != "" && p.ParentRoomID != g.room {
+		return g.errOneRoom
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -98,8 +98,8 @@ func (g *Gateway) RoomList(_ context.Context, _ *wire.Conn, p wire.RoomListParam
 }
 
 func (g *Gateway) RoomJoin(_ context.Context, _ *wire.Conn, p wire.RoomJoinParams, _ wire.Reply[wire.Empty]) error {
-	if p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != g.room {
+		return g.errOneRoom
 	}
 	if p.UserID != "" {
 		return wire.Unsupported("Everyone connected is in the room")
@@ -110,8 +110,8 @@ func (g *Gateway) RoomJoin(_ context.Context, _ *wire.Conn, p wire.RoomJoinParam
 // RoomLeave of another user is an op's /kick; a connection leaves the room
 // by closing.
 func (g *Gateway) RoomLeave(ctx context.Context, c *wire.Conn, p wire.RoomLeaveParams, _ wire.Reply[wire.Empty]) error {
-	if p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != g.room {
+		return g.errOneRoom
 	}
 	s, _ := wire.DataOf[*session](c)
 	if p.UserID == "" || p.UserID == c.UserID() {
@@ -142,8 +142,8 @@ func (g *Gateway) RoomSet(_ context.Context, _ *wire.Conn, p wire.RoomSetParams,
 const historyLimit = 200
 
 func (g *Gateway) History(_ context.Context, _ *wire.Conn, p wire.HistoryParams, reply wire.Reply[wire.HistoryResult]) error {
-	if p.RoomID != "" && p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != "" && p.RoomID != g.room {
+		return g.errOneRoom
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -155,8 +155,8 @@ func (g *Gateway) History(_ context.Context, _ *wire.Conn, p wire.HistoryParams,
 // notifications to hold back, so mutes and idle reports change nothing.
 
 func (g *Gateway) Status(_ context.Context, c *wire.Conn, p wire.StatusParams, _ wire.Reply[wire.Empty]) error {
-	if p.RoomID != "" && p.RoomID != Room {
-		return errOneRoom
+	if p.RoomID != "" && p.RoomID != g.room {
+		return g.errOneRoom
 	}
 	if p.Mute != nil {
 		c.Notify(wire.StatusUpdate{RoomID: p.RoomID, Mute: *p.Mute})
