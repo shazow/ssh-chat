@@ -42,7 +42,7 @@ type Options struct {
 	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
 
-	BindApron    string   `long:"bind-apron" description:"Also serve the chat over the Apron protocol (WebSocket at /ws) on this host and port, such as 127.0.0.1:8080."`
+	ApronBind    string   `long:"apron-bind" description:"Also serve the chat over the Apron protocol (WebSocket at /ws) on this host and port, such as 127.0.0.1:8080."`
 	ApronOrigins []string `long:"apron-origin" description:"Origin, such as https://web.apron.chat, of a web app allowed to open an Apron WebSocket. Repeatable; '*' allows any."`
 
 	RequirePubkey bool `long:"require-pubkey" description:"Refuse connections that do not present a public key, so every user has a key fingerprint. Any key is accepted. Has no effect with --unsafe-passphrase."`
@@ -196,8 +196,8 @@ func main() {
 
 	go host.Serve()
 
-	if options.BindApron != "" {
-		gateway := apron.New(host, auth, Version)
+	if options.ApronBind != "" {
+		gateway := apron.New(apron.Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: Version})
 		for _, origin := range options.ApronOrigins {
 			if origin == "*" {
 				gateway.Server().AllowAnyOrigin = true
@@ -205,7 +205,7 @@ func main() {
 				gateway.Server().OriginPatterns = append(gateway.Server().OriginPatterns, origin)
 			}
 		}
-		apronListener, err := net.Listen("tcp", options.BindApron)
+		apronListener, err := net.Listen("tcp", options.ApronBind)
 		if err != nil {
 			fail(9, "Failed to listen for Apron on socket: %v\n", err)
 		}

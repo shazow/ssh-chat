@@ -21,7 +21,7 @@ import (
 )
 
 // chat is an ssh-chat Host with the gateway in front of it.
-type chat struct {
+type testChat struct {
 	t       *testing.T
 	auth    *sshchat.Auth
 	host    *sshchat.Host
@@ -29,7 +29,7 @@ type chat struct {
 	wsURL   string
 }
 
-func newChat(t *testing.T) *chat {
+func newChat(t *testing.T) *testChat {
 	t.Helper()
 	key, err := sshd.NewRandomSigner(1024)
 	if err != nil {
@@ -44,7 +44,7 @@ func newChat(t *testing.T) *chat {
 	}
 	host := sshchat.NewHost(listener, auth)
 	go host.Serve()
-	gateway := New(host, auth, "test")
+	gateway := New(Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: "test"})
 	gateway.limiter = func() rateio.Limiter { return rateio.NewSimpleLimiter(100, time.Second) }
 	web := httptest.NewServer(gateway.Handler())
 	t.Cleanup(func() {
@@ -54,7 +54,7 @@ func newChat(t *testing.T) *chat {
 		web.Close()
 		listener.Close()
 	})
-	return &chat{t: t, auth: auth, host: host, sshAddr: listener.Addr().String(), wsURL: "ws" + strings.TrimPrefix(web.URL, "http") + "/ws"}
+	return &testChat{t: t, auth: auth, host: host, sshAddr: listener.Addr().String(), wsURL: "ws" + strings.TrimPrefix(web.URL, "http") + "/ws"}
 }
 
 // sshUser is an SSH client in bot mode: no echo, no colors, one line per
@@ -65,7 +65,7 @@ type sshUser struct {
 	lines chan string
 }
 
-func (c *chat) ssh(name string, key ssh.Signer) *sshUser {
+func (c *testChat) ssh(name string, key ssh.Signer) *sshUser {
 	c.t.Helper()
 	config := sshd.NewClientConfig(name)
 	if key != nil {
@@ -131,7 +131,7 @@ type apronUser struct {
 	seen []map[string]any
 }
 
-func (c *chat) apron(name string) (*apronUser, map[string]any) {
+func (c *testChat) apron(name string) (*apronUser, map[string]any) {
 	c.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -217,6 +217,30 @@ func text(want string) func(map[string]any) bool {
 	}
 }
 
+// membership waits for a room_update with a membership of the user named
+// name, and returns the user.
+func membership(u *apronUser, name string, joined bool) map[string]any {
+	u.t.Helper()
+	var user map[string]any
+	u.expect(func(f map[string]any) bool {
+		if f["method"] != "room_update" {
+			return false
+		}
+		for _, m := range params(f)["memberships"].([]any) {
+			for _, e := range m.(map[string]any)["members"].([]any) {
+				entry := e.(map[string]any)
+				who := entry["user"].(map[string]any)
+				if who["name"] == name && entry["joined"] == joined {
+					user = who
+					return true
+				}
+			}
+		}
+		return false
+	})
+	return user
+}
+
 func params(f map[string]any) map[string]any { p, _ := f["params"].(map[string]any); return p }
 func from(f map[string]any) map[string]any   { p, _ := params(f)["from"].(map[string]any); return p }
 
@@ -230,7 +254,8 @@ func TestChatBothWays(t *testing.T) {
 		t.Fatalf("auth: %v", reply)
 	}
 	alice.expect("ada joined")
-	ada.expect(text("ada joined"))
+	// A join is a membership, not a message.
+	membership(ada, "ada", true)
 
 	// Apron to SSH.
 	result := ada.call("message", map[string]any{"body": map[string]any{"text": "hello from apron"}})
@@ -371,5 +396,159 @@ func TestAllowlistKeepsApronOut(t *testing.T) {
 	e, _ := reply["error"].(map[string]any)
 	if e == nil || e["code"].(float64) != -32001 {
 		t.Fatalf("allowlist: %v", reply)
+	}
+}
+
+func result(reply map[string]any) map[string]any {
+	r, _ := reply["result"].(map[string]any)
+	return r
+}
+
+func TestRoomsHistoryAndStatus(t *testing.T) {
+	c := newChat(t)
+	key, err := sshd.NewRandomSigner(1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.auth.Op(key.PublicKey(), 0)
+	op := c.ssh("op", key)
+	op.expect("op joined")
+	op.say("said before anyone used Apron")
+
+	ada, _ := c.apron("ada")
+	if !strings.Contains(fmt.Sprint(ada.call("room_list", map[string]any{})), Room) {
+		t.Fatal("room_list without the room")
+	}
+
+	// The room lists everyone, SSH users too, with their roles and status.
+	list := result(ada.call("room_list", map[string]any{"filter": "joined", "members": true}))
+	joined := list["joined"].([]any)
+	room := joined[0].(map[string]any)
+	if len(joined) != 1 || room["room_id"] != Room || room["latest_log_id"] == nil || room["history_log_id"] == nil {
+		t.Fatalf("room_list: %v", list)
+	}
+	users := map[string]map[string]any{}
+	for _, u := range list["users"].([]any) {
+		users[u.(map[string]any)["name"].(string)] = u.(map[string]any)
+	}
+	if users["op"]["status"] != "online" || fmt.Sprint(users["op"]["roles"]) != "[op]" || users["ada"] == nil {
+		t.Fatalf("users: %v", users)
+	}
+
+	// History has what was said before ada came, with the same message_ids
+	// as live delivery.
+	op.say("said while ada is here")
+	live := ada.expect(text("said while ada is here"))
+	page := result(ada.call("history", map[string]any{"room_id": Room}))
+	var texts []string
+	for _, m := range page["messages"].([]any) {
+		msg := m.(map[string]any)
+		texts = append(texts, msg["body"].(map[string]any)["text"].(string))
+		if strings.Contains(fmt.Sprint(msg["body"]), "said while ada is here") && msg["message_id"] != params(live)["message_id"] {
+			t.Fatalf("history's message_id %v, live %v", msg["message_id"], params(live)["message_id"])
+		}
+	}
+	if !strings.Contains(strings.Join(texts, "|"), "said before anyone used Apron") || len(page["memberships"].([]any)) < 2 {
+		t.Fatalf("history: %v", page)
+	}
+
+	// Away is a status, both ways.
+	op.say("/away lunch")
+	ada.expect(func(f map[string]any) bool {
+		u, _ := params(f)["new"].(map[string]any)
+		return f["method"] == "user" && u["name"] == "op" && u["status"] == "away"
+	})
+	you := result(ada.call("me", map[string]any{"status": "away"}))["you"].(map[string]any)
+	if you["status"] != "away" {
+		t.Fatalf("me status: %v", you)
+	}
+	op.expect("ada has gone away")
+	if e := ada.call("me", map[string]any{"status": "dnd"})["error"]; e == nil {
+		t.Fatal("an unoffered status was accepted")
+	}
+
+	// room_leave of another user is /kick, for ops only.
+	bob := c.ssh("bob", nil)
+	bob.expect("bob joined")
+	bobUser := membership(ada, "bob", true)
+	if e, _ := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]})["error"].(map[string]any); e == nil || e["code"].(float64) != -32001 {
+		t.Fatalf("a non-op removed someone: %v", e)
+	}
+	time.Sleep(3 * time.Second) // ssh-chat lets an SSH user say three lines in three seconds.
+	op.say("/op ada")
+	ada.expect(text("Made op"))
+	if reply := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]}); reply["error"] != nil {
+		t.Fatalf("op room_leave: %v", reply)
+	}
+	op.expect("bob was kicked by ada")
+	membership(ada, "bob", false)
+
+	// One room: creating others is refused; leaving it is disconnecting.
+	for method, p := range map[string]map[string]any{
+		"room_set":   {"title": "another"},
+		"room_leave": {"room_id": Room},
+	} {
+		if e, _ := ada.call(method, p)["error"].(map[string]any); e == nil || e["code"].(float64) != -32001 {
+			t.Errorf("%s: %v", method, e)
+		}
+	}
+	if e, _ := ada.call("room_set", map[string]any{"private": true})["error"].(map[string]any); e == nil || e["code"].(float64) != -32601 {
+		t.Errorf("private room_set: %v", e)
+	}
+}
+
+func TestJoinsWhileNobodyIsConnectedOverApron(t *testing.T) {
+	c := newChat(t)
+	bob := c.ssh("bob", nil)
+	bob.expect("bob joined")
+	time.Sleep(2 * watchInterval)
+	alice := c.ssh("alice", nil)
+	alice.expect("alice joined")
+	time.Sleep(2 * watchInterval)
+	ada, _ := c.apron("ada")
+	page := result(ada.call("history", map[string]any{}))
+	var joined []string
+	for _, m := range page["memberships"].([]any) {
+		for _, e := range m.(map[string]any)["members"].([]any) {
+			joined = append(joined, e.(map[string]any)["user"].(map[string]any)["name"].(string))
+		}
+	}
+	if fmt.Sprint(joined) != "[bob alice ada]" {
+		t.Fatalf("memberships: %v (history %v)", joined, page)
+	}
+	messages, _ := page["messages"].([]any)
+	for _, m := range messages {
+		if strings.Contains(fmt.Sprint(m), "joined") {
+			t.Fatalf("a join as a message: %v", m)
+		}
+	}
+}
+
+func TestHistoryFollowsTheBuffer(t *testing.T) {
+	c := newChat(t)
+	ada, _ := c.apron("ada")
+	first := result(ada.call("history", map[string]any{}))
+	lower := first["history_log_id"].(string)
+	for i := range 25 {
+		ada.call("message", map[string]any{"body": map[string]any{"text": fmt.Sprintf("line %d", i)}})
+	}
+	page := result(ada.call("history", map[string]any{"limit": 5}))
+	if !page["more"].(bool) || len(page["messages"].([]any)) != 5 {
+		t.Fatalf("a limited page: %v", page)
+	}
+	full := result(ada.call("history", map[string]any{}))
+	messages := full["messages"].([]any)
+	newLower := full["history_log_id"].(string)
+	if newLower <= lower || full["first_log_id"] != newLower || len(messages) != 20 {
+		t.Fatalf("the log follows ssh-chat's 20-message buffer: lower %s -> %s, first %v, %d messages", lower, newLower, full["first_log_id"], len(messages))
+	}
+	last := messages[len(messages)-1].(map[string]any)
+	if last["body"].(map[string]any)["text"] != "line 24" || full["latest_log_id"] != last["log_id"] {
+		t.Fatalf("latest: %v %v", full["latest_log_id"], last)
+	}
+	// Paging forward from the start.
+	next := result(ada.call("history", map[string]any{"after": newLower, "limit": 10}))
+	if next["first_log_id"] != newLower || !next["more"].(bool) {
+		t.Fatalf("forward: %v", next)
 	}
 }
