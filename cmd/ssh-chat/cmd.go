@@ -197,14 +197,7 @@ func main() {
 	go host.Serve()
 
 	if options.ApronBind != "" {
-		gateway := apron.New(apron.Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: Version})
-		for _, origin := range options.ApronOrigins {
-			if origin == "*" {
-				gateway.Server().AllowAnyOrigin = true
-			} else {
-				gateway.Server().OriginPatterns = append(gateway.Server().OriginPatterns, origin)
-			}
-		}
+		gateway := apron.New(apron.Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: Version, Origins: options.ApronOrigins})
 		apronListener, err := net.Listen("tcp", options.ApronBind)
 		if err != nil {
 			fail(9, "Failed to listen for Apron on socket: %v\n", err)

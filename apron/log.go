@@ -1,10 +1,10 @@
 package apron
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"slices"
-	"strconv"
 
 	"github.com/apron-chat/apron-server-go/wire"
 
@@ -16,30 +16,35 @@ import (
 // The room's log, as Apron clients see it, is its history buffer: each
 // message there is a record, with a message_id derived from its time as
 // the gateway first sees it, in the buffer's order. Joins and leaves,
-// which ssh-chat announces, are membership records.
+// which ssh-chat announces, are membership records. The buffer keeps only
+// the latest messages, so the log starts where the buffer does, once it
+// has dropped one (§4.3.3).
 
 // logState is what the gateway keeps about the log. Guarded by Gateway.mu.
 type logState struct {
-	// memberships are the join and leave announcements, by log_id.
-	memberships map[string]*wire.Membership
+	// entries is the buffer as of the last sync, oldest first.
+	entries []message.Message
+	// memberships are the join and leave announcements in the buffer, by
+	// log_id.
+	memberships map[wire.LogID]*wire.Membership
 	// replyTo holds what messages from Apron clients reply to, which
 	// ssh-chat has no place for, by message key, while they are in the
 	// buffer.
 	replyTo map[msgKey]*wire.Ref
-	// known are the members as last seen, as current user objects, and
-	// departed those who have left since, latest last, whose leave may not
-	// be announced yet.
+	// known are the members as last seen, as current user objects: what
+	// every client has been told of them. departed are those who have left
+	// since, latest last, whose leave may not be announced yet.
 	known    map[*message.User]wire.User
 	departed []wire.User
-	// oldest is the log_id of the buffer's oldest record at the last sync;
-	// evicted is set once the buffer has dropped one, after which the log
-	// starts at the buffer's oldest.
-	oldest  string
+	// oldest is the log_id of the buffer's oldest message at the last
+	// sync; evicted is set once the buffer has dropped one, after which the
+	// log starts at the buffer's oldest.
+	oldest  wire.LogID
 	evicted bool
 }
 
 func (l *logState) init() {
-	l.memberships = make(map[string]*wire.Membership)
+	l.memberships = make(map[wire.LogID]*wire.Membership)
 	l.replyTo = make(map[msgKey]*wire.Ref)
 	l.known = make(map[*message.User]wire.User)
 }
@@ -72,27 +77,24 @@ var (
 )
 
 // syncLocked brings the gateway's view of the log and the members up to
-// date with the room: it gives message_ids to new messages in the buffer, in
-// its order, recognizes joins and leaves, and returns the members whose user
-// objects changed.
-func (g *Gateway) syncLocked() []wire.User {
+// date with the room: it gives message_ids to new messages in the buffer,
+// in its order, recognizes joins and leaves, and tells clients of the
+// members whose user objects changed (§3.3.3). It sends while g.mu is
+// held, so that every connection gets the changes in the order they were
+// seen.
+func (g *Gateway) syncLocked() {
 	entries := g.history.Get(g.history.Len())
 	members := g.roomMembers()
-	present := make(map[string]bool, len(entries))
+	present := make(map[wire.LogID]bool, len(entries))
 	referenced := make(map[*message.User]bool)
+	var oldest wire.LogID
 	for i, m := range entries {
 		key := keyOf(m)
 		_, seen := g.ids.Lookup(key)
 		id := g.ids.ID(key, m.Timestamp())
 		present[id] = true
 		if i == 0 {
-			// The buffer drops only its oldest, so a new oldest means it
-			// dropped one: from now on, the log starts at the buffer's
-			// oldest (§4.3.3).
-			if g.log.oldest != "" && g.log.oldest != id {
-				g.log.evicted = true
-			}
-			g.log.oldest = id
+			oldest = id
 		}
 		if f, ok := m.(message.MessageFrom); ok {
 			referenced[f.From()] = true
@@ -108,6 +110,15 @@ func (g *Gateway) syncLocked() []wire.User {
 			referenced[g.userByIDLocked(membership.Members[0].User.UserID)] = true
 		}
 	}
+	if len(entries) > 0 {
+		if g.log.oldest != 0 && g.log.oldest != oldest {
+			// The buffer drops only its oldest, so a new oldest means it
+			// dropped one: from now on, the log starts at the buffer's
+			// oldest (§4.3.3).
+			g.log.evicted = true
+		}
+		g.log.oldest = oldest
+	}
 	for key := range g.log.replyTo {
 		// Kept until the message has left the buffer, or, for one that
 		// never enters it, been delivered.
@@ -115,13 +126,17 @@ func (g *Gateway) syncLocked() []wire.User {
 			delete(g.log.replyTo, key)
 		}
 	}
+	g.log.entries = entries
 
-	var changed []wire.User
 	known := make(map[*message.User]wire.User, len(members))
 	for _, member := range members {
 		u := g.userLocked(member.User)
-		if old, ok := g.log.known[member.User]; ok && !sameUser(old, u) {
-			changed = append(changed, u)
+		if old, ok := g.log.known[member.User]; ok {
+			if _, changed := u.Patch(old); changed {
+				// A patch, which clears what was taken away, such as
+				// roles: [] for a member who is no longer an op.
+				g.server.PublishUser(old, u, nil)
+			}
 		}
 		known[member.User] = u
 		referenced[member.User] = true
@@ -141,12 +156,11 @@ func (g *Gateway) syncLocked() []wire.User {
 			delete(g.userIDs, user)
 		}
 	}
-	return changed
 }
 
 // classifyLocked records an announcement that is a join or a leave as a
 // membership.
-func (g *Gateway) classifyLocked(id, text string, members []*chat.Member) {
+func (g *Gateway) classifyLocked(id wire.LogID, text string, members []*chat.Member) {
 	var user wire.User
 	var joined bool
 	if match := joinedRE.FindStringSubmatch(text); match != nil {
@@ -177,10 +191,9 @@ func (g *Gateway) classifyLocked(id, text string, members []*chat.Member) {
 }
 
 // recordLocked returns the record of a message in the log.
-func (g *Gateway) recordLocked(m message.Message, id string) (wire.Record, bool) {
-	logID, _ := strconv.ParseInt(id, 10, 64)
-	snapshot := func(from wire.User, body *wire.Body, ext map[string]any) (wire.Record, bool) {
-		return wire.Record{LogID: logID, Message: &wire.Message{
+func (g *Gateway) recordLocked(m message.Message, id wire.LogID) (wire.Record, bool) {
+	snapshot := func(from wire.User, body *wire.Body, ext wire.Ext) (wire.Record, bool) {
+		return wire.Record{LogID: id, Message: &wire.Message{
 			MessageID: id, LogID: id, RoomID: Room, From: from, Body: body,
 			ReplyTo: g.log.replyTo[keyOf(m)], Ext: ext,
 		}}, true
@@ -190,34 +203,38 @@ func (g *Gateway) recordLocked(m message.Message, id string) (wire.Record, bool)
 		return snapshot(g.recordedLocked(m.From()), &wire.Body{Text: m.Body()}, nil)
 	case *message.EmoteMsg:
 		return snapshot(g.recordedLocked(m.From()), &wire.Body{Text: "_" + m.Body() + "_", Format: wire.Markdown},
-			map[string]any{"ssh-chat": map[string]any{"emote": true}})
+			wire.MustExt("ssh-chat", map[string]any{"emote": true}))
 	case *message.AnnounceMsg:
 		if membership := g.log.memberships[id]; membership != nil {
-			return wire.Record{LogID: logID, Membership: membership}, true
+			return wire.Record{LogID: id, Membership: membership}, true
 		}
 		return snapshot(wire.RoomNotice, &wire.Body{Text: plain(m.Body())}, nil)
 	}
 	return wire.Record{}, false
 }
 
-// logLocked returns the log's records, its effective lower bound, and its
-// latest log_id.
-func (g *Gateway) logLocked() (records []wire.Record, lower, latest int64) {
-	roomLogID, _ := strconv.ParseInt(g.roomLogID, 10, 64)
-	room := g.roomLocked(false)
-	records = append(records, wire.Record{LogID: roomLogID, Room: &room})
-	for _, m := range g.history.Get(g.history.Len()) {
-		id, _ := g.ids.Lookup(keyOf(m))
-		if record, ok := g.recordLocked(m, id); ok && record.LogID > 0 {
+// logLocked returns the log as of the last sync: the room's record, the
+// buffer's records, in log_id order, with its bounds.
+func (g *Gateway) logLocked() wire.Log {
+	room := g.roomLocked()
+	records := []wire.Record{{LogID: g.roomLogID, Room: &room}}
+	for _, m := range g.log.entries {
+		id, ok := g.ids.Lookup(keyOf(m))
+		if !ok {
+			continue
+		}
+		if record, ok := g.recordLocked(m, id); ok {
 			records = append(records, record)
 		}
 	}
-	slices.SortFunc(records, func(a, b wire.Record) int { return int(a.LogID - b.LogID) })
-	lower = roomLogID
-	if g.log.evicted && len(records) > 1 {
-		lower = records[1].LogID
+	slices.SortFunc(records, func(a, b wire.Record) int { return cmp.Compare(a.LogID, b.LogID) })
+	log := wire.Log{Records: records, Lower: g.roomLogID, Latest: records[len(records)-1].LogID}
+	if g.log.evicted {
+		// The room's record went with the first message the buffer
+		// dropped.
+		log.Lower = g.log.oldest
 	}
-	return records, lower, records[len(records)-1].LogID
+	return log
 }
 
 // roomMembers returns the room's members.

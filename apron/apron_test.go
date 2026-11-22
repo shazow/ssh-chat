@@ -4,14 +4,20 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/apron-chat/apron-server-go/wire"
+	"github.com/apron-chat/apron-server-go/wire/wiretest"
 	"github.com/coder/websocket"
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
@@ -20,16 +26,17 @@ import (
 	"github.com/shazow/ssh-chat/sshd"
 )
 
-// chat is an ssh-chat Host with the gateway in front of it.
+// testChat is an ssh-chat Host with the gateway in front of it.
 type testChat struct {
 	t       *testing.T
 	auth    *sshchat.Auth
 	host    *sshchat.Host
+	gateway *Gateway
 	sshAddr string
 	wsURL   string
 }
 
-func newChat(t *testing.T) *testChat {
+func newChat(t *testing.T, origins ...string) *testChat {
 	t.Helper()
 	key, err := sshd.NewRandomSigner(1024)
 	if err != nil {
@@ -44,7 +51,7 @@ func newChat(t *testing.T) *testChat {
 	}
 	host := sshchat.NewHost(listener, auth)
 	go host.Serve()
-	gateway := New(Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: "test"})
+	gateway := New(Config{Host: host, Auth: auth, History: host.HistoryBuffer(), Version: "test", Origins: origins})
 	gateway.limiter = func() rateio.Limiter { return rateio.NewSimpleLimiter(100, time.Second) }
 	web := httptest.NewServer(gateway.Handler())
 	t.Cleanup(func() {
@@ -54,7 +61,17 @@ func newChat(t *testing.T) *testChat {
 		web.Close()
 		listener.Close()
 	})
-	return &testChat{t: t, auth: auth, host: host, sshAddr: listener.Addr().String(), wsURL: "ws" + strings.TrimPrefix(web.URL, "http") + "/ws"}
+	return &testChat{
+		t: t, auth: auth, host: host, gateway: gateway,
+		sshAddr: listener.Addr().String(), wsURL: "ws" + strings.TrimPrefix(web.URL, "http") + "/ws",
+	}
+}
+
+// within returns a context that ends a wait for a frame or a line.
+func within(t *testing.T) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	return ctx
 }
 
 // sshUser is an SSH client in bot mode: no echo, no colors, one line per
@@ -123,97 +140,116 @@ func (u *sshUser) expect(want string) string {
 // apronUser is an Apron client.
 type apronUser struct {
 	t      *testing.T
-	ws     *websocket.Conn
-	frames chan map[string]any
+	c      *wiretest.Client
+	you    wire.User
 	nextID atomic.Int64
-	you    map[string]any
-	// seen holds the frames expect passed over, for later expects.
-	seen []map[string]any
 }
 
-func (c *testChat) apron(name string) (*apronUser, map[string]any) {
+// dial connects an Apron client, which has not signed in.
+func (c *testChat) dial() *apronUser {
 	c.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	ws, _, err := websocket.Dial(ctx, c.wsURL, nil)
+	client, err := wiretest.Dial(within(c.t), c.wsURL)
 	if err != nil {
 		c.t.Fatal(err)
 	}
-	c.t.Cleanup(func() { ws.CloseNow() })
-	u := &apronUser{t: c.t, ws: ws, frames: make(chan map[string]any, 100)}
-	go func() {
-		defer close(u.frames)
-		for {
-			_, data, err := ws.Read(context.Background())
-			if err != nil {
-				return
-			}
-			var frame map[string]any
-			if json.Unmarshal(data, &frame) == nil {
-				u.frames <- frame
-			}
-		}
-	}()
-	u.expect(func(f map[string]any) bool { return f["method"] == "server" })
-	reply := u.call("auth", map[string]any{"scheme": "guest", "name": name})
-	if result, ok := reply["result"].(map[string]any); ok {
-		u.you, _ = result["you"].(map[string]any)
-	}
-	return u, reply
+	c.t.Cleanup(func() { client.Close() })
+	return &apronUser{t: c.t, c: client}
 }
 
+// apron connects an Apron client and signs it in as a guest.
+func (c *testChat) apron(name string) *apronUser {
+	c.t.Helper()
+	u := c.dial()
+	if err := u.auth(name); err != nil {
+		c.t.Fatalf("auth as %s: %v", name, err)
+	}
+	return u
+}
+
+func (u *apronUser) auth(name string) error {
+	result, err := u.c.Auth(within(u.t), map[string]any{"scheme": "guest", "name": name})
+	if err != nil {
+		return err
+	}
+	u.you = *result.You
+	return nil
+}
+
+// call sends a request and returns its result, or its error reply.
+func (u *apronUser) call(method string, params any) (map[string]any, *wire.Error) {
+	u.t.Helper()
+	raw, err := u.c.Call(within(u.t), method, params)
+	var e *wire.Error
+	if errors.As(err, &e) {
+		return nil, e
+	} else if err != nil {
+		u.t.Fatalf("%s: %v", method, err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		u.t.Fatalf("%s: %s: %v", method, raw, err)
+	}
+	return result, nil
+}
+
+// ok sends a request and returns its result, failing on an error reply.
+func (u *apronUser) ok(method string, params any) map[string]any {
+	u.t.Helper()
+	result, e := u.call(method, params)
+	if e != nil {
+		u.t.Fatalf("%s: %v", method, e)
+	}
+	return result
+}
+
+// send sends a request without waiting for its reply, and returns its id.
 func (u *apronUser) send(method string, params any) string {
-	id := fmt.Sprintf("r%d", u.nextID.Add(1))
-	data, _ := json.Marshal(map[string]any{"method": method, "id": id, "params": params})
-	if err := u.ws.Write(context.Background(), websocket.MessageText, data); err != nil {
+	u.t.Helper()
+	id := fmt.Sprintf("t%d", u.nextID.Add(1))
+	frame, _ := json.Marshal(map[string]any{"method": method, "id": id, "params": params})
+	if err := u.c.Send(within(u.t), frame); err != nil {
 		u.t.Fatal(err)
 	}
 	return id
 }
 
-// call sends a request and returns its reply.
-func (u *apronUser) call(method string, params any) map[string]any {
-	u.t.Helper()
-	id := u.send(method, params)
-	return u.expect(func(f map[string]any) bool { return f["id"] == id })
-}
-
-// expect waits for a frame that match accepts, and fails when the
-// connection closes first.
+// expect waits for the first frame that match accepts, as a JSON object,
+// and fails when the connection closes first. The frames before it stay
+// for later expects.
 func (u *apronUser) expect(match func(map[string]any) bool) map[string]any {
 	u.t.Helper()
-	for i, f := range u.seen {
-		if match(f) {
-			u.seen = append(u.seen[:i:i], u.seen[i+1:]...)
-			return f
-		}
+	f, err := u.c.Expect(within(u.t), func(f wiretest.Frame) bool { return match(object(f)) })
+	if err != nil {
+		u.t.Fatalf("no matching apron frame: %v", err)
 	}
-	timeout := time.After(5 * time.Second)
-	for {
-		select {
-		case f, ok := <-u.frames:
-			if !ok {
-				u.t.Fatal("apron connection closed")
-			}
-			if match(f) {
-				return f
-			}
-			u.seen = append(u.seen, f)
-		case <-timeout:
-			u.t.Fatal("no matching apron frame")
-		}
-	}
+	return object(f)
 }
 
-// message matches a message notification whose text contains text.
+func object(f wiretest.Frame) map[string]any {
+	var m map[string]any
+	_ = json.Unmarshal(f.Raw, &m)
+	return m
+}
+
+// text matches a message notification whose text contains want.
 func text(want string) func(map[string]any) bool {
 	return func(f map[string]any) bool {
 		if f["method"] != "message" {
 			return false
 		}
-		body, _ := f["params"].(map[string]any)["body"].(map[string]any)
+		body, _ := params(f)["body"].(map[string]any)
 		s, _ := body["text"].(string)
 		return strings.Contains(s, want)
+	}
+}
+
+// userUpdate matches a user notification whose role ("you" or "new") is
+// of userID and has field.
+func userUpdate(role, userID, field string) func(map[string]any) bool {
+	return func(f map[string]any) bool {
+		u, _ := params(f)[role].(map[string]any)
+		_, has := u[field]
+		return f["method"] == "user" && u["user_id"] == userID && has
 	}
 }
 
@@ -249,18 +285,23 @@ func TestChatBothWays(t *testing.T) {
 	alice := c.ssh("alice", nil)
 	alice.expect("alice joined")
 
-	ada, reply := c.apron("ada")
-	if ada.you["name"] != "ada" {
-		t.Fatalf("auth: %v", reply)
+	ada := c.apron("ada")
+	if ada.you.Name != "ada" || ada.you.Status != "online" {
+		t.Fatalf("auth: %+v", ada.you)
 	}
+	// The others in the room, with their statuses, follow the result
+	// (§4.5.4).
+	ada.expect(func(f map[string]any) bool {
+		u, _ := params(f)["new"].(map[string]any)
+		return f["method"] == "user" && u["name"] == "alice" && u["status"] == "online"
+	})
 	alice.expect("ada joined")
 	// A join is a membership, not a message.
 	membership(ada, "ada", true)
 
 	// Apron to SSH.
-	result := ada.call("message", map[string]any{"body": map[string]any{"text": "hello from apron"}})
-	id, _ := result["result"].(map[string]any)["message_id"].(string)
-	if id == "" {
+	result := ada.ok("message", map[string]any{"body": map[string]any{"text": "hello from apron"}})
+	if id, _ := result["message_id"].(string); id == "" {
 		t.Fatalf("message: %v", result)
 	}
 	alice.expect("ada: hello from apron")
@@ -288,7 +329,7 @@ func TestCommandsAndPrivateMessages(t *testing.T) {
 	c := newChat(t)
 	alice := c.ssh("alice", nil)
 	alice.expect("alice joined")
-	ada, _ := c.apron("ada")
+	ada := c.apron("ada")
 
 	// A command reply is a ~private notice, before the result.
 	id := ada.send("command", map[string]any{"body": map[string]any{"text": "/names"}})
@@ -300,7 +341,7 @@ func TestCommandsAndPrivateMessages(t *testing.T) {
 	}
 
 	// An Apron client's private message reaches the SSH user.
-	ada.call("command", map[string]any{"body": map[string]any{"text": "/msg alice psst"}})
+	ada.ok("command", map[string]any{"body": map[string]any{"text": "/msg alice psst"}})
 	alice.expect("[PM from ada] psst")
 
 	// And an SSH user's reaches the Apron client, marked private.
@@ -313,19 +354,18 @@ func TestCommandsAndPrivateMessages(t *testing.T) {
 
 	// Too much input is refused, as over SSH.
 	long := strings.Repeat("x", maxInputLength+1)
-	if e, _ := ada.call("message", map[string]any{"body": map[string]any{"text": long}})["error"].(map[string]any); e == nil || e["code"].(float64) != -32003 {
+	if _, e := ada.call("message", map[string]any{"body": map[string]any{"text": long}}); e == nil || e.Code != wire.CodeTooLarge {
 		t.Fatalf("long line: %v", e)
 	}
 
 	// Unknown commands fail as ssh-chat says.
-	ada.call("command", map[string]any{"body": map[string]any{"text": "/nope"}})
+	ada.ok("command", map[string]any{"body": map[string]any{"text": "/nope"}})
 	ada.expect(text("Err:"))
 
 	// me renames through ssh-chat, which normalizes the name.
-	reply := ada.call("me", map[string]any{"name": "Ada L"})
-	you, _ := reply["result"].(map[string]any)["you"].(map[string]any)
-	if you["name"] != "AdaL" || you["user_id"] != ada.you["user_id"] {
-		t.Fatalf("me: %v", reply)
+	you, _ := ada.ok("me", map[string]any{"name": "Ada L"})["you"].(map[string]any)
+	if you["name"] != "AdaL" || you["user_id"] != ada.you.UserID || you["status"] != "online" {
+		t.Fatalf("me: %v", you)
 	}
 	alice.expect("ada is now known as AdaL")
 
@@ -337,10 +377,9 @@ func TestCommandsAndPrivateMessages(t *testing.T) {
 	})
 
 	// Mentions are written as names for SSH users.
-	aliceID := ""
 	alice.say("ping")
-	aliceID, _ = from(ada.expect(text("ping")))["user_id"].(string)
-	ada.call("message", map[string]any{"body": map[string]any{"text": "@" + aliceID + " pong", "mentions": []string{aliceID}}})
+	aliceID, _ := from(ada.expect(text("ping")))["user_id"].(string)
+	ada.ok("message", map[string]any{"body": map[string]any{"text": "@" + aliceID + " pong", "mentions": []string{aliceID}}})
 	alice.expect("ada2: alice pong")
 }
 
@@ -358,11 +397,11 @@ func TestOpsAndPolicy(t *testing.T) {
 	bob.expect("bob joined")
 
 	// Muted: the room shows a muted member's messages only to them.
-	ada, _ := c.apron("ada")
+	ada := c.apron("ada")
 	bob.expect("ada joined")
 	op.say("/mute ada")
 	op.expect("Muted: ada")
-	ada.call("message", map[string]any{"body": map[string]any{"text": "can anyone hear me"}})
+	ada.ok("message", map[string]any{"body": map[string]any{"text": "can anyone hear me"}})
 	ada.expect(text("can anyone hear me"))
 	op.say("marker")
 	if line := bob.expect("op: "); !strings.Contains(line, "marker") {
@@ -372,36 +411,27 @@ func TestOpsAndPolicy(t *testing.T) {
 	// Kicked: the connection closes with an error.
 	op.say("/kick ada")
 	op.expect("ada was kicked by op")
-	closed := false
-	for f := range ada.frames {
-		if e, ok := f["error"].(map[string]any); ok && f["id"] == nil {
-			closed = e["code"].(float64) == -32001
-		}
+	f, err := ada.c.Expect(within(t), func(f wiretest.Frame) bool { return f.Error != nil && f.ID == "" && f.Method == "" })
+	if err != nil || f.Error.Code != wire.CodeDenied {
+		t.Fatalf("no error frame before the kick closed the connection: %v %v", f.Error, err)
 	}
-	if !closed {
-		t.Fatal("no error frame before the kick closed the connection")
+	if _, err := ada.c.Expect(within(t), func(wiretest.Frame) bool { return false }); !errors.Is(err, wire.ErrClosed) {
+		t.Fatalf("the connection stayed open after the kick: %v", err)
 	}
 
 	// Banned by address: a new Apron client from it is refused.
 	c.auth.BanAddr(&net.TCPAddr{IP: net.ParseIP("127.0.0.1")}, time.Minute)
-	if _, reply := c.apron("ada"); reply["error"] == nil {
-		t.Fatalf("banned client signed in: %v", reply)
+	if err := c.dial().auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+		t.Fatalf("banned client signed in: %v", err)
 	}
 }
 
 func TestAllowlistKeepsApronOut(t *testing.T) {
 	c := newChat(t)
 	c.auth.SetAllowlistMode(true)
-	_, reply := c.apron("ada")
-	e, _ := reply["error"].(map[string]any)
-	if e == nil || e["code"].(float64) != -32001 {
-		t.Fatalf("allowlist: %v", reply)
+	if err := c.dial().auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+		t.Fatalf("allowlist: %v", err)
 	}
-}
-
-func result(reply map[string]any) map[string]any {
-	r, _ := reply["result"].(map[string]any)
-	return r
 }
 
 func TestRoomsHistoryAndStatus(t *testing.T) {
@@ -415,13 +445,13 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	op.expect("op joined")
 	op.say("said before anyone used Apron")
 
-	ada, _ := c.apron("ada")
-	if !strings.Contains(fmt.Sprint(ada.call("room_list", map[string]any{})), Room) {
+	ada := c.apron("ada")
+	if !strings.Contains(fmt.Sprint(ada.ok("room_list", map[string]any{})), Room) {
 		t.Fatal("room_list without the room")
 	}
 
 	// The room lists everyone, SSH users too, with their roles and status.
-	list := result(ada.call("room_list", map[string]any{"filter": "joined", "members": true}))
+	list := ada.ok("room_list", map[string]any{"filter": "joined", "members": true})
 	joined := list["joined"].([]any)
 	room := joined[0].(map[string]any)
 	if len(joined) != 1 || room["room_id"] != Room || room["latest_log_id"] == nil || room["history_log_id"] == nil {
@@ -434,12 +464,13 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	if users["op"]["status"] != "online" || fmt.Sprint(users["op"]["roles"]) != "[op]" || users["ada"] == nil {
 		t.Fatalf("users: %v", users)
 	}
+	opID := users["op"]["user_id"].(string)
 
 	// History has what was said before ada came, with the same message_ids
 	// as live delivery.
 	op.say("said while ada is here")
 	live := ada.expect(text("said while ada is here"))
-	page := result(ada.call("history", map[string]any{"room_id": Room}))
+	page := ada.ok("history", map[string]any{"room_id": Room})
 	var texts []string
 	for _, m := range page["messages"].([]any) {
 		msg := m.(map[string]any)
@@ -452,36 +483,39 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 		t.Fatalf("history: %v", page)
 	}
 
-	// Away is a status, both ways.
+	// Away is a status, both ways; a change carries what changed.
 	op.say("/away lunch")
 	ada.expect(func(f map[string]any) bool {
 		u, _ := params(f)["new"].(map[string]any)
-		return f["method"] == "user" && u["name"] == "op" && u["status"] == "away"
+		return userUpdate("new", opID, "status")(f) && u["status"] == "away" && u["name"] == nil
 	})
-	you := result(ada.call("me", map[string]any{"status": "away"}))["you"].(map[string]any)
-	if you["status"] != "away" {
+	you := ada.ok("me", map[string]any{"status": "away"})["you"].(map[string]any)
+	if you["status"] != "away" || you["name"] != "ada" {
 		t.Fatalf("me status: %v", you)
 	}
 	op.expect("ada has gone away")
 	// A status the server does not offer is not an error: the server
 	// keeps one it does (§4.5.1), here back from away.
-	if you := result(ada.call("me", map[string]any{"status": "dnd"}))["you"].(map[string]any); you["status"] == "dnd" {
+	if you := ada.ok("me", map[string]any{"status": "dnd"})["you"].(map[string]any); you["status"] != "online" {
 		t.Fatalf("an unoffered status was kept: %v", you)
+	}
+	// Mutes change nothing here, but are told back (§4.5.3).
+	ada.ok("status", map[string]any{"mute": true})
+	if mute := ada.expect(func(f map[string]any) bool { return f["method"] == "status" }); params(mute)["mute"] != true {
+		t.Fatalf("status: %v", mute)
 	}
 
 	// room_leave of another user is /kick, for ops only.
 	bob := c.ssh("bob", nil)
 	bob.expect("bob joined")
 	bobUser := membership(ada, "bob", true)
-	if e, _ := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]})["error"].(map[string]any); e == nil || e["code"].(float64) != -32001 {
+	if _, e := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]}); e == nil || e.Code != wire.CodeDenied {
 		t.Fatalf("a non-op removed someone: %v", e)
 	}
 	time.Sleep(3 * time.Second) // ssh-chat lets an SSH user say three lines in three seconds.
 	op.say("/op ada")
 	ada.expect(text("Made op"))
-	if reply := ada.call("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]}); reply["error"] != nil {
-		t.Fatalf("op room_leave: %v", reply)
-	}
+	ada.ok("room_leave", map[string]any{"room_id": Room, "user_id": bobUser["user_id"]})
 	op.expect("bob was kicked by ada")
 	membership(ada, "bob", false)
 
@@ -490,13 +524,17 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 		"room_set":   {"title": "another"},
 		"room_leave": {"room_id": Room},
 	} {
-		if e, _ := ada.call(method, p)["error"].(map[string]any); e == nil || e["code"].(float64) != -32001 {
+		if _, e := ada.call(method, p); e == nil || e.Code != wire.CodeDenied {
 			t.Errorf("%s: %v", method, e)
 		}
 	}
-	if e, _ := ada.call("room_set", map[string]any{"private": true})["error"].(map[string]any); e == nil || e["code"].(float64) != -32601 {
+	if _, e := ada.call("room_set", map[string]any{"private": true}); e == nil || e.Code != wire.CodeUnsupported {
 		t.Errorf("private room_set: %v", e)
 	}
+	if _, e := ada.call("room_join", map[string]any{"room_id": "elsewhere"}); e == nil || e.Code != wire.CodeInvalidParams {
+		t.Errorf("room_join of another room: %v", e)
+	}
+	ada.ok("room_join", map[string]any{"room_id": Room})
 }
 
 func TestJoinsWhileNobodyIsConnectedOverApron(t *testing.T) {
@@ -507,8 +545,8 @@ func TestJoinsWhileNobodyIsConnectedOverApron(t *testing.T) {
 	alice := c.ssh("alice", nil)
 	alice.expect("alice joined")
 	time.Sleep(2 * watchInterval)
-	ada, _ := c.apron("ada")
-	page := result(ada.call("history", map[string]any{}))
+	ada := c.apron("ada")
+	page := ada.ok("history", map[string]any{})
 	var joined []string
 	for _, m := range page["memberships"].([]any) {
 		for _, e := range m.(map[string]any)["members"].([]any) {
@@ -526,31 +564,230 @@ func TestJoinsWhileNobodyIsConnectedOverApron(t *testing.T) {
 	}
 }
 
+// logIDs returns the log_ids of a history result's records, in order.
+func logIDs(page map[string]any) []string {
+	var ids []string
+	for _, kind := range []string{"rooms", "messages", "memberships", "reactions"} {
+		records, _ := page[kind].([]any)
+		for _, r := range records {
+			ids = append(ids, r.(map[string]any)["log_id"].(string))
+		}
+	}
+	slices.SortFunc(ids, compareLogIDs)
+	return ids
+}
+
+// compareLogIDs compares two log_ids as numbers.
+func compareLogIDs(a, b string) int {
+	if len(a) != len(b) {
+		return len(a) - len(b)
+	}
+	return strings.Compare(a, b)
+}
+
 func TestHistoryFollowsTheBuffer(t *testing.T) {
 	c := newChat(t)
-	ada, _ := c.apron("ada")
-	first := result(ada.call("history", map[string]any{}))
+	ada := c.apron("ada")
+	first := ada.ok("history", map[string]any{})
 	lower := first["history_log_id"].(string)
 	for i := range 25 {
-		ada.call("message", map[string]any{"body": map[string]any{"text": fmt.Sprintf("line %d", i)}})
+		ada.ok("message", map[string]any{"body": map[string]any{"text": fmt.Sprintf("line %d", i)}})
 	}
-	page := result(ada.call("history", map[string]any{"limit": 5}))
-	if !page["more"].(bool) || len(page["messages"].([]any)) != 5 {
+	page := ada.ok("history", map[string]any{"limit": 5})
+	if !page["more"].(bool) || len(logIDs(page)) != 5 {
 		t.Fatalf("a limited page: %v", page)
 	}
-	full := result(ada.call("history", map[string]any{}))
+	full := ada.ok("history", map[string]any{})
 	messages := full["messages"].([]any)
 	newLower := full["history_log_id"].(string)
-	if newLower <= lower || full["first_log_id"] != newLower || len(messages) != 20 {
+	if compareLogIDs(newLower, lower) <= 0 || full["first_log_id"] != newLower || len(messages) != 20 {
 		t.Fatalf("the log follows ssh-chat's 20-message buffer: lower %s -> %s, first %v, %d messages", lower, newLower, full["first_log_id"], len(messages))
 	}
 	last := messages[len(messages)-1].(map[string]any)
-	if last["body"].(map[string]any)["text"] != "line 24" || full["latest_log_id"] != last["log_id"] {
+	if last["body"].(map[string]any)["text"] != "line 24" || compareLogIDs(full["latest_log_id"].(string), last["log_id"].(string)) < 0 {
 		t.Fatalf("latest: %v %v", full["latest_log_id"], last)
 	}
-	// Paging forward from the start.
-	next := result(ada.call("history", map[string]any{"after": newLower, "limit": 10}))
-	if next["first_log_id"] != newLower || !next["more"].(bool) {
-		t.Fatalf("forward: %v", next)
+
+	// Paging forward from the start, a few records at a time, gives the
+	// whole log once, in order, as one page does.
+	var paged []string
+	after := newLower
+	for {
+		next := ada.ok("history", map[string]any{"after": after, "limit": 3})
+		ids := logIDs(next)
+		if len(ids) == 0 {
+			break
+		}
+		if next["first_log_id"] != ids[0] || next["last_log_id"] != ids[len(ids)-1] || next["history_log_id"] != newLower {
+			t.Fatalf("forward: %v", next)
+		}
+		paged = append(paged, ids...)
+		if !next["more"].(bool) {
+			break
+		}
+		var n int64
+		fmt.Sscan(ids[len(ids)-1], &n)
+		after = fmt.Sprint(n + 1)
+	}
+	if want := logIDs(full); !slices.Equal(paged, want) {
+		t.Fatalf("paged %v, one page %v", paged, want)
+	}
+	for i := 1; i < len(paged); i++ {
+		if compareLogIDs(paged[i-1], paged[i]) >= 0 {
+			t.Fatalf("log_ids out of order or repeated: %v", paged)
+		}
+	}
+}
+
+// Taking op away is a change too: clients merge user objects (§3.3.1), so
+// it reaches them as roles: [].
+func TestOpRemovalReachesClients(t *testing.T) {
+	c := newChat(t)
+	key, err := sshd.NewRandomSigner(1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.auth.Op(key.PublicKey(), 0)
+	op := c.ssh("op", key)
+	op.expect("op joined")
+	ada := c.apron("ada")
+	bea := c.apron("bea")
+
+	roles := func(u *apronUser, role string) any {
+		t.Helper()
+		update := params(u.expect(userUpdate(role, ada.you.UserID, "roles")))[role].(map[string]any)
+		return update["roles"]
+	}
+	op.say("/op ada")
+	ada.expect(text("Made op"))
+	if you, others := roles(ada, "you"), roles(bea, "new"); fmt.Sprint(you, others) != "[op] [op]" {
+		t.Fatalf("op: you %v, others %v", you, others)
+	}
+	op.say("/op ada remove")
+	ada.expect(text("Removed op"))
+	for _, got := range []any{roles(ada, "you"), roles(bea, "new")} {
+		if r, ok := got.([]any); !ok || len(r) != 0 {
+			t.Fatalf("op taken away: roles %v, not []", got)
+		}
+	}
+}
+
+// Every client gets a user's changes in the order they were made, however
+// many goroutines see them: the gateway sends them as it sees them, under
+// its lock.
+func TestUserUpdatesInOrder(t *testing.T) {
+	c := newChat(t)
+	c.ssh("bob", nil).expect("bob joined")
+	ada := c.apron("ada")
+	bobID := params(ada.expect(func(f map[string]any) bool {
+		u, _ := params(f)["new"].(map[string]any)
+		return f["method"] == "user" && u["name"] == "bob"
+	}))["new"].(map[string]any)["user_id"].(string)
+	bob, _ := c.host.MemberByID("bob")
+
+	// bob goes away and comes back, over and over, while connections'
+	// deliveries and the watch sync at once.
+	stop := make(chan struct{})
+	var syncing sync.WaitGroup
+	for range 4 {
+		syncing.Go(func() {
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				c.gateway.mu.Lock()
+				c.gateway.syncLocked()
+				c.gateway.mu.Unlock()
+			}
+		})
+	}
+	const toggles = 60
+	for i := range toggles {
+		if i%2 == 0 {
+			bob.User.SetAway("brb")
+		} else {
+			bob.User.SetAway("")
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+	close(stop)
+	syncing.Wait()
+	c.gateway.mu.Lock()
+	c.gateway.syncLocked()
+	c.gateway.mu.Unlock()
+
+	// Every frame sent before the reply has arrived with it.
+	ada.ok("history", map[string]any{"limit": 1})
+	var statuses []string
+	for _, f := range ada.c.Pending() {
+		if m := object(f); userUpdate("new", bobID, "status")(m) {
+			statuses = append(statuses, params(m)["new"].(map[string]any)["status"].(string))
+		}
+	}
+	// Each change is sent once, so the statuses alternate, and the last is
+	// bob's.
+	for i, status := range statuses {
+		if i > 0 && status == statuses[i-1] {
+			t.Fatalf("bob's statuses out of order: %v", statuses)
+		}
+	}
+	if len(statuses) == 0 || statuses[len(statuses)-1] != "online" {
+		t.Fatalf("bob's statuses end wrong: %v", statuses)
+	}
+}
+
+// A connection is signed in as its auth result is queued, so a change made
+// while the sign-in finishes reaches it, after the result (§3.2.2).
+func TestSignInSeesChangesMadeDuringAuth(t *testing.T) {
+	c := newChat(t)
+	key, err := sshd.NewRandomSigner(1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.auth.Op(key.PublicKey(), 0)
+	op := c.ssh("op", key)
+	op.expect("op joined")
+	c.gateway.afterAuth = func(*wire.Conn) {
+		member, _ := c.host.MemberByID("op")
+		member.IsOp.Store(false)
+		c.gateway.mu.Lock()
+		c.gateway.syncLocked()
+		c.gateway.mu.Unlock()
+	}
+	ada := c.apron("ada")
+	opUser := params(ada.expect(func(f map[string]any) bool {
+		u, _ := params(f)["new"].(map[string]any)
+		return f["method"] == "user" && u["name"] == "op"
+	}))["new"].(map[string]any)
+	if fmt.Sprint(opUser["roles"]) != "[op]" {
+		t.Fatalf("op as of the sign-in: %v", opUser)
+	}
+	update := params(ada.expect(userUpdate("new", opUser["user_id"].(string), "roles")))["new"].(map[string]any)
+	if roles, ok := update["roles"].([]any); !ok || len(roles) != 0 {
+		t.Fatalf("the change made during auth: %v", update)
+	}
+}
+
+func TestOrigins(t *testing.T) {
+	for _, tc := range []struct {
+		origins []string
+		origin  string
+		ok      bool
+	}{
+		{nil, "https://web.example", false},
+		{[]string{"https://web.example"}, "https://web.example", true},
+		{[]string{"https://web.example"}, "https://evil.example", false},
+		{[]string{"*"}, "https://evil.example", true},
+	} {
+		c := newChat(t, tc.origins...)
+		ws, _, err := websocket.Dial(within(t), c.wsURL, &websocket.DialOptions{HTTPHeader: http.Header{"Origin": {tc.origin}}})
+		if ws != nil {
+			ws.CloseNow()
+		}
+		if (err == nil) != tc.ok {
+			t.Errorf("origins %v, origin %s: %v", tc.origins, tc.origin, err)
+		}
 	}
 }
