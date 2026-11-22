@@ -18,7 +18,9 @@ import (
 // the gateway first sees it, in the buffer's order. Joins and leaves,
 // which ssh-chat announces, are membership records. The buffer keeps only
 // the latest messages, so the log starts where the buffer does, once it
-// has dropped one (§4.3.3).
+// has dropped one (§4.3.3); when what it drops held memberships, the
+// gateway appends a membership record of its own first, which lists every
+// member, so that the log still tells who is in the room.
 
 // logState is what the gateway keeps about the log. Guarded by Gateway.mu.
 type logState struct {
@@ -27,6 +29,9 @@ type logState struct {
 	// memberships are the join and leave announcements in the buffer, by
 	// log_id.
 	memberships map[wire.LogID]*wire.Membership
+	// snapshots are the membership records the gateway appended, each
+	// listing every member, oldest first, while they are in the log.
+	snapshots []wire.Membership
 	// replyTo holds what messages from Apron clients reply to, which
 	// ssh-chat has no place for, by message key, while they are in the
 	// buffer.
@@ -36,11 +41,11 @@ type logState struct {
 	// since, latest last, whose leave may not be announced yet.
 	known    map[*message.User]wire.User
 	departed []wire.User
-	// oldest is the log_id of the buffer's oldest message at the last
-	// sync; evicted is set once the buffer has dropped one, after which the
-	// log starts at the buffer's oldest.
-	oldest  wire.LogID
-	evicted bool
+	// oldest and newest are the log_ids of the buffer's oldest and newest
+	// messages at the last sync; evicted is set once the buffer has dropped
+	// one, after which the log starts at the buffer's oldest.
+	oldest, newest wire.LogID
+	evicted        bool
 }
 
 func (l *logState) init() {
@@ -84,8 +89,9 @@ var (
 
 // syncLocked brings the gateway's view of the log and the members up to
 // date with the room: it gives message_ids to new messages in the buffer,
-// in its order, recognizes joins and leaves, and tells clients of the
-// members whose user objects changed (§3.3.3). It sends while g.mu is
+// in its order, recognizes joins and leaves, appends a membership record
+// of every member before the log loses memberships, and tells clients of
+// the members whose user objects changed (§3.3.3). It sends while g.mu is
 // held, so that every connection gets the changes in the order they were
 // seen.
 func (g *Gateway) syncLocked() {
@@ -93,7 +99,7 @@ func (g *Gateway) syncLocked() {
 	members := g.roomMembers()
 	present := make(map[wire.LogID]bool, len(entries))
 	referenced := make(map[*message.User]bool)
-	var oldest wire.LogID
+	var oldest, newest wire.LogID
 	for i, m := range entries {
 		key := keyOf(m)
 		_, seen := g.ids.Lookup(key)
@@ -102,6 +108,7 @@ func (g *Gateway) syncLocked() {
 		if i == 0 {
 			oldest = id
 		}
+		newest = id
 		if f, ok := m.(message.MessageFrom); ok {
 			referenced[f.From()] = true
 		}
@@ -109,13 +116,20 @@ func (g *Gateway) syncLocked() {
 			g.classifyLocked(id, a.Body(), members)
 		}
 	}
+	// Whether the log loses memberships: a join or leave left the buffer,
+	// or one of the gateway's membership records fell below its oldest.
+	lost := false
 	for id, membership := range g.log.memberships {
 		if !present[id] {
 			delete(g.log.memberships, id)
+			lost = true
 		} else {
 			referenced[g.userByIDLocked(membership.Members[0].User.UserID)] = true
 		}
 	}
+	// A buffer that turned over entirely since the last sync may have
+	// dropped memberships the gateway never saw, newer than any it keeps.
+	unseen := g.log.newest != 0 && !present[g.log.newest]
 	if len(entries) > 0 {
 		if g.log.oldest != 0 && g.log.oldest != oldest {
 			// The buffer drops only its oldest, so a new oldest means it
@@ -123,7 +137,25 @@ func (g *Gateway) syncLocked() {
 			// oldest (§4.3.3).
 			g.log.evicted = true
 		}
-		g.log.oldest = oldest
+		g.log.oldest, g.log.newest = oldest, newest
+	}
+	if g.log.evicted {
+		before := len(g.log.snapshots)
+		g.log.snapshots = slices.DeleteFunc(g.log.snapshots, func(s wire.Membership) bool { return s.LogID < g.log.oldest })
+		lost = lost || len(g.log.snapshots) < before
+	}
+	// What the log drops is older than what it keeps, so a membership
+	// record of every member that it keeps still tells who is in the room;
+	// otherwise the gateway appends one (§4.3.3).
+	if (unseen || lost && len(g.log.snapshots) == 0) && len(members) > 0 {
+		// Its log_id is the latest yet, after every message of the
+		// buffer's, so the log's records stay in order, and its lower
+		// bound, the buffer's oldest, never moves back.
+		snapshot := wire.Membership{LogID: g.clock.Next(), RoomID: Room}
+		for _, member := range members {
+			snapshot.Members = append(snapshot.Members, wire.Member{User: g.recordedLocked(member.User), Joined: true})
+		}
+		g.log.snapshots = append(g.log.snapshots, snapshot)
 	}
 	for key := range g.log.replyTo {
 		// Kept until the message has left the buffer, or, for one that
@@ -220,7 +252,8 @@ func (g *Gateway) recordLocked(m message.Message, id wire.LogID) (wire.Record, b
 }
 
 // logLocked returns the log as of the last sync: the room's record, the
-// buffer's records, in log_id order, with its bounds.
+// buffer's records, and the gateway's membership records, in log_id order,
+// with its bounds.
 func (g *Gateway) logLocked() wire.Log {
 	room := g.roomLocked()
 	records := []wire.Record{{LogID: g.roomLogID, Room: &room}}
@@ -232,6 +265,9 @@ func (g *Gateway) logLocked() wire.Log {
 		if record, ok := g.recordLocked(m, id); ok {
 			records = append(records, record)
 		}
+	}
+	for i := range g.log.snapshots {
+		records = append(records, wire.Record{LogID: g.log.snapshots[i].LogID, Membership: &g.log.snapshots[i]})
 	}
 	slices.SortFunc(records, func(a, b wire.Record) int { return cmp.Compare(a.LogID, b.LogID) })
 	log := wire.Log{Records: records, Lower: g.roomLogID, Latest: records[len(records)-1].LogID}

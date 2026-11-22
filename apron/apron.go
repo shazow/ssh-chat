@@ -11,7 +11,9 @@
 // What maps where:
 //
 //   - The room is the server's one room, Room, and its log is the room's
-//     history buffer: history pages it, and it ends where the buffer does.
+//     history buffer: history pages it, and it ends where the buffer does,
+//     with a membership record of everyone in the room once the buffer
+//     has dropped the joins.
 //   - A member is a user, with a user_id that stays the same across renames
 //     for as long as the member is around; the name is the member's name,
 //     ops have role "op", and away members have status "away".

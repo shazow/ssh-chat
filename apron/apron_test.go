@@ -639,6 +639,53 @@ func TestHistoryFollowsTheBuffer(t *testing.T) {
 	}
 }
 
+// The history buffer drops joins as it fills; before the log loses them,
+// it gets a membership record of everyone in the room (§4.3.3).
+func TestHistoryKeepsMembersAsTheBufferDrops(t *testing.T) {
+	c := newChat(t)
+	bob := c.ssh("bob", nil)
+	bob.expect("bob joined")
+	ada := c.apron("ada")
+	membership(ada, "ada", true)
+	for i := range 25 {
+		ada.ok("message", map[string]any{"body": map[string]any{"text": fmt.Sprintf("line %d", i)}})
+	}
+	full := ada.ok("history", map[string]any{})
+	lower := full["history_log_id"].(string)
+	memberships, _ := full["memberships"].([]any)
+	if len(memberships) != 1 {
+		t.Fatalf("memberships after the joins left the buffer: %v", memberships)
+	}
+	record := memberships[0].(map[string]any)
+	var names []string
+	for _, e := range record["members"].([]any) {
+		entry := e.(map[string]any)
+		if entry["joined"] != true {
+			t.Fatalf("a member not joined: %v", record)
+		}
+		names = append(names, entry["user"].(map[string]any)["name"].(string))
+	}
+	slices.Sort(names)
+	if fmt.Sprint(names) != "[ada bob]" || compareLogIDs(record["log_id"].(string), lower) < 0 {
+		t.Fatalf("membership record %v, history_log_id %s", record, lower)
+	}
+
+	// The record stays in the log as long as it is newer than the
+	// buffer's oldest, and the bound never moves back; once the buffer
+	// passes it, another takes its place.
+	for i := range 25 {
+		ada.ok("message", map[string]any{"body": map[string]any{"text": fmt.Sprintf("more %d", i)}})
+		page := ada.ok("history", map[string]any{})
+		if compareLogIDs(page["history_log_id"].(string), lower) < 0 {
+			t.Fatalf("history_log_id moved back: %s -> %v", lower, page["history_log_id"])
+		}
+		lower = page["history_log_id"].(string)
+		if m, _ := page["memberships"].([]any); len(m) == 0 {
+			t.Fatalf("no membership record after %d more lines: %v", i+1, page)
+		}
+	}
+}
+
 func TestRenameKeepsMessageIDs(t *testing.T) {
 	c := newChat(t)
 	alice := c.ssh("alice", nil)
