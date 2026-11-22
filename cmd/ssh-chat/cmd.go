@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	sshchat "github.com/shazow/ssh-chat"
+	"github.com/shazow/ssh-chat/apron"
 	"github.com/shazow/ssh-chat/chat"
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
@@ -39,6 +41,9 @@ type Options struct {
 	Allowlist  string   `long:"allowlist" description:"Optional file of public keys who are allowed to connect."`
 	Whitelist  string   `long:"whitelist" dexcription:"Old name for allowlist option"`
 	Passphrase string   `long:"unsafe-passphrase" description:"Require an interactive passphrase to connect. Allowlist feature is more secure."`
+
+	BindApron    string   `long:"bind-apron" description:"Also serve the chat over the Apron protocol (WebSocket at /ws) on this host and port, such as 127.0.0.1:8080."`
+	ApronOrigins []string `long:"apron-origin" description:"Origin, such as https://web.apron.chat, of a web app allowed to open an Apron WebSocket. Repeatable; '*' allows any."`
 
 	RequirePubkey bool `long:"require-pubkey" description:"Refuse connections that do not present a public key, so every user has a key fingerprint. Any key is accepted. Has no effect with --unsafe-passphrase."`
 }
@@ -190,6 +195,25 @@ func main() {
 	}
 
 	go host.Serve()
+
+	if options.BindApron != "" {
+		gateway := apron.New(host, auth, Version)
+		for _, origin := range options.ApronOrigins {
+			if origin == "*" {
+				gateway.Server().AllowAnyOrigin = true
+			} else {
+				gateway.Server().OriginPatterns = append(gateway.Server().OriginPatterns, origin)
+			}
+		}
+		apronListener, err := net.Listen("tcp", options.BindApron)
+		if err != nil {
+			fail(9, "Failed to listen for Apron on socket: %v\n", err)
+		}
+		fmt.Printf("Listening for Apron connections on ws://%v/ws\n", apronListener.Addr().String())
+		go func() {
+			fmt.Fprintln(os.Stderr, (&http.Server{Handler: gateway.Handler()}).Serve(apronListener))
+		}()
+	}
 
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)

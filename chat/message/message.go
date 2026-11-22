@@ -58,6 +58,11 @@ func (m Msg) String() string {
 	return m.body
 }
 
+// Body returns the message's text, without rendering.
+func (m Msg) Body() string {
+	return m.body
+}
+
 func (m Msg) Command() string {
 	return ""
 }

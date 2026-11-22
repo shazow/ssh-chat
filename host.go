@@ -90,6 +90,13 @@ func (h *Host) SetMotd(motd string) {
 	h.mu.Unlock()
 }
 
+// Motd returns the host's message of the day.
+func (h *Host) Motd() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.motd
+}
+
 func (h *Host) isOp(conn sshd.Connection) bool {
 	key := conn.PublicKey()
 	if key == nil {

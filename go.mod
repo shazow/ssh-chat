@@ -2,7 +2,9 @@ module github.com/shazow/ssh-chat
 
 require (
 	github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58
-	github.com/jessevdk/go-flags v1.5.0
+	github.com/apron-chat/apron-server-go v0.0.0-00010101000000-000000000000
+	github.com/coder/websocket v1.8.14
+	github.com/jessevdk/go-flags v1.6.1
 	github.com/shazow/rateio v0.0.0-20200113175441-4461efc8bdc4
 	golang.org/x/crypto v0.59.0
 	golang.org/x/sync v0.25.0
@@ -11,4 +13,6 @@ require (
 	golang.org/x/text v0.44.0
 )
 
-go 1.26.0
+go 1.27.0
+
+replace github.com/apron-chat/apron-server-go => ../apron-server-go

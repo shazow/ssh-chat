@@ -168,6 +168,20 @@ func (u *User) Consume() {
 	}
 }
 
+// ConsumeFunc is like Consume, but hands each message to handle instead of
+// rendering it to a screen, for users connected by something other than a
+// terminal. It returns once the user is closed.
+func (u *User) ConsumeFunc(handle func(Message)) {
+	for {
+		select {
+		case <-u.done:
+			return
+		case m := <-u.msg:
+			handle(m)
+		}
+	}
+}
+
 // Consume one message and stop, mostly for testing
 func (u *User) ConsumeOne() Message {
 	return <-u.msg
