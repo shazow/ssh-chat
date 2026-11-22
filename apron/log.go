@@ -170,11 +170,9 @@ func (g *Gateway) syncLocked() {
 	for _, member := range members {
 		u := g.userLocked(member.User)
 		if old, ok := g.log.known[member.User]; ok {
-			if _, changed := u.Patch(old); changed {
-				// A patch, which clears what was taken away, such as
-				// roles: [] for a member who is no longer an op.
-				g.server.PublishUser(old, u, nil)
-			}
+			// A patch, which clears what was taken away, such as roles: []
+			// for a member who is no longer an op; nothing if unchanged.
+			g.server.PublishUser(old, u, nil)
 		}
 		known[member.User] = u
 		referenced[member.User] = true

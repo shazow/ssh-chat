@@ -791,9 +791,12 @@ func TestUserUpdatesInOrder(t *testing.T) {
 	c.gateway.mu.Unlock()
 
 	// Every frame sent before the reply has arrived with it.
-	ada.ok("history", map[string]any{"limit": 1})
+	_, before, err := ada.c.CallFrames(within(t), "history", map[string]any{"limit": 1})
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
 	var statuses []string
-	for _, f := range ada.c.Pending() {
+	for _, f := range before {
 		if m := object(f); userUpdate("new", bobID, "status")(m) {
 			statuses = append(statuses, params(m)["new"].(map[string]any)["status"].(string))
 		}
@@ -859,6 +862,9 @@ func TestFailedJoinLeavesTheConnectionOpen(t *testing.T) {
 	// history; a request before sign-in is refused.
 	if _, e := ada.call("history", map[string]any{}); e == nil {
 		t.Fatal("history before sign-in")
+	}
+	if err := ada.c.Sync(within(t)); err != nil {
+		t.Fatalf("sync: %v", err)
 	}
 	if pending := ada.c.Pending(); len(pending) != 0 {
 		t.Fatalf("frames of a failed sign-in: %s", pending[0].Raw)
