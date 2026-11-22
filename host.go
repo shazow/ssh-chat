@@ -188,7 +188,7 @@ func (h *Host) Connect(term *sshd.Terminal) {
 
 	// Should the user be op'd on join?
 	if h.isOp(term.Conn) {
-		member.IsOp = true
+		member.IsOp.Store(true)
 	}
 	ratelimit := rateio.NewSimpleLimiter(3, time.Second*3)
 
@@ -630,7 +630,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 			if !ok {
 				return errors.New("user not found")
 			}
-			member.IsOp = opValue
+			member.IsOp.Store(opValue)
 
 			id := member.Identifier.(*Identity)
 			h.auth.Op(id.PublicKey(), until)
@@ -814,7 +814,7 @@ func (h *Host) InitCommands(c *chat.Commands) {
 		}
 		var kicked []string
 		forConnectedUsers(func(user *chat.Member, pk ssh.PublicKey) error {
-			if h.auth.CheckPublicKey(pk) != nil && !user.IsOp { // we do this check here as well for ops without keys
+			if h.auth.CheckPublicKey(pk) != nil && !user.IsOp.Load() { // we do this check here as well for ops without keys
 				kicked = append(kicked, user.Name())
 				user.Close()
 			}

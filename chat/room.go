@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/internal/humantime"
@@ -26,9 +27,9 @@ var ErrInvalidName = errors.New("invalid name")
 // Member is a User with per-Room metadata attached to it.
 type Member struct {
 	*message.User
-	IsOp bool
-
-	// TODO: Move IsOp under mu?
+	// IsOp is set while the member is an operator; other members' commands
+	// read it as it changes.
+	IsOp atomic.Bool
 
 	mu      sync.Mutex
 	isMuted bool // When true, messages should not be broadcasted.
@@ -170,6 +171,12 @@ func (r *Room) History(u *message.User) {
 	}
 }
 
+// HistoryBuffer returns the room's recent message history, which other
+// frontends can read, such as to page it.
+func (r *Room) HistoryBuffer() *message.History {
+	return r.history
+}
+
 // Join the room as a user, will announce.
 func (r *Room) Join(u *message.User) (*Member, error) {
 	// TODO: Check if closed
@@ -243,7 +250,7 @@ func (r *Room) IsOp(u *message.User) bool {
 	if !ok {
 		return false
 	}
-	return m.IsOp
+	return m.IsOp.Load()
 }
 
 // Topic of the room.

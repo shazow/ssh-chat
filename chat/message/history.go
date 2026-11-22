@@ -43,6 +43,8 @@ func (h *History) Add(entry Message) {
 
 // Len returns the number of entries in the history
 func (h *History) Len() int {
+	h.RLock()
+	defer h.RUnlock()
 	return h.size
 }
 
