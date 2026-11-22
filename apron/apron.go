@@ -316,13 +316,13 @@ func (g *Gateway) signInLocked(user *message.User, reply wire.Reply[wire.AuthRes
 		if other.UserID == you.UserID {
 			continue
 		}
-		frame, err := wire.Encode(wire.UserUpdate{New: &wire.CurrentUser{User: other}})
+		frame, err := wire.Encode(wire.UserUpdate{New: &other})
 		if err != nil {
 			return err
 		}
 		others = append(others, frame)
 	}
-	return reply.Send(wire.AuthResult{You: &you}, others...)
+	return reply.Send(wire.AuthResult{You: &wire.CurrentUser{User: you}}, others...)
 }
 
 func (g *Gateway) disconnected(c *wire.Conn) {

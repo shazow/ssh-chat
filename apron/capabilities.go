@@ -51,12 +51,12 @@ func (g *Gateway) recordedLocked(user *message.User) wire.User {
 }
 
 // membersLocked returns the room's members as clients were last told of
-// them.
-func (g *Gateway) membersLocked() []wire.User {
-	var users []wire.User
+// them, as complete user objects.
+func (g *Gateway) membersLocked() []wire.CurrentUser {
+	users := []wire.CurrentUser{}
 	for _, member := range g.roomMembers() {
 		if u, ok := g.log.known[member.User]; ok {
-			users = append(users, u)
+			users = append(users, wire.CurrentUser{User: u})
 		}
 	}
 	return users
@@ -84,7 +84,7 @@ func (g *Gateway) RoomList(_ context.Context, _ *wire.Conn, p wire.RoomListParam
 	if p.Members {
 		room.Members = g.membersLocked()
 		if p.UserID != "" {
-			room.Members = slices.DeleteFunc(room.Members, func(u wire.User) bool { return u.UserID != p.UserID })
+			room.Members = slices.DeleteFunc(room.Members, func(u wire.CurrentUser) bool { return u.UserID != p.UserID })
 		}
 		result.Users = room.Members
 	}

@@ -171,7 +171,7 @@ func (u *apronUser) auth(name string) error {
 	if err != nil {
 		return err
 	}
-	u.you = *result.You
+	u.you = result.You.User
 	return nil
 }
 
