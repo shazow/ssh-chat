@@ -463,8 +463,10 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 		t.Fatalf("me status: %v", you)
 	}
 	op.expect("ada has gone away")
-	if e := ada.call("me", map[string]any{"status": "dnd"})["error"]; e == nil {
-		t.Fatal("an unoffered status was accepted")
+	// A status the server does not offer is not an error: the server
+	// keeps one it does (§4.5.1), here back from away.
+	if you := result(ada.call("me", map[string]any{"status": "dnd"}))["you"].(map[string]any); you["status"] == "dnd" {
+		t.Fatalf("an unoffered status was kept: %v", you)
 	}
 
 	// room_leave of another user is /kick, for ops only.
