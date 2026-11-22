@@ -58,8 +58,14 @@ type msgKey struct {
 	body string
 }
 
+// keyOf returns a message's key. It holds the message's body, not how it
+// renders, which names the sender as they are called now: a key must not
+// change when they rename.
 func keyOf(m message.Message) msgKey {
 	k := msgKey{kind: fmt.Sprintf("%T", m), when: m.Timestamp().UnixNano(), body: m.String()}
+	if b, ok := m.(interface{ Body() string }); ok {
+		k.body = b.Body()
+	}
 	if f, ok := m.(message.MessageFrom); ok {
 		k.from = f.From()
 	}

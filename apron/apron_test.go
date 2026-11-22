@@ -639,6 +639,31 @@ func TestHistoryFollowsTheBuffer(t *testing.T) {
 	}
 }
 
+func TestRenameKeepsMessageIDs(t *testing.T) {
+	c := newChat(t)
+	alice := c.ssh("alice", nil)
+	alice.expect("alice joined")
+	ada := c.apron("ada")
+	alice.say("before the rename")
+	live := ada.expect(text("before the rename"))
+	alice.say("/nick alicia")
+	ada.expect(text("alice is now known as alicia"))
+	page := ada.ok("history", map[string]any{})
+	found := 0
+	for _, m := range page["messages"].([]any) {
+		msg := m.(map[string]any)
+		if strings.Contains(fmt.Sprint(msg["body"]), "before the rename") {
+			found++
+			if msg["message_id"] != params(live)["message_id"] {
+				t.Fatalf("the message's id changed with its sender's name: %v, live %v", msg["message_id"], params(live)["message_id"])
+			}
+		}
+	}
+	if found != 1 {
+		t.Fatalf("%d copies of the message in history: %v", found, page)
+	}
+}
+
 // Taking op away is a change too: clients merge user objects (§3.3.1), so
 // it reaches them as roles: [].
 func TestOpRemovalReachesClients(t *testing.T) {
