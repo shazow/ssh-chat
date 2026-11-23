@@ -346,7 +346,8 @@ func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*m
 	delivered := make(chan struct{})
 	go func() {
 		defer close(delivered)
-		user.ConsumeFunc(func(m message.Message) { g.deliver(c, m) })
+		var last wire.LogID
+		user.ConsumeFunc(func(m message.Message) { g.deliver(c, user, &last, m) })
 		if <-joined {
 			c.CloseWithError(errDisconnected)
 		}
@@ -634,10 +635,11 @@ func (g *Gateway) flushOthers(ctx context.Context, except *message.User) {
 	}
 }
 
-// deliver sends a message from the room to an Apron connection. It sends
-// under g.mu, as every other change the gateway tells clients of, so that
-// the user notifications a sync sends and the records keep their order.
-func (g *Gateway) deliver(c *wire.Conn, m message.Message) {
+// deliver sends a message from the room to an Apron connection, its
+// member's, which has had the records up to log_id last. It sends under
+// g.mu, as every other change the gateway tells clients of, so that the
+// user notifications a sync sends and the records keep their order.
+func (g *Gateway) deliver(c *wire.Conn, user *message.User, last *wire.LogID, m message.Message) {
 	if b, ok := m.(*barrier); ok {
 		close(b.done)
 		return
@@ -660,16 +662,49 @@ func (g *Gateway) deliver(c *wire.Conn, m message.Message) {
 		g.syncLocked()
 		// A muted member's own message is not in the history, and gets
 		// its message_id here.
-		record, ok := g.recordLocked(m, g.ids.ID(keyOf(m), m.Timestamp()))
-		switch {
-		case !ok:
-		case record.Membership != nil:
-			c.Notify(wire.RoomUpdate{Memberships: []wire.Membership{*record.Membership}})
-		default:
-			c.Notify(*record.Message)
+		id := g.ids.ID(keyOf(m), m.Timestamp())
+		if id <= *last {
+			return // Delivered already, ahead of its turn.
 		}
+		// The room adds a message to the buffer, the log, and then hands
+		// it to the members, in the poster's goroutine or one of its own,
+		// so two at once may reach a member in the other order. Those
+		// the buffer has before this one, which the member is due but has
+		// not had, go first, and are skipped when they come (§3.5.3).
+		for _, e := range g.log.entries {
+			if eid, ok := g.ids.Lookup(keyOf(e)); ok && eid > *last && eid < id && due(user, e) {
+				g.liveLocked(c, e, eid)
+			}
+		}
+		g.liveLocked(c, m, id)
+		*last = id
 	}
 	// Commands are never delivered to members; anything new is skipped.
+}
+
+// liveLocked sends a connection the record of a message, with log_id id.
+func (g *Gateway) liveLocked(c *wire.Conn, m message.Message, id wire.LogID) {
+	record, ok := g.recordLocked(m, id)
+	switch {
+	case !ok:
+	case record.Membership != nil:
+		c.Notify(wire.RoomUpdate{Memberships: []wire.Membership{*record.Membership}})
+	default:
+		c.Notify(*record.Message)
+	}
+}
+
+// due returns whether the room hands a message of its buffer to a member,
+// as Room.HandleMsg decides: not one from someone the member ignores, nor
+// an announcement while the member is quiet.
+func due(user *message.User, m message.Message) bool {
+	if f, ok := m.(message.MessageFrom); ok && user.Ignored.In(f.From().ID()) {
+		return false
+	}
+	if _, ok := m.(*message.AnnounceMsg); ok && user.Config().Quiet {
+		return false
+	}
+	return true
 }
 
 // plain turns ssh-chat's terminal line breaks into newlines.

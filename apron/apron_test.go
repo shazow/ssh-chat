@@ -875,6 +875,34 @@ func TestMessageReachesOthersBeforeItsResult(t *testing.T) {
 	}
 }
 
+// The room's goroutines may hand two messages to a member in another order
+// than they entered the history buffer, as when two are posted at once:
+// each adds its message to the buffer and then hands it to the members.
+// They still arrive in log order, once each (§3.5.3).
+func TestMessagesArriveInLogOrder(t *testing.T) {
+	c := newChat(t)
+	c.apron("ada")
+	bob := c.apron("bob")
+	sender, _ := c.host.MemberByID("ada")
+	member, _ := c.host.MemberByID("bob")
+	first, second := message.NewPublicMsg("first", sender.User), message.NewPublicMsg("second", sender.User)
+	// What two posts' goroutines do, interleaved: both add their message,
+	// and the second's hands it out first.
+	c.host.HistoryBuffer().Add(first)
+	c.host.HistoryBuffer().Add(second)
+	member.User.Send(second)
+	member.User.Send(first)
+	member.User.Send(message.NewPublicMsg("third", sender.User))
+	var got []string
+	for len(got) == 0 || got[len(got)-1] != "third" {
+		f := bob.expect(func(f map[string]any) bool { return f["method"] == "message" })
+		got = append(got, fmt.Sprint(params(f)["body"].(map[string]any)["text"]))
+	}
+	if want := []string{"first", "second", "third"}; !slices.Equal(got, want) {
+		t.Fatalf("bob's messages: %q, want %q", got, want)
+	}
+}
+
 // A guest who cannot join, as when the name and the guest name are both
 // taken, gets the error as the auth reply, and nothing of the sign-in: the
 // connection stays open for another try.
