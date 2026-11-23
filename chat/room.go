@@ -88,6 +88,9 @@ func (r *Room) SetCommands(commands Commands) {
 	r.commands = commands
 }
 
+// Commands returns the room's command handlers, which are not to be changed.
+func (r *Room) Commands() Commands { return r.commands }
+
 // Close the room and all the users it contains.
 func (r *Room) Close() {
 	r.closeOnce.Do(func() {
