@@ -26,11 +26,14 @@ func stripPrompt(s string) string {
 	if endPos := strings.Index(s, "\x1b[K-> "); endPos > 0 {
 		return s[endPos+6:]
 	}
-	if endPos := strings.Index(s, "] "); endPos > 0 {
-		return s[endPos+2:]
-	}
+	// Before "] ", which a system message may hold, as the /allowlist usage
+	// does ("import [AGE] | ..."): one sent with no prompt drawn before it
+	// starts with "-> ".
 	if strings.HasPrefix(s, "-> ") {
 		return s[3:]
+	}
+	if endPos := strings.Index(s, "] "); endPos > 0 {
+		return s[endPos+2:]
 	}
 	return s
 }
@@ -204,13 +207,18 @@ func TestHostAllowlistCommand(t *testing.T) {
 	}
 
 	kickSignal := make(chan struct{})
+	barReady := make(chan struct{})
 	clientKey, err := sshd.NewRandomSigner(1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clientKeyFP := sshd.Fingerprint(clientKey.PublicKey())
 	go sshd.ConnectShellWithKey(s.Addr().String(), "bar", clientKey, func(r io.Reader, w io.WriteCloser) error {
+		close(barReady)
 		<-kickSignal
+		// The kick reaches this client after the room hears of it: wait
+		// for the server to close the connection before writing.
+		_, _ = io.Copy(io.Discard, r)
 		n, err := w.Write([]byte("alive and well"))
 		if n != 0 || err == nil {
 			t.Error("could write after being kicked")
@@ -221,6 +229,9 @@ func TestHostAllowlistCommand(t *testing.T) {
 	sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
 		<-users
 		<-users
+		// bar's client is connected, and waits for kickSignal, before the
+		// reverification kicks it.
+		<-barReady
 		m, ok := host.MemberByID("foo")
 		if !ok {
 			t.Fatal("can't get member foo")
@@ -366,11 +377,18 @@ func TestHostKick(t *testing.T) {
 			scanner.Scan() // Connected message
 
 			w.Write([]byte("/kick bar\r\n"))
-			scanner.Scan() // Prompt
-
-			scanner.Scan() // Kick result
-			if actual, expected := stripPrompt(scanner.Text()), " * bar was kicked by quux.\r"; actual != expected {
-				t.Errorf("Failed to detect kick:\n Got: %q;\nWant: %q", actual, expected)
+			// The kick result comes within the next three lines, with
+			// the prompt and bar leaving, whose order depends on when
+			// the prompt is drawn.
+			const expected = " * bar was kicked by quux.\r"
+			var got []string
+			for len(got) < 3 && scanner.Scan() {
+				if got = append(got, stripPrompt(scanner.Text())); got[len(got)-1] == expected {
+					break
+				}
+			}
+			if len(got) == 0 || got[len(got)-1] != expected {
+				t.Errorf("Failed to detect kick:\n Got: %q;\nWant: %q", got, expected)
 			}
 
 			kicked <- struct{}{}
@@ -387,17 +405,17 @@ func TestHostKick(t *testing.T) {
 
 			<-kicked
 
+			// The kick is announced before the server closes the
+			// connection: read to its end before writing.
+			for scanner.Scan() {
+			}
+			if err := scanner.Err(); err != nil {
+				return err
+			}
 			if _, err := w.Write([]byte("am I still here?\r\n")); err != io.EOF {
 				return errors.New("expected to be kicked")
 			}
-
-			scanner.Scan()
-			if err := scanner.Err(); err == io.EOF {
-				// All good, we got kicked.
-				return nil
-			} else {
-				return err
-			}
+			return nil
 		})
 	})
 
