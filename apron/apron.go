@@ -25,6 +25,7 @@
 //   - A private message is a transient message from its sender, marked in
 //     ext.
 //   - Commands arrive as command requests, and run as if typed over SSH;
+//     ext:command_list lists those that ssh-chat's /help does;
 //     me sets the name with /nick and status away with /away, and an op's
 //     room_leave of another user is /kick.
 //
@@ -43,6 +44,7 @@ import (
 	"time"
 
 	"github.com/apron-chat/apron-server-go/wire"
+	"github.com/apron-chat/apron-server-go/wire/commands"
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
 
@@ -140,10 +142,11 @@ func New(config Config) *Gateway {
 	if slices.Contains(config.Origins, "*") {
 		checkOrigin = wire.AnyOrigin
 	}
+	router := g.newRouter(g.host.Commands())
 	g.server = &wire.Server{
 		Backend:      g,
 		Messages:     g,
-		Commands:     g,
+		Commands:     router,
 		Profiles:     g,
 		Rooms:        g,
 		History:      g,
@@ -151,6 +154,7 @@ func New(config Config) *Gateway {
 		OnDisconnect: g.disconnected,
 		CheckOrigin:  checkOrigin,
 	}
+	g.server.Handle(commands.ListMethod, router.ListHandler())
 	g.stop = make(chan struct{})
 	g.mu.Lock()
 	g.syncLocked()
@@ -375,33 +379,6 @@ func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParam
 		result.MessageID, _ = g.ids.Lookup(keyOf(posted[0]))
 	}
 	return reply.Send(result)
-}
-
-func (g *Gateway) Command(ctx context.Context, c *wire.Conn, p wire.CommandParams, reply wire.Reply[wire.CommandResult]) error {
-	s, _ := wire.DataOf[*session](c)
-	text := strings.TrimSpace(g.withNames(p.Body))
-	if strings.ContainsAny(text, "\r\n") {
-		return wire.InvalidParams("A command is one line")
-	}
-	if err := g.check(s, text); err != nil {
-		return err
-	}
-	if err := g.start(s, text); err != nil {
-		return err
-	}
-	// The command has run; what it sends the member is still on its way,
-	// and comes before the result (§1, §4.1). Waiting for it can take a
-	// while, so the result is sent later, and the connection goes on with
-	// its next request meanwhile. ctx is the connection's, which ends with
-	// it.
-	go func() {
-		if err := g.settle(ctx, s.user); err != nil {
-			reply.Fail(err)
-			return
-		}
-		reply.Send(wire.CommandResult{})
-	}()
-	return reply.Later()
 }
 
 // run runs a command line as the member typed it, and waits for what it

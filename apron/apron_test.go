@@ -898,3 +898,63 @@ func TestOrigins(t *testing.T) {
 		}
 	}
 }
+
+// commandNames returns the names of the commands ext:command_list lists.
+func commandNames(u *apronUser) []string {
+	u.t.Helper()
+	var names []string
+	for _, e := range u.ok("ext:command_list", nil)["commands"].([]any) {
+		names = append(names, e.(map[string]any)["name"].(string))
+	}
+	return names
+}
+
+func TestCommandList(t *testing.T) {
+	c := newChat(t)
+	key, err := sshd.NewRandomSigner(1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.auth.Op(key.PublicKey(), 0)
+	op := c.ssh("op", key)
+	op.expect("op joined")
+	ada := c.apron("ada")
+
+	// The commands of ssh-chat's /help, with its usage and help, op
+	// commands only for ops.
+	names := commandNames(ada)
+	if names[0] != "help" || !slices.Contains(names, "msg") || !slices.Contains(names, "nick") ||
+		slices.Contains(names, "kick") || slices.Contains(names, "quit") || slices.Contains(names, "me") {
+		t.Fatalf("command list: %v", names)
+	}
+	for _, e := range ada.ok("ext:command_list", nil)["commands"].([]any) {
+		if entry := e.(map[string]any); entry["name"] == "msg" &&
+			(entry["hint"] != "USER MESSAGE" || entry["description"] != "Send MESSAGE to USER." || fmt.Sprint(entry["uses"]) != "[body.mentions]") {
+			t.Fatalf("msg: %v", entry)
+		}
+	}
+	op.say("/op ada")
+	ada.expect(text("Made op"))
+	if names := commandNames(ada); !slices.Contains(names, "kick") {
+		t.Fatalf("an op's command list: %v", names)
+	}
+
+	// /help is ssh-chat's, and commands it does not list still run.
+	ada.ok("command", map[string]any{"body": map[string]any{"text": "/help"}})
+	ada.expect(text("Operator commands"))
+	ada.ok("command", map[string]any{"body": map[string]any{"text": "/me waves"}})
+	op.expect("ada waves")
+
+	// An op command is ssh-chat's to refuse, as over SSH.
+	bea := c.apron("bea")
+	bea.ok("command", map[string]any{"body": map[string]any{"text": "/kick ada"}})
+	bea.expect(text("must be op"))
+
+	// Every command line is checked as a line of input.
+	if _, e := ada.call("command", map[string]any{"body": map[string]any{"text": "/msg op " + strings.Repeat("x", maxInputLength)}}); e == nil || e.Code != wire.CodeTooLarge {
+		t.Fatalf("long command: %v", e)
+	}
+	if _, e := ada.call("command", map[string]any{"room_id": "elsewhere", "body": map[string]any{"text": "/names"}}); e == nil || e.Code != wire.CodeInvalidParams {
+		t.Fatalf("another room: %v", e)
+	}
+}
