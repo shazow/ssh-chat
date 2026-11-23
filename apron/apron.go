@@ -386,22 +386,42 @@ func (g *Gateway) Command(ctx context.Context, c *wire.Conn, p wire.CommandParam
 	if err := g.check(s, text); err != nil {
 		return err
 	}
-	if err := g.run(ctx, s, text); err != nil {
+	if err := g.start(s, text); err != nil {
 		return err
 	}
-	return reply.Send(wire.CommandResult{})
+	// The command has run; what it sends the member is still on its way,
+	// and comes before the result (§1, §4.1). Waiting for it can take a
+	// while, so the result is sent later, and the connection goes on with
+	// its next request meanwhile. ctx is the connection's, which ends with
+	// it.
+	go func() {
+		if err := g.settle(ctx, s.user); err != nil {
+			reply.Fail(err)
+			return
+		}
+		reply.Send(wire.CommandResult{})
+	}()
+	return reply.Later()
 }
 
 // run runs a command line as the member typed it, and waits for what it
 // sends the member.
 func (g *Gateway) run(ctx context.Context, s *session, line string) error {
+	if err := g.start(s, line); err != nil {
+		return err
+	}
+	// Replies to the command are sent before the result (§1, §4.1).
+	return g.settle(ctx, s.user)
+}
+
+// start runs a command line as the member typed it.
+func (g *Gateway) start(s *session, line string) error {
 	cmd, ok := message.NewPublicMsg(line, s.user).ParseCommand()
 	if !ok {
 		return wire.InvalidParams("A command starts with /")
 	}
 	g.host.HandleMsg(cmd)
-	// Replies to the command are sent before the result (§1, §4.1).
-	return g.settle(ctx, s.user)
+	return nil
 }
 
 func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply wire.Reply[wire.CurrentUser]) error {
