@@ -3,6 +3,7 @@ package apron
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 
@@ -95,7 +96,10 @@ var (
 // held, so that every connection gets the changes in the order they were
 // seen.
 func (g *Gateway) syncLocked() {
-	entries := g.history.Get(g.history.Len())
+	// The whole buffer, read at once: Get takes at most what there is, and
+	// one added between Len and Get would drop the oldest from the view,
+	// as if the buffer had dropped it.
+	entries := g.history.Get(math.MaxInt)
 	members := g.roomMembers()
 	present := make(map[wire.LogID]bool, len(entries))
 	referenced := make(map[*message.User]bool)
