@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/apron-chat/apron-server-go/wire"
+	"github.com/apron-chat/apron-server-go/wire/bot"
 	"github.com/apron-chat/apron-server-go/wire/wiretest"
 	"github.com/coder/websocket"
 	"github.com/shazow/rateio"
@@ -957,4 +958,93 @@ func TestCommandList(t *testing.T) {
 	if _, e := ada.call("command", map[string]any{"room_id": "elsewhere", "body": map[string]any{"text": "/names"}}); e == nil || e.Code != wire.CodeInvalidParams {
 		t.Fatalf("another room: %v", e)
 	}
+}
+
+// A bot of wire/bot runs on the gateway as a member of the room, on a
+// Local connection: it sees what SSH users say, and they see its replies.
+func TestBot(t *testing.T) {
+	c := newChat(t)
+	alice := c.ssh("alice", nil)
+	alice.expect("alice joined")
+	ada := c.apron("ada")
+
+	heard := make(chan wire.Message, 10)
+	echo, err := bot.Start(c.gateway.Server(), bot.Options{
+		User: wire.User{UserID: "echo", Name: "echo"},
+		OnMessage: func(ctx context.Context, b *bot.Bot, m wire.Message) {
+			said, ok := strings.CutPrefix(m.Body.Text, "echo ")
+			if m.MessageID == 0 || !ok {
+				return
+			}
+			heard <- m
+			if _, err := b.Reply(ctx, m, "you said "+said); err != nil {
+				t.Errorf("reply: %v", err)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { echo.Close() })
+	alice.expect("echo joined")
+	if bot := membership(ada, "echo", true); bot["user_id"] != "echo" {
+		t.Fatalf("the bot's user: %v", bot)
+	}
+
+	alice.say("echo hello")
+	var m wire.Message
+	select {
+	case m = <-heard:
+	case <-within(t).Done():
+		t.Fatal("the bot heard nothing")
+	}
+	if m.From.Name != "alice" || m.RoomID != DefaultRoom {
+		t.Fatalf("the bot heard %+v", m)
+	}
+	alice.expect("echo: you said hello")
+	reply := ada.expect(text("you said hello"))
+	replyTo, _ := params(reply)["reply_to"].(map[string]any)
+	if from(reply)["user_id"] != "echo" || replyTo["message_id"] != fmt.Sprint(m.MessageID) {
+		t.Fatalf("the bot's reply: %v", reply)
+	}
+
+	// A Local connection's commands are ssh-chat's, with their replies
+	// before the result; ssh-chat knows it as a local Apron client.
+	var notices []string
+	got := make(chan string, 10)
+	probe, err := bot.Dial(c.gateway.Server(), wire.LocalOptions{
+		User: wire.User{UserID: "probe", Name: "probe"},
+		OnFrame: func(f wire.Frame) {
+			var n struct {
+				Params wire.Message `json:"params"`
+			}
+			if json.Unmarshal(f, &n) == nil && n.Params.From.UserID == wire.Private.UserID {
+				got <- n.Params.Body.Text
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := probe.Command(within(t), wire.CommandParams{Body: &wire.Body{Text: "/whois echo"}}); err != nil {
+		t.Fatal(err)
+	}
+	for len(got) > 0 {
+		notices = append(notices, <-got)
+	}
+	if !strings.Contains(strings.Join(notices, "\n"), "apron local") {
+		t.Fatalf("/whois echo: %q", notices)
+	}
+	probe.Close()
+
+	// A user_id that is someone else's in the room is not the bot's.
+	for _, taken := range []string{"echo", ada.you.UserID} {
+		if _, err := c.gateway.Server().Local(wire.LocalOptions{User: wire.User{UserID: taken}}); err == nil {
+			t.Fatalf("a Local connection signed in as %s, who is in the room", taken)
+		}
+	}
+
+	// Closing the bot leaves the room.
+	echo.Close()
+	alice.expect("echo left")
 }

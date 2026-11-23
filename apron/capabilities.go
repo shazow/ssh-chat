@@ -3,6 +3,7 @@ package apron
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/apron-chat/apron-server-go/wire"
@@ -13,24 +14,50 @@ import (
 // Users.
 
 // userIDLocked returns a member's user_id, giving one to a user the gateway
-// has not seen before.
+// has not seen before: the one a Local connection's member names, or the
+// next of the gateway's own that nobody has.
 func (g *Gateway) userIDLocked(user *message.User) string {
-	id, ok := g.userIDs[user]
-	if !ok {
+	if id, ok := g.userIDs[user]; ok {
+		return id
+	}
+	id, ok := g.pinned[user]
+	for !ok {
 		g.nextID++
 		id = fmt.Sprintf("u%d", g.nextID)
-		g.userIDs[user] = id
+		ok = g.userByIDLocked(id) == nil && !slices.Contains(slices.Collect(maps.Values(g.pinned)), id)
 	}
+	g.userIDs[user] = id
 	return id
 }
 
+// userByIDLocked returns the user with a user_id, the member in the room
+// when another, who has left, had it before.
 func (g *Gateway) userByIDLocked(userID string) *message.User {
+	var found *message.User
 	for user, id := range g.userIDs {
-		if id == userID {
+		if id != userID {
+			continue
+		}
+		if _, ok := g.host.Member(user); ok {
 			return user
 		}
+		found = user
 	}
-	return nil
+	return found
+}
+
+// takenLocked reports whether a user_id is a member's in the room, or a
+// Local connection's.
+func (g *Gateway) takenLocked(userID string) bool {
+	if slices.Contains(slices.Collect(maps.Values(g.pinned)), userID) {
+		return true
+	}
+	user := g.userByIDLocked(userID)
+	if user == nil {
+		return false
+	}
+	_, ok := g.host.Member(user)
+	return ok
 }
 
 // userLocked returns a member's complete current user object (§3.3.1).

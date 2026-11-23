@@ -31,6 +31,16 @@
 //
 // Sign-in is as a guest, only while ssh-chat lets in anonymous users: an
 // allowlist, a passphrase, or --require-pubkey keeps Apron clients out.
+//
+// A bot of the server's own, of package bot of wire, runs on the gateway's
+// Server: a Local connection is a member from the start, as the user_id
+// and name it opens with, while that user_id is nobody else's in the room;
+// its Data is the gateway's.
+//
+//	echo, err := bot.Start(gateway.Server(), bot.Options{
+//		User: wire.User{UserID: "echo", Name: "echo"},
+//		OnMessage: func(ctx context.Context, b *bot.Bot, m wire.Message) { ... },
+//	})
 package apron
 
 import (
@@ -109,9 +119,12 @@ type Gateway struct {
 
 	mu      sync.Mutex
 	userIDs map[*message.User]string
-	nextID  int
-	guests  int
-	log     logState
+	// pinned are the user_ids of Local connections' members, which they
+	// name themselves.
+	pinned map[*message.User]string
+	nextID int
+	guests int
+	log    logState
 }
 
 // New returns a Gateway that joins Apron clients to the host's room.
@@ -122,6 +135,7 @@ func New(config Config) *Gateway {
 		history: config.History,
 		version: config.Version,
 		userIDs: make(map[*message.User]string),
+		pinned:  make(map[*message.User]string),
 		limiter: func() rateio.Limiter { return rateio.NewSimpleLimiter(3, 3*time.Second) },
 	}
 	if g.history == nil {
@@ -151,6 +165,7 @@ func New(config Config) *Gateway {
 		Rooms:        g,
 		History:      g,
 		Status:       g,
+		OnConnect:    g.connected,
 		OnDisconnect: g.disconnected,
 		CheckOrigin:  checkOrigin,
 	}
@@ -185,7 +200,8 @@ func (g *Gateway) watch() {
 }
 
 // Server is the gateway's protocol server, for its settings, which are
-// set before it serves its first connection.
+// set before it serves its first connection, and for Local connections,
+// such as bots' (see the package documentation).
 func (g *Gateway) Server() *wire.Server { return g.server }
 
 // Handler serves the WebSocket endpoint at /ws, and a line for browsers at
@@ -247,13 +263,80 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 	if err := g.auth.CheckBans(conn.RemoteAddr(), nil, client); err != nil {
 		return wire.Denied("You are banned from this server")
 	}
+	user, err := g.admit(ctx, c, conn, "")
+	if err != nil {
+		return err
+	}
 
+	// The reply is sent under g.mu, which signs the connection in as the
+	// result is queued, so that every user notification sent after it
+	// reaches the connection too.
+	g.mu.Lock()
+	you, others, err := g.signInLocked(user)
+	if err == nil {
+		err = reply.Send(wire.AuthResult{You: &wire.CurrentUser{User: you}}, others...)
+	}
+	g.mu.Unlock()
+	if g.afterAuth != nil {
+		g.afterAuth(c)
+	}
+	return err
+}
+
+// connected admits a Local connection (wire.Server.Local), such as a bot's
+// (wire/bot), which opens signed in as the user it names: its member joins
+// the room as an Apron client's does when it signs in, as that user_id,
+// and named as the user is, or as a guest when the name is taken. The
+// program that opens it is the server's own, so an allowlist or a ban does
+// not keep it out. A network connection signs in with auth instead.
+func (g *Gateway) connected(ctx context.Context, c *wire.Conn) error {
+	u := c.User()
+	if u == nil {
+		return nil
+	}
+	name := u.Name
+	if name == "" {
+		name = u.UserID
+	}
+	user, err := g.admit(ctx, c, &connection{conn: c, name: name, client: "apron local"}, u.UserID)
+	if err == nil {
+		// What a sign-in would send: frames sent while wire opens the
+		// connection go after its server frame.
+		g.mu.Lock()
+		var you wire.User
+		var others []wire.Frame
+		if you, others, err = g.signInLocked(user); err == nil {
+			c.SetUser(you)
+			c.SendBatch(others...)
+		}
+		g.mu.Unlock()
+	}
+	if err != nil {
+		// wire does not tell OnDisconnect of a connection OnConnect
+		// refused.
+		g.disconnected(c)
+	}
+	return err
+}
+
+// admit joins a connection's member to the room, as a guest when the name
+// it asks for is taken, and starts delivering to the connection what the
+// room sends the member. userID, if set, is the member's user_id, unless
+// it is someone else's in the room.
+func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection, userID string) (*message.User, error) {
 	id := sshchat.NewIdentity(conn)
 	user := message.NewUser(id)
 	cfg := user.Config()
 	cfg.Theme = nil // Text goes out unrendered.
 	user.SetConfig(cfg)
 	g.mu.Lock()
+	if userID != "" {
+		if g.takenLocked(userID) {
+			g.mu.Unlock()
+			return nil, fmt.Errorf("apron: user_id %s is someone else's in the room", userID)
+		}
+		g.pinned[user] = userID
+	}
 	g.guests++
 	guest := fmt.Sprintf("Guest%d", g.guests)
 	g.mu.Unlock()
@@ -288,32 +371,26 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 		user.Close()
 		// Nothing more is delivered once Auth returns.
 		<-delivered
-		return wire.Denied("Could not join the chat: " + err.Error())
+		g.mu.Lock()
+		delete(g.pinned, user)
+		g.mu.Unlock()
+		return nil, wire.Denied("Could not join the chat: " + err.Error())
 	}
 	joined <- true
 	c.SetData(&session{user: user, limit: g.limiter()})
 	if err := g.settle(ctx, user); err != nil {
-		return err
+		return nil, err
 	}
-
-	g.mu.Lock()
-	err = g.signInLocked(user, reply)
-	g.mu.Unlock()
-	if g.afterAuth != nil {
-		g.afterAuth(c)
-	}
-	return err
+	return user, nil
 }
 
-// signInLocked answers a sign-in with the member's user object, followed by
-// the others in the room, with their statuses (§4.5.4). It replies under
-// g.mu, which signs the connection in as the result is queued, so that
-// every user notification sent after it reaches the connection too.
-func (g *Gateway) signInLocked(user *message.User, reply wire.Reply[wire.AuthResult]) error {
+// signInLocked returns what a sign-in tells the member: its user object,
+// and the others in the room, with their statuses (§4.5.4).
+func (g *Gateway) signInLocked(user *message.User) (wire.User, []wire.Frame, error) {
 	g.syncLocked()
 	you, ok := g.log.known[user]
 	if !ok {
-		return errDisconnected
+		return wire.User{}, nil, errDisconnected
 	}
 	var others []wire.Frame
 	for _, other := range g.membersLocked() {
@@ -322,11 +399,11 @@ func (g *Gateway) signInLocked(user *message.User, reply wire.Reply[wire.AuthRes
 		}
 		frame, err := wire.Encode(wire.UserUpdate{New: &other})
 		if err != nil {
-			return err
+			return wire.User{}, nil, err
 		}
 		others = append(others, frame)
 	}
-	return reply.Send(wire.AuthResult{You: &wire.CurrentUser{User: you}}, others...)
+	return you, others, nil
 }
 
 func (g *Gateway) disconnected(c *wire.Conn) {
@@ -336,6 +413,9 @@ func (g *Gateway) disconnected(c *wire.Conn) {
 	}
 	_ = g.host.Leave(s.user)
 	s.user.Close()
+	g.mu.Lock()
+	delete(g.pinned, s.user)
+	g.mu.Unlock()
 }
 
 func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParams, reply wire.Reply[wire.MessageResult]) error {
