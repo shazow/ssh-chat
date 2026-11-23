@@ -972,8 +972,8 @@ func TestBot(t *testing.T) {
 	echo, err := bot.Start(c.gateway.Server(), bot.Options{
 		User: wire.User{UserID: "echo", Name: "echo"},
 		OnMessage: func(ctx context.Context, b *bot.Bot, m wire.Message) {
-			said, ok := strings.CutPrefix(m.Body.Text, "echo ")
-			if m.MessageID == 0 || !ok {
+			said, ok := strings.CutPrefix(m.Body.Text, "echo: ")
+			if !b.Addressed(m) || !ok {
 				return
 			}
 			heard <- m
@@ -987,11 +987,11 @@ func TestBot(t *testing.T) {
 	}
 	t.Cleanup(func() { echo.Close() })
 	alice.expect("echo joined")
-	if bot := membership(ada, "echo", true); bot["user_id"] != "echo" {
-		t.Fatalf("the bot's user: %v", bot)
+	if bot := membership(ada, "echo", true); bot["user_id"] != echo.UserID() || echo.User().Name != "echo" {
+		t.Fatalf("the bot's user: %v, %+v", bot, echo.User())
 	}
 
-	alice.say("echo hello")
+	alice.say("echo: hello")
 	var m wire.Message
 	select {
 	case m = <-heard:
@@ -1004,7 +1004,7 @@ func TestBot(t *testing.T) {
 	alice.expect("echo: you said hello")
 	reply := ada.expect(text("you said hello"))
 	replyTo, _ := params(reply)["reply_to"].(map[string]any)
-	if from(reply)["user_id"] != "echo" || replyTo["message_id"] != fmt.Sprint(m.MessageID) {
+	if from(reply)["user_id"] != echo.UserID() || replyTo["message_id"] != fmt.Sprint(m.MessageID) {
 		t.Fatalf("the bot's reply: %v", reply)
 	}
 
@@ -1037,12 +1037,16 @@ func TestBot(t *testing.T) {
 	}
 	probe.Close()
 
-	// A user_id that is someone else's in the room is not the bot's.
-	for _, taken := range []string{"echo", ada.you.UserID} {
-		if _, err := c.gateway.Server().Local(wire.LocalOptions{User: wire.User{UserID: taken}}); err == nil {
-			t.Fatalf("a Local connection signed in as %s, who is in the room", taken)
-		}
+	// A Local connection gets a user_id of the gateway's, and a guest's
+	// name when its name is taken.
+	twin, err := bot.Dial(c.gateway.Server(), wire.LocalOptions{User: wire.User{UserID: "echo", Name: "echo"}})
+	if err != nil {
+		t.Fatal(err)
 	}
+	if u := twin.User(); u.UserID == "echo" || u.UserID == echo.UserID() || !strings.HasPrefix(u.Name, "Guest") {
+		t.Fatalf("the second echo is %+v", u)
+	}
+	twin.Close()
 
 	// Closing the bot leaves the room.
 	echo.Close()

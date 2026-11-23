@@ -21,12 +21,12 @@ import (
 
 // newRouter returns a Router of ssh-chat's commands.
 func (g *Gateway) newRouter(registry chat.Commands) *commands.Router {
-	r := &commands.Router{Before: g.before, Fallback: g.forward}
+	// ssh-chat checks every command, and says what is wrong with it.
+	r := &commands.Router{Before: g.before, Fallback: g.forward, RunChecks: commands.CheckAll}
 	r.MustAdd(commands.Command{
-		Name:      "help",
-		Forms:     []commands.Form{{Help: "List the commands.", Group: commands.GroupAll}},
-		Run:       g.forward,
-		RunChecks: commands.CheckAll,
+		Name:  "help",
+		Forms: []commands.Form{{Help: "List the commands.", Group: commands.GroupAll}},
+		Run:   g.forward,
 	})
 	var listed []*chat.Command
 	for prefix, cmd := range registry {
@@ -55,8 +55,6 @@ func (g *Gateway) newRouter(registry chat.Commands) *commands.Router {
 			Name:  strings.TrimPrefix(cmd.Prefix, "/"),
 			Forms: []commands.Form{form},
 			Run:   g.forward,
-			// ssh-chat checks the command, and says what is wrong with it.
-			RunChecks: commands.CheckAll,
 		}); err != nil {
 			// A name the Router does not take still runs, unlisted.
 			continue
@@ -73,7 +71,8 @@ func (g *Gateway) isOp(_ context.Context, c *wire.Conn, _ string) bool {
 }
 
 // before checks a command line as ssh-chat checks a line of input, once
-// its mentions are written as names, which is the line that runs.
+// its mentions are written as names, which is the line that runs: the
+// call's Data.
 func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 	if call.Params.RoomID != "" && call.Params.RoomID != g.room {
 		return g.errOneRoom
@@ -86,9 +85,7 @@ func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 	if err := g.check(s, text); err != nil {
 		return err
 	}
-	body := *call.Params.Body
-	body.Text = text
-	call.Params.Body = &body
+	call.Data = text
 	_, call.Args, _ = commands.Parse(text)
 	return nil
 }
@@ -97,7 +94,8 @@ func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 // what it sends the member has been delivered.
 func (g *Gateway) forward(ctx context.Context, call *commands.Call) error {
 	s, _ := wire.DataOf[*session](call.Conn)
-	if err := g.start(s, call.Params.Body.Text); err != nil {
+	line, _ := call.Data.(string)
+	if err := g.start(s, line); err != nil {
 		return err
 	}
 	// The command has run; what it sends the member is still on its way,
