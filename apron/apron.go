@@ -116,9 +116,15 @@ type Gateway struct {
 	// afterAuth, a test's, runs once a sign-in's result is queued, before
 	// Auth returns.
 	afterAuth func(*wire.Conn)
+	// beforeDeliver, a test's, runs as a message from the room is about to
+	// be delivered to a connection, before deliver takes g.mu.
+	beforeDeliver func(*wire.Conn, message.Message)
 
 	mu      sync.Mutex
 	userIDs map[*message.User]string
+	// members are the users of the Apron connections that have joined the
+	// room, with their connections.
+	members map[*message.User]*wire.Conn
 	nextID  int
 	guests  int
 	log     logState
@@ -132,6 +138,7 @@ func New(config Config) *Gateway {
 		history: config.History,
 		version: config.Version,
 		userIDs: make(map[*message.User]string),
+		members: make(map[*message.User]*wire.Conn),
 		limiter: func() rateio.Limiter { return rateio.NewSimpleLimiter(3, 3*time.Second) },
 	}
 	if g.history == nil {
@@ -361,6 +368,9 @@ func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*m
 	}
 	joined <- true
 	c.SetData(&session{user: user, limit: g.limiter()})
+	g.mu.Lock()
+	g.members[user] = c
+	g.mu.Unlock()
 	if err := g.settle(ctx, user); err != nil {
 		return nil, err
 	}
@@ -394,6 +404,9 @@ func (g *Gateway) disconnected(c *wire.Conn) {
 	if !ok {
 		return
 	}
+	g.mu.Lock()
+	delete(g.members, s.user)
+	g.mu.Unlock()
 	_ = g.host.Leave(s.user)
 	s.user.Close()
 }
@@ -427,7 +440,12 @@ func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParam
 		posted = append(posted, m)
 		g.host.HandleMsg(m)
 	}
-	// The member's own copy is sent before the result (§1).
+	// The member's own copy is sent before the result (§1), and so is
+	// every other Apron member's, so that what the poster does once it has
+	// the result, such as tell another member, comes after the message.
+	if len(posted) > 0 {
+		g.flushOthers(ctx, s.user)
+	}
 	if flushErr := g.flush(ctx, s.user); err == nil {
 		err = flushErr
 	}
@@ -578,6 +596,44 @@ func (g *Gateway) flush(ctx context.Context, user *message.User) error {
 	}
 }
 
+// flushOthers waits until the queue of every Apron member but one has been
+// delivered up to now, as flush does a member's own. The room hands a
+// message to every member before HandleMsg returns, but only to their
+// queues, which goroutines of the gateway's deliver to the connections
+// later: until then, a member that has seen the poster's result may ask
+// for the room's history, and find the message there before it arrives
+// live (§1, §3.5.3). A member that goes away is not waited for.
+func (g *Gateway) flushOthers(ctx context.Context, except *message.User) {
+	type waiting struct {
+		b    *barrier
+		conn *wire.Conn
+	}
+	g.mu.Lock()
+	others := make(map[*message.User]*wire.Conn, len(g.members))
+	for user, conn := range g.members {
+		if user != except {
+			others[user] = conn
+		}
+	}
+	g.mu.Unlock()
+	// Under g.mu no more: delivering takes it.
+	var queued []waiting
+	for user, conn := range others {
+		b := &barrier{done: make(chan struct{})}
+		if user.Send(b) == nil {
+			queued = append(queued, waiting{b, conn})
+		}
+	}
+	for _, w := range queued {
+		select {
+		case <-w.b.done:
+		case <-w.conn.Done():
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 // deliver sends a message from the room to an Apron connection. It sends
 // under g.mu, as every other change the gateway tells clients of, so that
 // the user notifications a sync sends and the records keep their order.
@@ -585,6 +641,9 @@ func (g *Gateway) deliver(c *wire.Conn, m message.Message) {
 	if b, ok := m.(*barrier); ok {
 		close(b.done)
 		return
+	}
+	if g.beforeDeliver != nil {
+		g.beforeDeliver(c, m)
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()

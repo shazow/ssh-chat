@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	sshchat "github.com/shazow/ssh-chat"
+	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
 )
 
@@ -843,6 +844,34 @@ func TestSignInSeesChangesMadeDuringAuth(t *testing.T) {
 	update := params(ada.expect(userUpdate("new", opUser["user_id"].(string), "roles")))["new"].(map[string]any)
 	if roles, ok := update["roles"].([]any); !ok || len(roles) != 0 {
 		t.Fatalf("the change made during auth: %v", update)
+	}
+}
+
+// A message reaches every Apron member's connection before its poster has
+// the result, though the room hands it to the members' queues, which
+// goroutines deliver later: what a member asks once the poster has told it
+// of the message, such as for the history, comes after the message (§1,
+// §3.5.3).
+func TestMessageReachesOthersBeforeItsResult(t *testing.T) {
+	c := newChat(t)
+	// Bob's copy is held up, as on a busy machine, until a moment after the
+	// message is posted.
+	var bobID atomic.Value
+	release := make(chan struct{})
+	c.gateway.beforeDeliver = func(conn *wire.Conn, m message.Message) {
+		if p, ok := m.(message.PublicMsg); ok && p.Body() == "held up" && conn.UserID() == bobID.Load() {
+			<-release
+		}
+	}
+	ada, bob := c.apron("ada"), c.apron("bob")
+	bobID.Store(bob.you.UserID)
+	posted := ada.send("message", map[string]any{"room_id": DefaultRoom, "body": map[string]any{"text": "held up"}})
+	time.AfterFunc(200*time.Millisecond, func() { close(release) })
+	ada.expect(func(f map[string]any) bool { return f["id"] == posted })
+	asked := bob.send("me", map[string]any{})
+	first := bob.expect(func(f map[string]any) bool { return f["id"] == asked || text("held up")(f) })
+	if first["id"] == asked {
+		t.Fatal("bob's reply came before the message whose result ada had")
 	}
 }
 
