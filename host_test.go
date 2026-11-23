@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shazow/ssh-chat/chat/message"
 	"github.com/shazow/ssh-chat/sshd"
@@ -120,34 +121,42 @@ func TestHostNameCollision(t *testing.T) {
 	}
 	go host.Serve()
 
-	g := errgroup.Group{}
-
-	// First client
-	g.Go(func() error {
-		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			// second client
-			name := (<-newUsers).Name()
-			if name != "Guest1" {
-				t.Errorf("Second client did not get Guest1 name: %q", name)
-			}
-			return nil
-		})
-	})
-
-	// Second client
-	g.Go(func() error {
-		// first client
-		name := (<-newUsers).Name()
-		if name != "foo" {
-			t.Errorf("First client did not get foo name: %q", name)
+	// The test alone takes the joins, in order: a client may be ready
+	// before the server has joined its user.
+	joined := func() string {
+		t.Helper()
+		select {
+		case u := <-newUsers:
+			return u.Name()
+		case <-time.After(10 * time.Second):
+			t.Fatal("no user joined")
+			return ""
 		}
-		return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
-			return nil
+	}
+	done := make(chan struct{})
+	g := errgroup.Group{}
+	defer func() {
+		close(done)
+		if err := g.Wait(); err != nil {
+			t.Error(err)
+		}
+	}()
+	connect := func() {
+		g.Go(func() error {
+			return sshd.ConnectShell(s.Addr().String(), "foo", func(r io.Reader, w io.WriteCloser) error {
+				<-done
+				return nil
+			})
 		})
-	})
+	}
 
-	if err := g.Wait(); err != nil {
-		t.Error(err)
+	connect()
+	if name := joined(); name != "foo" {
+		t.Errorf("First client did not get foo name: %q", name)
+	}
+	connect()
+	if name := joined(); name != "Guest1" {
+		t.Errorf("Second client did not get Guest1 name: %q", name)
 	}
 }
 
