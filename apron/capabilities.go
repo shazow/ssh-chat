@@ -107,7 +107,7 @@ func (g *Gateway) RoomList(_ context.Context, _ *wire.Conn, p wire.RoomListParam
 	return reply.Send(result)
 }
 
-func (g *Gateway) RoomJoin(_ context.Context, _ *wire.Conn, p wire.RoomJoinParams, _ wire.Reply[wire.Empty]) error {
+func (g *Gateway) RoomJoin(_ context.Context, _ *wire.Conn, p wire.RoomJoinParams, _ wire.Reply[wire.OK]) error {
 	if p.RoomID != g.room {
 		return g.errOneRoom
 	}
@@ -119,11 +119,11 @@ func (g *Gateway) RoomJoin(_ context.Context, _ *wire.Conn, p wire.RoomJoinParam
 
 // RoomLeave of another user is an op's /kick; a connection leaves the room
 // by closing.
-func (g *Gateway) RoomLeave(ctx context.Context, c *wire.Conn, p wire.RoomLeaveParams, _ wire.Reply[wire.Empty]) error {
+func (g *Gateway) RoomLeave(ctx context.Context, c *wire.Conn, p wire.RoomLeaveParams, _ wire.Reply[wire.OK]) error {
 	if p.RoomID != g.room {
 		return g.errOneRoom
 	}
-	s, _ := wire.DataOf[*session](c)
+	s, _ := c.Data().(*session)
 	if p.UserID == "" || p.UserID == c.UserID() {
 		return wire.Denied("Everyone connected is in the room; disconnect to leave")
 	}
@@ -164,7 +164,7 @@ func (g *Gateway) History(_ context.Context, _ *wire.Conn, p wire.HistoryParams,
 // Status (§4.5): members are online, or away. ssh-chat has no
 // notifications to hold back, so mutes and idle reports change nothing.
 
-func (g *Gateway) Status(_ context.Context, c *wire.Conn, p wire.StatusParams, _ wire.Reply[wire.Empty]) error {
+func (g *Gateway) Status(_ context.Context, c *wire.Conn, p wire.StatusParams, _ wire.Reply[wire.OK]) error {
 	if p.RoomID != "" && p.RoomID != g.room {
 		return g.errOneRoom
 	}

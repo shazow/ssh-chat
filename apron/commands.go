@@ -22,7 +22,7 @@ import (
 // newRouter returns a Router of ssh-chat's commands.
 func (g *Gateway) newRouter(registry chat.Commands) *commands.Router {
 	// ssh-chat checks every command, and says what is wrong with it.
-	r := &commands.Router{Before: g.before, Fallback: g.forward, RunChecks: commands.CheckAll}
+	r := &commands.Router{Before: g.before, Fallback: g.forward, SkipChecks: commands.CheckAll}
 	r.MustAdd(commands.Command{
 		Name:  "help",
 		Forms: []commands.Form{{Help: "List the commands.", Group: commands.GroupAll}},
@@ -66,7 +66,7 @@ func (g *Gateway) newRouter(registry chat.Commands) *commands.Router {
 // isOp reports whether the connection's member is an op, who may use op
 // commands: in a listing, which is all the Router asks it for.
 func (g *Gateway) isOp(_ context.Context, c *wire.Conn, _ string) bool {
-	s, ok := wire.DataOf[*session](c)
+	s, ok := c.Data().(*session)
 	return ok && g.host.IsOp(s.user)
 }
 
@@ -77,7 +77,7 @@ func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 	if call.Params.RoomID != "" && call.Params.RoomID != g.room {
 		return g.errOneRoom
 	}
-	s, _ := wire.DataOf[*session](call.Conn)
+	s, _ := call.Conn.Data().(*session)
 	text := strings.TrimSpace(g.withNames(call.Params.Body))
 	if strings.ContainsAny(text, "\r\n") {
 		return wire.InvalidParams("A command is one line")
@@ -93,7 +93,7 @@ func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 // forward runs a command line as the member typed it, and answers once
 // what it sends the member has been delivered.
 func (g *Gateway) forward(ctx context.Context, call *commands.Call) error {
-	s, _ := wire.DataOf[*session](call.Conn)
+	s, _ := call.Conn.Data().(*session)
 	line, _ := call.Data.(string)
 	if err := g.start(s, line); err != nil {
 		return err

@@ -100,7 +100,7 @@ type Gateway struct {
 	version string
 	server  *wire.Server
 	clock   wire.Clock
-	ids     wire.IDs[msgKey]
+	ids     wire.MessageIDs[msgKey]
 	// room is the room_id of ssh-chat's room, and errOneRoom the error of a
 	// request that names another.
 	room       string
@@ -160,8 +160,7 @@ func New(config Config) *Gateway {
 		checkOrigin = wire.AnyOrigin
 	}
 	router := g.newRouter(g.host.Commands())
-	g.server = &wire.Server{
-		Backend:      g,
+	g.server = wire.NewServer(g, wire.Config{
 		Messages:     g,
 		Commands:     router,
 		Profiles:     g,
@@ -171,7 +170,7 @@ func New(config Config) *Gateway {
 		OnConnect:    g.connected,
 		OnDisconnect: g.disconnected,
 		CheckOrigin:  checkOrigin,
-	}
+	})
 	g.server.Handle(commands.ListMethod, router.ListHandler())
 	g.stop = make(chan struct{})
 	g.mu.Lock()
@@ -202,9 +201,9 @@ func (g *Gateway) watch() {
 	}
 }
 
-// Server is the gateway's protocol server, for its settings, which are
-// set before it serves its first connection, and for Local connections,
-// such as bots' (see the package documentation).
+// Server is the gateway's protocol server, made with its configuration
+// (wire.NewServer), for Local connections, such as bots' (see the package
+// documentation), and methods of a program's own (wire.Server.Handle).
 func (g *Gateway) Server() *wire.Server { return g.server }
 
 // Handler serves the WebSocket endpoint at /ws, and a line for browsers at
@@ -315,7 +314,7 @@ func (g *Gateway) connected(ctx context.Context, c *wire.Conn) error {
 	you, others, err := g.signInLocked(user)
 	if err == nil {
 		c.SetUser(you)
-		c.SendBatch(others...)
+		c.Send(others...)
 	}
 	return err
 }
@@ -401,7 +400,7 @@ func (g *Gateway) signInLocked(user *message.User) (wire.User, []wire.Frame, err
 }
 
 func (g *Gateway) disconnected(c *wire.Conn) {
-	s, ok := wire.DataOf[*session](c)
+	s, ok := c.Data().(*session)
 	if !ok {
 		return
 	}
@@ -421,8 +420,14 @@ func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParam
 			return wire.InvalidParams("reply_to names no recent message")
 		}
 	}
-	s, _ := wire.DataOf[*session](c)
+	s, _ := c.Data().(*session)
+	// Every new message's result has its message_id, so one ssh-chat
+	// would post nothing of, as with no text or only blank lines, is
+	// refused (§3.5.1).
 	lines := strings.Split(strings.ReplaceAll(g.withNames(p.Body), "\r\n", "\n"), "\n")
+	if !slices.ContainsFunc(lines, func(line string) bool { return strings.TrimRight(line, " \t") != "" }) {
+		return wire.InvalidParams("A new message needs text")
+	}
 	var posted []message.PublicMsg
 	var err error
 	for _, line := range lines {
@@ -481,7 +486,7 @@ func (g *Gateway) start(s *session, line string) error {
 }
 
 func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply wire.Reply[wire.CurrentUser]) error {
-	s, _ := wire.DataOf[*session](c)
+	s, _ := c.Data().(*session)
 	before := c.User()
 	if p.Name != nil && sanitize.Name(*p.Name) != s.user.Name() {
 		// ssh-chat's names are one short word; the server may normalize
@@ -655,7 +660,7 @@ func (g *Gateway) deliver(c *wire.Conn, user *message.User, last *wire.LogID, m 
 		from, to := g.userIDLocked(m.From()), g.userIDLocked(m.To())
 		c.Notify(wire.Message{
 			RoomID: g.room, From: wire.User{UserID: from, Name: m.From().Name()}, Body: &wire.Body{Text: m.Body()},
-			Ext: wire.MustExt("ssh-chat", map[string]any{"private": true, "to": to}),
+			Ext: wire.Ext{}.With("ssh-chat", map[string]any{"private": true, "to": to}),
 		})
 	case message.PublicMsg, *message.EmoteMsg, *message.AnnounceMsg:
 		g.syncLocked()

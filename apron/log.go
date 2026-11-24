@@ -36,7 +36,7 @@ type logState struct {
 	// replyTo holds what messages from Apron clients reply to, which
 	// ssh-chat has no place for, by message key, while they are in the
 	// buffer.
-	replyTo map[msgKey]*wire.Ref
+	replyTo map[msgKey]*wire.MessageRef
 	// known are the members as last seen, as current user objects: what
 	// every client has been told of them. departed are those who have left
 	// since, latest last, whose leave may not be announced yet.
@@ -51,7 +51,7 @@ type logState struct {
 
 func (l *logState) init() {
 	l.memberships = make(map[wire.LogID]*wire.Membership)
-	l.replyTo = make(map[msgKey]*wire.Ref)
+	l.replyTo = make(map[msgKey]*wire.MessageRef)
 	l.known = make(map[*message.User]wire.User)
 }
 
@@ -176,7 +176,7 @@ func (g *Gateway) syncLocked() {
 		if old, ok := g.log.known[member.User]; ok {
 			// A patch, which clears what was taken away, such as roles: []
 			// for a member who is no longer an op; nothing if unchanged.
-			g.server.PublishUser(old, u, nil)
+			g.server.PublishUser(wire.UserChange{Old: old, New: u}, nil)
 		}
 		known[member.User] = u
 		referenced[member.User] = true
@@ -243,7 +243,7 @@ func (g *Gateway) recordLocked(m message.Message, id wire.LogID) (wire.Record, b
 		return snapshot(g.recordedLocked(m.From()), &wire.Body{Text: m.Body()}, nil)
 	case *message.EmoteMsg:
 		return snapshot(g.recordedLocked(m.From()), &wire.Body{Text: "_" + m.Body() + "_", Format: wire.Markdown},
-			wire.MustExt("ssh-chat", map[string]any{"emote": true}))
+			wire.Ext{}.With("ssh-chat", map[string]any{"emote": true}))
 	case *message.AnnounceMsg:
 		if membership := g.log.memberships[id]; membership != nil {
 			return wire.Record{LogID: id, Membership: membership}, true
