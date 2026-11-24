@@ -515,8 +515,7 @@ func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply w
 		return errDisconnected
 	}
 	// The complete object, with what the request cleared (§3.3.2).
-	patch, _ := you.Patch(*before)
-	return reply.Send(wire.CurrentUser{User: you, Cleared: patch.Cleared})
+	return reply.Send(you.Complete(*before))
 }
 
 // check applies ssh-chat's limits on input.
@@ -525,7 +524,7 @@ func (g *Gateway) check(s *session, line string) error {
 		return wire.TooLarge(fmt.Sprintf("A line is at most %d bytes", maxInputLength))
 	}
 	if s.limit.Count(1) != nil {
-		return wire.RetryAfter("Rate limiting is in effect", 3)
+		return wire.RetryAfter("Rate limiting is in effect", 3*time.Second)
 	}
 	return nil
 }
