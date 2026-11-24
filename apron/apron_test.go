@@ -1109,3 +1109,19 @@ func TestBot(t *testing.T) {
 	echo.Close()
 	alice.expect("echo left")
 }
+
+// TestRateLimited checks that a member over ssh-chat's input limit is
+// told to retry after the limiter's window, in seconds.
+func TestRateLimited(t *testing.T) {
+	c := newChat(t)
+	c.gateway.limiter = func() rateio.Limiter { return rateio.NewSimpleLimiter(1, time.Minute) }
+	ada := c.apron("ada")
+	ada.ok("message", map[string]any{"body": map[string]any{"text": "one"}})
+	_, err := ada.call("message", map[string]any{"body": map[string]any{"text": "two"}})
+	if wire.CodeOf(err) != wire.CodeRetryAfter {
+		t.Fatalf("over the limit: %v, want retry_after", err)
+	}
+	if data, _ := err.Data.(map[string]any); data["retry_after"] != 3 && data["retry_after"] != float64(3) {
+		t.Errorf("retry_after: %#v, want 3", err.Data)
+	}
+}
