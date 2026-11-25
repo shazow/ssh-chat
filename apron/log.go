@@ -190,9 +190,12 @@ func (g *Gateway) syncLocked() {
 		g.log.departed = g.log.departed[extra:]
 	}
 	g.log.known = known
-	// A user_id is kept while its user is in the room or the log.
-	for user := range g.userIDs {
+	// A user_id is kept while its user is in the room or the log. One that
+	// goes is never given again, so wire forgets the requests it kept of it
+	// for deduplication (§1.2).
+	for user, id := range g.userIDs {
 		if !referenced[user] {
+			g.server.ForgetUser(id)
 			delete(g.userIDs, user)
 		}
 	}
