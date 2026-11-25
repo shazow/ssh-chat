@@ -1,7 +1,7 @@
 github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58 h1:MkpmYfld/S8kXqTYI68DfL8/hHXjHogL120Dy00TIxc=
 github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58/go.mod h1:YNfsMyWSs+h+PaYkxGeMVmVCX75Zj/pqdjbu12ciCYE=
-github.com/apron-chat/apron-server-go/wire v0.0.0-20261125050210-d4266de46e93 h1:xNVmJPijebVsF8Mg0xVzl0SwCLfEiL12PsNDauKHwAc=
-github.com/apron-chat/apron-server-go/wire v0.0.0-20261125050210-d4266de46e93/go.mod h1:gNW4u6aSRhOmcZFrawwo3gHz5GDHhP0qzk/XZHQDPu8=
+github.com/apron-chat/apron-server-go/apron v0.0.0-20261125181340-391040ea4537 h1:ZQg8o1FJcYRCyXlvgsBgAzbf1gYB4zlOZYC/OCWt2Sw=
+github.com/apron-chat/apron-server-go/apron v0.0.0-20261125181340-391040ea4537/go.mod h1:SI5+S4dCyK2CTQ4/YtFbd3dfFHtMGZJALSDkfkfh1a0=
 github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9g=
 github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/jessevdk/go-flags v1.5.0 h1:1jKYvbxEjfUl0fmqTCOfonvskHHXMjBySTLW4y9LFvc=

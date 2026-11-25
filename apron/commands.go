@@ -6,8 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/apron-chat/apron-server-go/wire"
-	"github.com/apron-chat/apron-server-go/wire/commands"
+	"github.com/apron-chat/apron-server-go/apron"
+	"github.com/apron-chat/apron-server-go/apron/server"
+	"github.com/apron-chat/apron-server-go/apron/server/commands"
 
 	"github.com/shazow/ssh-chat/chat"
 )
@@ -65,7 +66,7 @@ func (g *Gateway) newRouter(registry chat.Commands) *commands.Router {
 
 // isOp reports whether the connection's member is an op, who may use op
 // commands: in a listing, which is all the Router asks it for.
-func (g *Gateway) isOp(_ context.Context, c *wire.Conn, _ string) bool {
+func (g *Gateway) isOp(_ context.Context, c *server.Conn, _ string) bool {
 	s, ok := c.Data().(*session)
 	return ok && g.host.IsOp(s.user)
 }
@@ -80,7 +81,7 @@ func (g *Gateway) before(_ context.Context, call *commands.Call) error {
 	s, _ := call.Conn.Data().(*session)
 	text := strings.TrimSpace(g.withNames(call.Params.Body))
 	if strings.ContainsAny(text, "\r\n") {
-		return wire.InvalidParams("A command is one line")
+		return apron.InvalidParams("A command is one line")
 	}
 	if err := g.check(s, text); err != nil {
 		return err

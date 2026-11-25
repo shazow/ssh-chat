@@ -6,7 +6,9 @@
 // member of the Host's room, with an Identity like an SSH connection's, and
 // what it posts goes through the room's HandleMsg, so commands, mutes,
 // ignores, bans, ops, and rate limits apply to it as to anyone. The protocol
-// itself is package wire of github.com/apron-chat/apron-server-go.
+// itself is the apron module of github.com/apron-chat/apron-server-go: its
+// vocabulary is package apron, and the engine this serves on is package
+// server.
 //
 // What maps where:
 //
@@ -32,14 +34,16 @@
 // Sign-in is as a guest, only while ssh-chat lets in anonymous users: an
 // allowlist, a passphrase, or --require-pubkey keeps Apron clients out.
 //
-// A bot of the server's own, of package bot of wire, runs on the gateway's
-// Server: a Local connection is a member from the start, named as it asks,
-// or as a guest when the name is taken, with a user_id of the gateway's
-// own, which wire tells it of (Bot.User); its Data is the gateway's.
+// A bot (package apron/bot) runs on the gateway's Server: a Local
+// connection is a member from the start, named as it asks, or as a guest
+// when the name is taken, with a user_id of the gateway's own, which the
+// server tells it of (Bot.User); its Data is the gateway's.
 //
-//	echo, err := bot.Start(gateway.Server(), bot.Options{
-//		User: wire.User{UserID: "echo", Name: "echo"},
-//		OnMessage: func(ctx context.Context, b *bot.Bot, m wire.Message) { ... },
+//	local := func(_ context.Context, onFrame func(apron.Frame)) (bot.Conn, error) {
+//		return gateway.Server().Local(server.LocalOptions{User: apron.User{UserID: "echo", Name: "echo"}, OnFrame: onFrame})
+//	}
+//	echo, err := bot.Start(local, bot.Options{
+//		OnMessage: func(ctx context.Context, b *bot.Bot, m apron.Message) { ... },
 //	})
 package apron
 
@@ -53,8 +57,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apron-chat/apron-server-go/wire"
-	"github.com/apron-chat/apron-server-go/wire/commands"
+	"github.com/apron-chat/apron-server-go/apron"
+	"github.com/apron-chat/apron-server-go/apron/server"
+	"github.com/apron-chat/apron-server-go/apron/server/commands"
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
 
@@ -83,10 +88,10 @@ type Config struct {
 	// Version is ssh-chat's, for the server frame.
 	Version string
 	// Room is the room_id of ssh-chat's room: DefaultRoom when empty, and
-	// else a valid ID (wire.ValidID).
+	// else a valid ID (apron.ValidID).
 	Room string
 	// Origins are the web origins whose pages may open an Apron WebSocket,
-	// such as https://web.apron.chat, as patterns of wire.OriginPatterns;
+	// such as https://web.apron.chat, as patterns of server.OriginPatterns;
 	// "*" allows any. Clients that are not browsers send no origin, and
 	// are always let in.
 	Origins []string
@@ -98,16 +103,16 @@ type Gateway struct {
 	auth    *sshchat.Auth
 	history *message.History
 	version string
-	server  *wire.Server
-	clock   wire.Clock
-	ids     wire.MessageIDs[msgKey]
+	server  *server.Server
+	clock   server.Clock
+	ids     server.MessageIDs[msgKey]
 	// room is the room_id of ssh-chat's room, and errOneRoom the error of a
 	// request that names another.
 	room       string
-	errOneRoom *wire.Error
+	errOneRoom *apron.Error
 	// roomLogID is the log_id of the room's record, issued when the gateway
 	// started, before any message's.
-	roomLogID wire.LogID
+	roomLogID apron.LogID
 	// limiter makes each member's input limiter, as for SSH users.
 	limiter func() rateio.Limiter
 	// stop ends watch.
@@ -115,16 +120,16 @@ type Gateway struct {
 	stopOnce sync.Once
 	// afterAuth, a test's, runs once a sign-in's result is queued, before
 	// Auth returns.
-	afterAuth func(*wire.Conn)
+	afterAuth func(*server.Conn)
 	// beforeDeliver, a test's, runs as a message from the room is about to
 	// be delivered to a connection, before deliver takes g.mu.
-	beforeDeliver func(*wire.Conn, message.Message)
+	beforeDeliver func(*server.Conn, message.Message)
 
 	mu      sync.Mutex
 	userIDs map[*message.User]string
 	// members are the users of the Apron connections that have joined the
 	// room, with their connections.
-	members map[*message.User]*wire.Conn
+	members map[*message.User]*server.Conn
 	nextID  int
 	guests  int
 	log     logState
@@ -138,7 +143,7 @@ func New(config Config) *Gateway {
 		history: config.History,
 		version: config.Version,
 		userIDs: make(map[*message.User]string),
-		members: make(map[*message.User]*wire.Conn),
+		members: make(map[*message.User]*server.Conn),
 		limiter: func() rateio.Limiter { return rateio.NewSimpleLimiter(3, 3*time.Second) },
 	}
 	if g.history == nil {
@@ -148,19 +153,19 @@ func New(config Config) *Gateway {
 	if g.room == "" {
 		g.room = DefaultRoom
 	}
-	if !wire.ValidID(g.room) {
+	if !apron.ValidID(g.room) {
 		panic("apron: Config.Room is not a valid room_id: " + g.room)
 	}
-	g.errOneRoom = wire.InvalidParams("This server has one room, " + g.room)
+	g.errOneRoom = apron.InvalidParams("This server has one room, " + g.room)
 	g.ids.Clock = &g.clock
 	g.roomLogID = g.clock.Next()
 	g.log.init()
-	checkOrigin := wire.OriginPatterns(config.Origins...)
+	checkOrigin := server.OriginPatterns(config.Origins...)
 	if slices.Contains(config.Origins, "*") {
-		checkOrigin = wire.AnyOrigin
+		checkOrigin = server.AnyOrigin
 	}
 	router := g.newRouter(g.host.Commands())
-	g.server = wire.NewServer(g, wire.Config{
+	g.server = server.New(g, server.Config{
 		Messages:     g,
 		Commands:     router,
 		Profiles:     g,
@@ -202,9 +207,9 @@ func (g *Gateway) watch() {
 }
 
 // Server is the gateway's protocol server, made with its configuration
-// (wire.NewServer), for Local connections, such as bots' (see the package
-// documentation), and methods of a program's own (wire.Server.Handle).
-func (g *Gateway) Server() *wire.Server { return g.server }
+// (server.New), for Local connections, such as bots' (see the package
+// documentation), and methods of a program's own (server.Server.Handle).
+func (g *Gateway) Server() *server.Server { return g.server }
 
 // Handler serves the WebSocket endpoint at /ws, and a line for browsers at
 // /.
@@ -232,11 +237,11 @@ type session struct {
 
 // Errors the gateway answers with in more than one place.
 var (
-	errDisconnected = wire.Denied("Disconnected from the chat")
+	errDisconnected = apron.Denied("Disconnected from the chat")
 )
 
-func (g *Gateway) Hello(context.Context, *wire.Conn) wire.ServerInfo {
-	info := wire.ServerInfo{
+func (g *Gateway) Hello(context.Context, *server.Conn) apron.ServerInfo {
+	info := apron.ServerInfo{
 		Auth:  []string{"guest"},
 		Agent: "ssh-chat/" + g.version,
 		Title: "ssh-chat",
@@ -250,12 +255,12 @@ func (g *Gateway) Hello(context.Context, *wire.Conn) wire.ServerInfo {
 	return info
 }
 
-func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, reply wire.Reply[wire.AuthResult]) error {
+func (g *Gateway) Auth(ctx context.Context, c *server.Conn, p apron.AuthParams, reply server.Reply[apron.AuthResult]) error {
 	if c.Data() != nil {
-		return wire.Denied("Already signed in")
+		return apron.Denied("Already signed in")
 	}
 	if !g.auth.AllowAnonymous() {
-		return wire.Denied("This server lets in only SSH users with an allowed key")
+		return apron.Denied("This server lets in only SSH users with an allowed key")
 	}
 	client := "apron"
 	if p.Agent != "" {
@@ -263,7 +268,7 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 	}
 	conn := &connection{conn: c, name: p.Name, client: client}
 	if err := g.auth.CheckBans(conn.RemoteAddr(), nil, client); err != nil {
-		return wire.Denied("You are banned from this server")
+		return apron.Denied("You are banned from this server")
 	}
 	user, err := g.admit(ctx, c, conn)
 	if err != nil {
@@ -276,7 +281,7 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 	g.mu.Lock()
 	you, others, err := g.signInLocked(user)
 	if err == nil {
-		err = reply.Send(wire.AuthResult{You: &wire.CurrentUser{User: you}}, others...)
+		err = reply.Send(apron.AuthResult{You: &apron.CurrentUser{User: you}}, others...)
 	}
 	g.mu.Unlock()
 	if g.afterAuth != nil {
@@ -285,15 +290,15 @@ func (g *Gateway) Auth(ctx context.Context, c *wire.Conn, p wire.AuthParams, rep
 	return err
 }
 
-// connected admits a Local connection (wire.Server.Local), such as a bot's
-// (wire/bot), which opens signed in as the user it asks to be: its member
+// connected admits a Local connection (server.Server.Local), such as a bot's
+// (apron/bot), which opens signed in as the user it asks to be: its member
 // joins the room as an Apron client's does when it signs in, named as the
 // user is, or as a guest when the name is taken, and the connection
-// becomes the member's user, with the gateway's user_id, which wire tells
-// it of. The program that opens it is the server's own, so an allowlist or
+// becomes the member's user, with the gateway's user_id, which the server
+// tells it of. The program that opens it is the server's own, so an allowlist or
 // a ban does not keep it out. A network connection signs in with auth
 // instead.
-func (g *Gateway) connected(ctx context.Context, c *wire.Conn) error {
+func (g *Gateway) connected(ctx context.Context, c *server.Conn) error {
 	if !c.Local() {
 		return nil
 	}
@@ -306,8 +311,8 @@ func (g *Gateway) connected(ctx context.Context, c *wire.Conn) error {
 	if err != nil {
 		return err // OnDisconnect undoes what admit did.
 	}
-	// What a sign-in would send: frames sent while wire opens the
-	// connection go after its server frame, and the user, which wire
+	// What a sign-in would send: frames sent while the server opens the
+	// connection go after its server frame, and the user, which the server
 	// tells it of.
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -322,7 +327,7 @@ func (g *Gateway) connected(ctx context.Context, c *wire.Conn) error {
 // admit joins a connection's member to the room, as a guest when the name
 // it asks for is taken, and starts delivering to the connection what the
 // room sends the member.
-func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*message.User, error) {
+func (g *Gateway) admit(ctx context.Context, c *server.Conn, conn *connection) (*message.User, error) {
 	id := sshchat.NewIdentity(conn)
 	user := message.NewUser(id)
 	cfg := user.Config()
@@ -345,14 +350,14 @@ func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*m
 	delivered := make(chan struct{})
 	go func() {
 		defer close(delivered)
-		var last wire.LogID
+		var last apron.LogID
 		user.ConsumeFunc(func(m message.Message) { g.deliver(c, user, &last, m) })
 		if <-joined {
 			c.CloseWithError(errDisconnected)
 		}
 	}()
 	if motd := g.host.Motd(); motd != "" {
-		c.Notify(wire.Notice(g.room, plain(motd)))
+		c.Notify(apron.Notice(g.room, plain(motd)))
 	}
 	_, err := g.host.Join(user)
 	if err != nil {
@@ -364,7 +369,7 @@ func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*m
 		user.Close()
 		// Nothing more is delivered once Auth returns.
 		<-delivered
-		return nil, wire.Denied("Could not join the chat: " + err.Error())
+		return nil, apron.Denied("Could not join the chat: " + err.Error())
 	}
 	joined <- true
 	c.SetData(&session{user: user, limit: g.limiter()})
@@ -379,27 +384,27 @@ func (g *Gateway) admit(ctx context.Context, c *wire.Conn, conn *connection) (*m
 
 // signInLocked returns what a sign-in tells the member: its user object,
 // and the others in the room, with their statuses (§4.5.4).
-func (g *Gateway) signInLocked(user *message.User) (wire.User, []wire.Frame, error) {
+func (g *Gateway) signInLocked(user *message.User) (apron.User, []apron.Frame, error) {
 	g.syncLocked()
 	you, ok := g.log.known[user]
 	if !ok {
-		return wire.User{}, nil, errDisconnected
+		return apron.User{}, nil, errDisconnected
 	}
-	var others []wire.Frame
+	var others []apron.Frame
 	for _, other := range g.membersLocked() {
 		if other.UserID == you.UserID {
 			continue
 		}
-		frame, err := wire.Encode(wire.UserUpdate{New: &other})
+		frame, err := apron.Encode(apron.UserUpdate{New: &other})
 		if err != nil {
-			return wire.User{}, nil, err
+			return apron.User{}, nil, err
 		}
 		others = append(others, frame)
 	}
 	return you, others, nil
 }
 
-func (g *Gateway) disconnected(c *wire.Conn) {
+func (g *Gateway) disconnected(c *server.Conn) {
 	s, ok := c.Data().(*session)
 	if !ok {
 		return
@@ -411,13 +416,13 @@ func (g *Gateway) disconnected(c *wire.Conn) {
 	s.user.Close()
 }
 
-func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParams, reply wire.Reply[wire.MessageResult]) error {
+func (g *Gateway) Message(ctx context.Context, c *server.Conn, p apron.MessageParams, reply server.Reply[apron.MessageResult]) error {
 	if p.RoomID != "" && p.RoomID != g.room {
 		return g.errOneRoom
 	}
 	if p.ReplyTo != nil {
 		if _, ok := g.ids.Key(p.ReplyTo.MessageID); !ok {
-			return wire.InvalidParams("reply_to names no recent message")
+			return apron.InvalidParams("reply_to names no recent message")
 		}
 	}
 	s, _ := c.Data().(*session)
@@ -426,7 +431,7 @@ func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParam
 	// refused (§3.5.1).
 	lines := strings.Split(strings.ReplaceAll(g.withNames(p.Body), "\r\n", "\n"), "\n")
 	if !slices.ContainsFunc(lines, func(line string) bool { return strings.TrimRight(line, " \t") != "" }) {
-		return wire.InvalidParams("A new message needs text")
+		return apron.InvalidParams("A new message needs text")
 	}
 	var posted []message.PublicMsg
 	var err error
@@ -458,7 +463,7 @@ func (g *Gateway) Message(ctx context.Context, c *wire.Conn, p wire.MessageParam
 	if err != nil {
 		return err
 	}
-	var result wire.MessageResult
+	var result apron.MessageResult
 	if len(posted) > 0 {
 		result.MessageID, _ = g.ids.Lookup(keyOf(posted[0]))
 	}
@@ -479,13 +484,13 @@ func (g *Gateway) run(ctx context.Context, s *session, line string) error {
 func (g *Gateway) start(s *session, line string) error {
 	cmd, ok := message.NewPublicMsg(line, s.user).ParseCommand()
 	if !ok {
-		return wire.InvalidParams("A command starts with /")
+		return apron.InvalidParams("A command starts with /")
 	}
 	g.host.HandleMsg(cmd)
 	return nil
 }
 
-func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply wire.Reply[wire.CurrentUser]) error {
+func (g *Gateway) Me(ctx context.Context, c *server.Conn, p apron.MeParams, reply server.Reply[apron.CurrentUser]) error {
 	s, _ := c.Data().(*session)
 	before := c.User()
 	if p.Name != nil && sanitize.Name(*p.Name) != s.user.Name() {
@@ -493,7 +498,7 @@ func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply w
 		// what a client asks for (§1.1).
 		name := sanitize.Name(*p.Name)
 		if name == "" {
-			return wire.InvalidParams("A name needs letters, digits, '.', '_', or '-'")
+			return apron.InvalidParams("A name needs letters, digits, '.', '_', or '-'")
 		}
 		if err := g.run(ctx, s, "/nick "+name); err != nil {
 			return err
@@ -526,17 +531,17 @@ func (g *Gateway) Me(ctx context.Context, c *wire.Conn, p wire.MeParams, reply w
 // check applies ssh-chat's limits on input.
 func (g *Gateway) check(s *session, line string) error {
 	if len(line) > maxInputLength {
-		return wire.TooLarge(fmt.Sprintf("A line is at most %d bytes", maxInputLength))
+		return apron.TooLarge(fmt.Sprintf("A line is at most %d bytes", maxInputLength))
 	}
 	if s.limit.Count(1) != nil {
-		return wire.RetryAfter("Rate limiting is in effect", 3*time.Second)
+		return apron.RetryAfter("Rate limiting is in effect", 3*time.Second)
 	}
 	return nil
 }
 
 // withNames returns a body's text with each mention written as the
 // member's name, which is how SSH users see one another.
-func (g *Gateway) withNames(body *wire.Body) string {
+func (g *Gateway) withNames(body *apron.Body) string {
 	text := body.Text
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -611,10 +616,10 @@ func (g *Gateway) flush(ctx context.Context, user *message.User) error {
 func (g *Gateway) flushOthers(ctx context.Context, except *message.User) {
 	type waiting struct {
 		b    *barrier
-		conn *wire.Conn
+		conn *server.Conn
 	}
 	g.mu.Lock()
-	others := make(map[*message.User]*wire.Conn, len(g.members))
+	others := make(map[*message.User]*server.Conn, len(g.members))
 	for user, conn := range g.members {
 		if user != except {
 			others[user] = conn
@@ -643,7 +648,7 @@ func (g *Gateway) flushOthers(ctx context.Context, except *message.User) {
 // member's, which has had the records up to log_id last. It sends under
 // g.mu, as every other change the gateway tells clients of, so that the
 // user notifications a sync sends and the records keep their order.
-func (g *Gateway) deliver(c *wire.Conn, user *message.User, last *wire.LogID, m message.Message) {
+func (g *Gateway) deliver(c *server.Conn, user *message.User, last *apron.LogID, m message.Message) {
 	if b, ok := m.(*barrier); ok {
 		close(b.done)
 		return
@@ -655,12 +660,12 @@ func (g *Gateway) deliver(c *wire.Conn, user *message.User, last *wire.LogID, m 
 	defer g.mu.Unlock()
 	switch m := m.(type) {
 	case *message.SystemMsg:
-		c.Notify(wire.Notice(g.room, plain(m.Body())))
+		c.Notify(apron.Notice(g.room, plain(m.Body())))
 	case *message.PrivateMsg:
 		from, to := g.userIDLocked(m.From()), g.userIDLocked(m.To())
-		c.Notify(wire.Message{
-			RoomID: g.room, From: wire.User{UserID: from, Name: m.From().Name()}, Body: &wire.Body{Text: m.Body()},
-			Ext: wire.Ext{}.With("ssh-chat", map[string]any{"private": true, "to": to}),
+		c.Notify(apron.Message{
+			RoomID: g.room, From: apron.User{UserID: from, Name: m.From().Name()}, Body: &apron.Body{Text: m.Body()},
+			Ext: apron.Ext{}.With("ssh-chat", map[string]any{"private": true, "to": to}),
 		})
 	case message.PublicMsg, *message.EmoteMsg, *message.AnnounceMsg:
 		g.syncLocked()
@@ -687,12 +692,12 @@ func (g *Gateway) deliver(c *wire.Conn, user *message.User, last *wire.LogID, m 
 }
 
 // liveLocked sends a connection the record of a message, with log_id id.
-func (g *Gateway) liveLocked(c *wire.Conn, m message.Message, id wire.LogID) {
+func (g *Gateway) liveLocked(c *server.Conn, m message.Message, id apron.LogID) {
 	record, ok := g.recordLocked(m, id)
 	switch {
 	case !ok:
 	case record.Membership != nil:
-		c.Notify(wire.RoomUpdate{Memberships: []wire.Membership{*record.Membership}})
+		c.Notify(apron.RoomUpdate{Memberships: []apron.Membership{*record.Membership}})
 	default:
 		c.Notify(*record.Message)
 	}
@@ -718,7 +723,7 @@ func plain(text string) string {
 
 // connection is the sshd.Connection of an Apron client, for its Identity.
 type connection struct {
-	conn   *wire.Conn
+	conn   *server.Conn
 	name   string
 	client string
 }

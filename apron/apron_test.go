@@ -16,9 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apron-chat/apron-server-go/wire"
-	"github.com/apron-chat/apron-server-go/wire/bot"
-	"github.com/apron-chat/apron-server-go/wire/wiretest"
+	"github.com/apron-chat/apron-server-go/apron"
+	"github.com/apron-chat/apron-server-go/apron/aprontest"
+	"github.com/apron-chat/apron-server-go/apron/bot"
+	"github.com/apron-chat/apron-server-go/apron/server"
 	"github.com/coder/websocket"
 	"github.com/shazow/rateio"
 	"golang.org/x/crypto/ssh"
@@ -142,15 +143,15 @@ func (u *sshUser) expect(want string) string {
 // apronUser is an Apron client.
 type apronUser struct {
 	t      *testing.T
-	c      *wiretest.Client
-	you    wire.User
+	c      *aprontest.Client
+	you    apron.User
 	nextID atomic.Int64
 }
 
 // dial connects an Apron client, which has not signed in.
 func (c *testChat) dial() *apronUser {
 	c.t.Helper()
-	client, err := wiretest.Dial(within(c.t), c.wsURL)
+	client, err := aprontest.Dial(within(c.t), c.wsURL)
 	if err != nil {
 		c.t.Fatal(err)
 	}
@@ -178,10 +179,10 @@ func (u *apronUser) auth(name string) error {
 }
 
 // call sends a request and returns its result, or its error reply.
-func (u *apronUser) call(method string, params any) (map[string]any, *wire.Error) {
+func (u *apronUser) call(method string, params any) (map[string]any, *apron.Error) {
 	u.t.Helper()
 	raw, err := u.c.Call(within(u.t), method, params)
-	var e *wire.Error
+	var e *apron.Error
 	if errors.As(err, &e) {
 		return nil, e
 	} else if err != nil {
@@ -220,14 +221,14 @@ func (u *apronUser) send(method string, params any) string {
 // for later expects.
 func (u *apronUser) expect(match func(map[string]any) bool) map[string]any {
 	u.t.Helper()
-	f, err := u.c.Expect(within(u.t), func(f wiretest.Frame) bool { return match(object(f)) })
+	f, err := u.c.Expect(within(u.t), func(f aprontest.Frame) bool { return match(object(f)) })
 	if err != nil {
 		u.t.Fatalf("no matching apron frame: %v", err)
 	}
 	return object(f)
 }
 
-func object(f wiretest.Frame) map[string]any {
+func object(f aprontest.Frame) map[string]any {
 	var m map[string]any
 	_ = json.Unmarshal(f.Raw, &m)
 	return m
@@ -356,7 +357,7 @@ func TestCommandsAndPrivateMessages(t *testing.T) {
 
 	// Too much input is refused, as over SSH.
 	long := strings.Repeat("x", maxInputLength+1)
-	if _, e := ada.call("message", map[string]any{"body": map[string]any{"text": long}}); e == nil || e.Code != wire.CodeTooLarge {
+	if _, e := ada.call("message", map[string]any{"body": map[string]any{"text": long}}); e == nil || e.Code != apron.CodeTooLarge {
 		t.Fatalf("long line: %v", e)
 	}
 
@@ -413,17 +414,17 @@ func TestOpsAndPolicy(t *testing.T) {
 	// Kicked: the connection closes with an error.
 	op.say("/kick ada")
 	op.expect("ada was kicked by op")
-	f, err := ada.c.Expect(within(t), func(f wiretest.Frame) bool { return f.Error != nil && f.ID == "" && f.Method == "" })
-	if err != nil || f.Error.Code != wire.CodeDenied {
+	f, err := ada.c.Expect(within(t), func(f aprontest.Frame) bool { return f.Error != nil && f.ID == "" && f.Method == "" })
+	if err != nil || f.Error.Code != apron.CodeDenied {
 		t.Fatalf("no error frame before the kick closed the connection: %v %v", f.Error, err)
 	}
-	if _, err := ada.c.Expect(within(t), func(wiretest.Frame) bool { return false }); !errors.Is(err, wire.ErrClosed) {
+	if _, err := ada.c.Expect(within(t), func(aprontest.Frame) bool { return false }); !errors.Is(err, apron.ErrClosed) {
 		t.Fatalf("the connection stayed open after the kick: %v", err)
 	}
 
 	// Banned by address: a new Apron client from it is refused.
 	c.auth.BanAddr(&net.TCPAddr{IP: net.ParseIP("127.0.0.1")}, time.Minute)
-	if err := c.dial().auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+	if err := c.dial().auth("ada"); apron.CodeOf(err) != apron.CodeDenied {
 		t.Fatalf("banned client signed in: %v", err)
 	}
 }
@@ -431,7 +432,7 @@ func TestOpsAndPolicy(t *testing.T) {
 func TestAllowlistKeepsApronOut(t *testing.T) {
 	c := newChat(t)
 	c.auth.SetAllowlistMode(true)
-	if err := c.dial().auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+	if err := c.dial().auth("ada"); apron.CodeOf(err) != apron.CodeDenied {
 		t.Fatalf("allowlist: %v", err)
 	}
 }
@@ -511,7 +512,7 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 	bob := c.ssh("bob", nil)
 	bob.expect("bob joined")
 	bobUser := membership(ada, "bob", true)
-	if _, e := ada.call("room_leave", map[string]any{"room_id": DefaultRoom, "user_id": bobUser["user_id"]}); e == nil || e.Code != wire.CodeDenied {
+	if _, e := ada.call("room_leave", map[string]any{"room_id": DefaultRoom, "user_id": bobUser["user_id"]}); e == nil || e.Code != apron.CodeDenied {
 		t.Fatalf("a non-op removed someone: %v", e)
 	}
 	time.Sleep(3 * time.Second) // ssh-chat lets an SSH user say three lines in three seconds.
@@ -526,14 +527,14 @@ func TestRoomsHistoryAndStatus(t *testing.T) {
 		"room_set":   {"title": "another"},
 		"room_leave": {"room_id": DefaultRoom},
 	} {
-		if _, e := ada.call(method, p); e == nil || e.Code != wire.CodeDenied {
+		if _, e := ada.call(method, p); e == nil || e.Code != apron.CodeDenied {
 			t.Errorf("%s: %v", method, e)
 		}
 	}
-	if _, e := ada.call("room_set", map[string]any{"private": true}); e == nil || e.Code != wire.CodeUnsupported {
+	if _, e := ada.call("room_set", map[string]any{"private": true}); e == nil || e.Code != apron.CodeUnsupported {
 		t.Errorf("private room_set: %v", e)
 	}
-	if _, e := ada.call("room_join", map[string]any{"room_id": "elsewhere"}); e == nil || e.Code != wire.CodeInvalidParams {
+	if _, e := ada.call("room_join", map[string]any{"room_id": "elsewhere"}); e == nil || e.Code != apron.CodeInvalidParams {
 		t.Errorf("room_join of another room: %v", e)
 	}
 	ada.ok("room_join", map[string]any{"room_id": DefaultRoom})
@@ -826,7 +827,7 @@ func TestSignInSeesChangesMadeDuringAuth(t *testing.T) {
 	c.auth.Op(key.PublicKey(), 0)
 	op := c.ssh("op", key)
 	op.expect("op joined")
-	c.gateway.afterAuth = func(*wire.Conn) {
+	c.gateway.afterAuth = func(*server.Conn) {
 		member, _ := c.host.MemberByID("op")
 		member.SetOp(false)
 		c.gateway.mu.Lock()
@@ -858,7 +859,7 @@ func TestMessageReachesOthersBeforeItsResult(t *testing.T) {
 	// message is posted.
 	var bobID atomic.Value
 	release := make(chan struct{})
-	c.gateway.beforeDeliver = func(conn *wire.Conn, m message.Message) {
+	c.gateway.beforeDeliver = func(conn *server.Conn, m message.Message) {
 		if p, ok := m.(message.PublicMsg); ok && p.Body() == "held up" && conn.UserID() == bobID.Load() {
 			<-release
 		}
@@ -913,7 +914,7 @@ func TestFailedJoinLeavesTheConnectionOpen(t *testing.T) {
 	c.ssh("Guest1", nil).expect("Guest1 joined")
 
 	ada := c.dial()
-	if err := ada.auth("ada"); wire.CodeOf(err) != wire.CodeDenied {
+	if err := ada.auth("ada"); apron.CodeOf(err) != apron.CodeDenied {
 		t.Fatalf("auth with both names taken: %v", err)
 	}
 	// Nothing the failed sign-in sent goes out: not the welcome, not the
@@ -1009,15 +1010,15 @@ func TestCommandList(t *testing.T) {
 	bea.expect(text("must be op"))
 
 	// Every command line is checked as a line of input.
-	if _, e := ada.call("command", map[string]any{"body": map[string]any{"text": "/msg op " + strings.Repeat("x", maxInputLength)}}); e == nil || e.Code != wire.CodeTooLarge {
+	if _, e := ada.call("command", map[string]any{"body": map[string]any{"text": "/msg op " + strings.Repeat("x", maxInputLength)}}); e == nil || e.Code != apron.CodeTooLarge {
 		t.Fatalf("long command: %v", e)
 	}
-	if _, e := ada.call("command", map[string]any{"room_id": "elsewhere", "body": map[string]any{"text": "/names"}}); e == nil || e.Code != wire.CodeInvalidParams {
+	if _, e := ada.call("command", map[string]any{"room_id": "elsewhere", "body": map[string]any{"text": "/names"}}); e == nil || e.Code != apron.CodeInvalidParams {
 		t.Fatalf("another room: %v", e)
 	}
 }
 
-// A bot of wire/bot runs on the gateway as a member of the room, on a
+// A bot of apron/bot runs on the gateway as a member of the room, on a
 // Local connection: it sees what SSH users say, and they see its replies.
 func TestBot(t *testing.T) {
 	c := newChat(t)
@@ -1025,10 +1026,12 @@ func TestBot(t *testing.T) {
 	alice.expect("alice joined")
 	ada := c.apron("ada")
 
-	heard := make(chan wire.Message, 10)
-	echo, err := bot.Start(c.gateway.Server(), bot.Options{
-		User: wire.User{UserID: "echo", Name: "echo"},
-		OnMessage: func(ctx context.Context, b *bot.Bot, m wire.Message) {
+	heard := make(chan apron.Message, 10)
+	local := func(_ context.Context, onFrame func(apron.Frame)) (bot.Conn, error) {
+		return c.gateway.Server().Local(server.LocalOptions{User: apron.User{UserID: "echo", Name: "echo"}, OnFrame: onFrame})
+	}
+	echo, err := bot.Start(local, bot.Options{
+		OnMessage: func(ctx context.Context, b *bot.Bot, m apron.Message) {
 			said, ok := strings.CutPrefix(m.Body.Text, "echo: ")
 			if !b.Addressed(m) || !ok {
 				return
@@ -1049,7 +1052,7 @@ func TestBot(t *testing.T) {
 	}
 
 	alice.say("echo: hello")
-	var m wire.Message
+	var m apron.Message
 	select {
 	case m = <-heard:
 	case <-within(t).Done():
@@ -1069,13 +1072,13 @@ func TestBot(t *testing.T) {
 	// before the result; ssh-chat knows it as a local Apron client.
 	var notices []string
 	got := make(chan string, 10)
-	probe, err := bot.Dial(c.gateway.Server(), wire.LocalOptions{
-		User: wire.User{UserID: "probe", Name: "probe"},
-		OnFrame: func(f wire.Frame) {
+	probe, err := c.gateway.Server().Local(server.LocalOptions{
+		User: apron.User{UserID: "probe", Name: "probe"},
+		OnFrame: func(f apron.Frame) {
 			var n struct {
-				Params wire.Message `json:"params"`
+				Params apron.Message `json:"params"`
 			}
-			if json.Unmarshal(f, &n) == nil && n.Params.From.UserID == wire.Private.UserID {
+			if json.Unmarshal(f, &n) == nil && n.Params.From.UserID == apron.PrivateNotice.UserID {
 				got <- n.Params.Body.Text
 			}
 		},
@@ -1083,7 +1086,7 @@ func TestBot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := probe.Command(within(t), wire.CommandParams{Body: &wire.Body{Text: "/whois echo"}}); err != nil {
+	if _, err := probe.Call(within(t), "command", apron.CommandParams{Body: &apron.Body{Text: "/whois echo"}}); err != nil {
 		t.Fatal(err)
 	}
 	for len(got) > 0 {
@@ -1096,7 +1099,7 @@ func TestBot(t *testing.T) {
 
 	// A Local connection gets a user_id of the gateway's, and a guest's
 	// name when its name is taken.
-	twin, err := bot.Dial(c.gateway.Server(), wire.LocalOptions{User: wire.User{UserID: "echo", Name: "echo"}})
+	twin, err := c.gateway.Server().Local(server.LocalOptions{User: apron.User{UserID: "echo", Name: "echo"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1118,7 +1121,7 @@ func TestRateLimited(t *testing.T) {
 	ada := c.apron("ada")
 	ada.ok("message", map[string]any{"body": map[string]any{"text": "one"}})
 	_, err := ada.call("message", map[string]any{"body": map[string]any{"text": "two"}})
-	if wire.CodeOf(err) != wire.CodeRetryAfter {
+	if apron.CodeOf(err) != apron.CodeRetryAfter {
 		t.Fatalf("over the limit: %v, want retry_after", err)
 	}
 	if data, _ := err.Data.(map[string]any); data["retry_after"] != 3 && data["retry_after"] != float64(3) {
