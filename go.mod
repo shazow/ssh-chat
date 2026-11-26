@@ -2,7 +2,7 @@ module github.com/shazow/ssh-chat
 
 require (
 	github.com/alexcesaro/log v0.0.0-20150915221235-61e686294e58
-	github.com/apron-chat/apron-server-go/apron v0.0.0-20261126032953-511019f357ce
+	github.com/apron-chat/apron-server-go/apron v0.0.0-20261126182724-27796da5bc2a
 	github.com/coder/websocket v1.8.14
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/shazow/rateio v0.0.0-20200113175441-4461efc8bdc4
